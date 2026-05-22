@@ -151,6 +151,194 @@ export type Database = {
           },
         ];
       };
+      match_player_stats: {
+        Row: {
+          created_at: string;
+          goals: number;
+          id: string;
+          match_id: string;
+          notas: string | null;
+          player_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          goals?: number;
+          id?: string;
+          match_id: string;
+          notas?: string | null;
+          player_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          goals?: number;
+          id?: string;
+          match_id?: string;
+          notas?: string | null;
+          player_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "match_player_stats_match_id_fkey";
+            columns: ["match_id"];
+            isOneToOne: false;
+            referencedRelation: "matches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "match_player_stats_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      match_team_players: {
+        Row: {
+          assigned_position: Database["public"]["Enums"]["position_pref"] | null;
+          created_at: string;
+          id: string;
+          is_goalkeeper: boolean;
+          match_team_id: string;
+          player_id: string;
+        };
+        Insert: {
+          assigned_position?: Database["public"]["Enums"]["position_pref"] | null;
+          created_at?: string;
+          id?: string;
+          is_goalkeeper?: boolean;
+          match_team_id: string;
+          player_id: string;
+        };
+        Update: {
+          assigned_position?: Database["public"]["Enums"]["position_pref"] | null;
+          created_at?: string;
+          id?: string;
+          is_goalkeeper?: boolean;
+          match_team_id?: string;
+          player_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "match_team_players_match_team_id_fkey";
+            columns: ["match_team_id"];
+            isOneToOne: false;
+            referencedRelation: "match_teams";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "match_team_players_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      match_teams: {
+        Row: {
+          balance_meta: Json | null;
+          created_at: string;
+          id: string;
+          match_id: string;
+          team_label: Database["public"]["Enums"]["match_team_label"];
+          total_score: number | null;
+        };
+        Insert: {
+          balance_meta?: Json | null;
+          created_at?: string;
+          id?: string;
+          match_id: string;
+          team_label: Database["public"]["Enums"]["match_team_label"];
+          total_score?: number | null;
+        };
+        Update: {
+          balance_meta?: Json | null;
+          created_at?: string;
+          id?: string;
+          match_id?: string;
+          team_label?: Database["public"]["Enums"]["match_team_label"];
+          total_score?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "match_teams_match_id_fkey";
+            columns: ["match_id"];
+            isOneToOne: false;
+            referencedRelation: "matches";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      matches: {
+        Row: {
+          algorithm_version: string;
+          balance_snapshot: Json | null;
+          confirmed_at: string | null;
+          confirmed_by: string | null;
+          confirmed_with_warning: boolean;
+          convocatoria_id: string;
+          created_at: string;
+          fecha: string;
+          id: string;
+          notas: string | null;
+          score_team_a: number | null;
+          score_team_b: number | null;
+          updated_at: string;
+          winner: Database["public"]["Enums"]["match_winner"] | null;
+        };
+        Insert: {
+          algorithm_version?: string;
+          balance_snapshot?: Json | null;
+          confirmed_at?: string | null;
+          confirmed_by?: string | null;
+          confirmed_with_warning?: boolean;
+          convocatoria_id: string;
+          created_at?: string;
+          fecha: string;
+          id?: string;
+          notas?: string | null;
+          score_team_a?: number | null;
+          score_team_b?: number | null;
+          updated_at?: string;
+          winner?: Database["public"]["Enums"]["match_winner"] | null;
+        };
+        Update: {
+          algorithm_version?: string;
+          balance_snapshot?: Json | null;
+          confirmed_at?: string | null;
+          confirmed_by?: string | null;
+          confirmed_with_warning?: boolean;
+          convocatoria_id?: string;
+          created_at?: string;
+          fecha?: string;
+          id?: string;
+          notas?: string | null;
+          score_team_a?: number | null;
+          score_team_b?: number | null;
+          updated_at?: string;
+          winner?: Database["public"]["Enums"]["match_winner"] | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "matches_confirmed_by_fkey";
+            columns: ["confirmed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "matches_convocatoria_id_fkey";
+            columns: ["convocatoria_id"];
+            isOneToOne: false;
+            referencedRelation: "convocatorias";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       player_change_requests: {
         Row: {
           action_type: Database["public"]["Enums"]["change_request_action"];
@@ -349,6 +537,8 @@ export type Database = {
         | "reactivate_player";
       change_request_status: "pending" | "approved" | "rejected" | "flagged";
       convocatoria_status: "abierta" | "cerrada" | "jugada" | "cancelada";
+      match_team_label: "A" | "B";
+      match_winner: "a" | "b" | "empate";
       player_role_field: "arquero" | "jugador_campo" | "mixto";
       player_status: "pending" | "approved" | "inactive";
       position_pref: "defensor" | "mediocampista" | "delantero";
@@ -491,6 +681,8 @@ export const Constants = {
       ],
       change_request_status: ["pending", "approved", "rejected", "flagged"],
       convocatoria_status: ["abierta", "cerrada", "jugada", "cancelada"],
+      match_team_label: ["A", "B"],
+      match_winner: ["a", "b", "empate"],
       player_role_field: ["arquero", "jugador_campo", "mixto"],
       player_status: ["pending", "approved", "inactive"],
       position_pref: ["defensor", "mediocampista", "delantero"],
