@@ -205,10 +205,25 @@ select is(
   'approve: audit_log con action=approve_change_request'
 );
 
--- 6. P0004 invalid_status: intentar approve sobre uno ya approved.
+-- 6. P0004 invalid_status: usar un request DIFERENTE puesto en estado
+--    approved directamente con session var (no via la funcion approve, para
+--    que el row no quede tocado por el FOR UPDATE del test 5).
+select _seed_request(
+  '00000000-0000-0000-0000-0000000000c6'::uuid,
+  '00000000-0000-0000-0000-0000000000a1'::uuid
+);
+select _as_postgres();
+select set_config('app.applying_change_request', 'true', true);
+update public.player_change_requests
+   set status = 'approved',
+       reviewed_by = '00000000-0000-0000-0000-0000000000a2',
+       reviewed_at = now()
+ where id = '00000000-0000-0000-0000-0000000000c6';
+select set_config('app.applying_change_request', '', true);
+
 select _as('00000000-0000-0000-0000-0000000000a2');
 select is(
-  _try($$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c1'::uuid)$$),
+  _try($$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c6'::uuid)$$),
   'invalid_status',
   'approve: P0004 invalid_status sobre request ya approved'
 );
