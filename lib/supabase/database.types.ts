@@ -71,6 +71,86 @@ export type Database = {
           },
         ];
       };
+      convocatoria_players: {
+        Row: {
+          added_at: string;
+          attendance_status: Database["public"]["Enums"]["attendance_status"];
+          convocatoria_id: string;
+          id: string;
+          player_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          added_at?: string;
+          attendance_status?: Database["public"]["Enums"]["attendance_status"];
+          convocatoria_id: string;
+          id?: string;
+          player_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          added_at?: string;
+          attendance_status?: Database["public"]["Enums"]["attendance_status"];
+          convocatoria_id?: string;
+          id?: string;
+          player_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "convocatoria_players_convocatoria_id_fkey";
+            columns: ["convocatoria_id"];
+            isOneToOne: false;
+            referencedRelation: "convocatorias";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "convocatoria_players_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      convocatorias: {
+        Row: {
+          created_at: string;
+          created_by: string;
+          fecha: string;
+          id: string;
+          notas: string | null;
+          status: Database["public"]["Enums"]["convocatoria_status"];
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by: string;
+          fecha: string;
+          id?: string;
+          notas?: string | null;
+          status?: Database["public"]["Enums"]["convocatoria_status"];
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string;
+          fecha?: string;
+          id?: string;
+          notas?: string | null;
+          status?: Database["public"]["Enums"]["convocatoria_status"];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "convocatorias_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       player_change_requests: {
         Row: {
           action_type: Database["public"]["Enums"]["change_request_action"];
@@ -261,12 +341,14 @@ export type Database = {
       };
     };
     Enums: {
+      attendance_status: "pendiente" | "confirmado" | "declinado" | "ausente_sin_aviso";
       change_request_action:
         | "create_player"
         | "update_sensitive_fields"
         | "deactivate_player"
         | "reactivate_player";
       change_request_status: "pending" | "approved" | "rejected" | "flagged";
+      convocatoria_status: "abierta" | "cerrada" | "jugada" | "cancelada";
       player_role_field: "arquero" | "jugador_campo" | "mixto";
       player_status: "pending" | "approved" | "inactive";
       position_pref: "defensor" | "mediocampista" | "delantero";
@@ -400,6 +482,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      attendance_status: ["pendiente", "confirmado", "declinado", "ausente_sin_aviso"],
       change_request_action: [
         "create_player",
         "update_sensitive_fields",
@@ -407,6 +490,7 @@ export const Constants = {
         "reactivate_player",
       ],
       change_request_status: ["pending", "approved", "rejected", "flagged"],
+      convocatoria_status: ["abierta", "cerrada", "jugada", "cancelada"],
       player_role_field: ["arquero", "jugador_campo", "mixto"],
       player_status: ["pending", "approved", "inactive"],
       position_pref: ["defensor", "mediocampista", "delantero"],
