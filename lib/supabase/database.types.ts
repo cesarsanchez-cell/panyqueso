@@ -234,6 +234,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      approve_player_change_request: {
+        Args: { p_comment?: string; p_request_id: string };
+        Returns: undefined;
+      };
       compute_internal_score: {
         Args: {
           p_edad: number;
