@@ -50,3 +50,6 @@ jobs:
 
       - name: Run pgTAP tests
         run: supabase test db
+
+      - name: Manual P0004 invalid_status tests (psql-based)
+        run: bash scripts/test-p0004-invalid-status.sh

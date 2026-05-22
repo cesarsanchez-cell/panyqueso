@@ -42,10 +42,30 @@ los tests no contaminan la DB local entre corridas.
   auth_required, P0002 request_not_found, P0003 not_a_veedor, P0005
   cannot_*_own_request, P0007 stale_request y los happy paths principales.
 
-- `invalid_status_test.sql` — 2 asserts dedicados a P0004 invalid_status
-  (approve sobre approved, flag sobre flagged). Aislado en transaction
-  propio porque el row necesita estar en estado terminal sin pasar por
-  un UPDATE previo en el mismo transaction.
+### Tests manuales (P0004 invalid_status)
+
+`scripts/test-p0004-invalid-status.sh` cubre los dos negativos de
+`invalid_status`:
+
+- approve sobre request approved
+- flag sobre request flagged
+
+No usa pgTAP. Razon: la exception escapa del `EXCEPTION WHEN OTHERS` de
+cualquier wrapper PL/pgSQL (EXECUTE, PERFORM, BEGIN..EXCEPTION inline)
+cuando approve/flag hacen `FOR UPDATE` sobre un row en estado terminal.
+El bug es 100% reproducible en pg_prove 3.36 + pgtap.
+
+El script usa `psql` directo: cada conexion es un proceso aparte, sin
+EXCEPTION involucrada. Verifica que la llamada falle (exit code != 0)
+y que stderr contenga `invalid_status`.
+
+Para correrlo local (con supabase start ya activo):
+
+```bash
+bash scripts/test-p0004-invalid-status.sh
+```
+
+CI lo corre como step adicional despues de `supabase test db`.
 
 ### Bajar el stack
 
