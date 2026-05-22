@@ -33,6 +33,44 @@ export type Database = {
   };
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string;
+          actor_id: string | null;
+          created_at: string;
+          entity: string;
+          entity_id: string | null;
+          id: string;
+          payload: Json | null;
+        };
+        Insert: {
+          action: string;
+          actor_id?: string | null;
+          created_at?: string;
+          entity: string;
+          entity_id?: string | null;
+          id?: string;
+          payload?: Json | null;
+        };
+        Update: {
+          action?: string;
+          actor_id?: string | null;
+          created_at?: string;
+          entity?: string;
+          entity_id?: string | null;
+          id?: string;
+          payload?: Json | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_actor_id_fkey";
+            columns: ["actor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       player_change_requests: {
         Row: {
           action_type: Database["public"]["Enums"]["change_request_action"];
