@@ -6,12 +6,15 @@
 -- flag_player_change_request. Verifica error codes (P0001-P0008) y los
 -- happy paths principales.
 --
--- Setup:
---   - a1: admin (proponente).
---   - a2: veedor1 (reviewer principal).
---   - a3: veedor2 (usado para "cannot_approve_own": insertamos requests con
---     requested_by=a3 y veedor a3 intenta aprobarlos).
---   - Cada test crea su propio request fresco para aislar estado.
+-- Estrategia:
+--   - 1 admin + 2 veedores. El veedor2 se usa como proponente cuando hace
+--     falta testear cannot_*_own_request.
+--   - Cada test crea su propio request fresco via _seed_request para
+--     aislar estado entre asserts.
+--   - Para verificar exceptions usamos _try(query) -> SQLERRM en lugar
+--     de throws_like (que mostro comportamiento erratico en esta version
+--     de pgtap cuando se llama varias veces sobre la misma fila tras un
+--     UPDATE exitoso).
 -- ============================================================================
 
 begin;
@@ -81,9 +84,22 @@ begin
 end;
 $$;
 
--- Helper: crea un request fresco con un UUID dado. Bypass de RLS/triggers
--- via postgres + session var. Usamos cuando necesitamos un request con
--- requested_by especifico (por ejemplo para test cannot_*_own_request).
+-- Helper: ejecuta query y devuelve SQLERRM si falla, o 'NO_ERROR' si no.
+-- Reemplaza throws_like/throws_ok para tener un matcher deterministico.
+create or replace function _try(p_query text)
+returns text
+language plpgsql as $$
+begin
+  execute p_query;
+  return 'NO_ERROR';
+exception when others then
+  return sqlerrm;
+end;
+$$;
+
+-- Helper: crea un request fresco con un UUID dado, bypasseando el trigger
+-- de normalizacion (corremos como postgres con jwt vacio para que el
+-- trigger respete el requested_by enviado).
 create or replace function _seed_request(
   p_id uuid,
   p_requested_by uuid,
@@ -94,9 +110,6 @@ create or replace function _seed_request(
 language plpgsql as $$
 begin
   perform set_config('role', 'postgres', true);
-  -- El trigger normalize de FUT-24 sobreescribe requested_by con
-  -- auth.uid(). Si auth.uid() es null (no JWT), el trigger respeta el
-  -- valor enviado. Aseguramos esto limpiando el JWT.
   perform set_config('request.jwt.claims', '', true);
 
   insert into public.player_change_requests
@@ -119,7 +132,6 @@ select plan(20);
 -- ===========================================================================
 
 -- 1. P0001 auth_required: sin JWT.
-select _as_postgres();
 select _seed_request(
   '00000000-0000-0000-0000-0000000000c1'::uuid,
   '00000000-0000-0000-0000-0000000000a1'::uuid
@@ -127,26 +139,26 @@ select _seed_request(
 -- Caller authenticated sin sub: auth.uid() devuelve null.
 select set_config('role', 'authenticated', true);
 select set_config('request.jwt.claims', '{}'::text, true);
-select throws_like(
-  $$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c1'::uuid)$$,
-  '%auth_required%',
-  'approve: auth_required (P0001) cuando no hay auth.uid()'
+select is(
+  _try($$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c1'::uuid)$$),
+  'auth_required',
+  'approve: P0001 auth_required cuando no hay auth.uid()'
 );
 
 -- 2. P0002 request_not_found.
 select _as('00000000-0000-0000-0000-0000000000a2');
-select throws_like(
-  $$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000ff'::uuid)$$,
-  '%request_not_found%',
-  'approve: request_not_found (P0002)'
+select is(
+  _try($$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000ff'::uuid)$$),
+  'request_not_found',
+  'approve: P0002 request_not_found'
 );
 
 -- 3. P0003 not_a_veedor: admin intentando aprobar.
 select _as('00000000-0000-0000-0000-0000000000a1');
-select throws_like(
-  $$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c1'::uuid)$$,
-  '%not_a_veedor%',
-  'approve: not_a_veedor (P0003) si caller no es veedor'
+select is(
+  _try($$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c1'::uuid)$$),
+  'not_a_veedor',
+  'approve: P0003 not_a_veedor si caller no es veedor'
 );
 
 -- 4. P0005 cannot_approve_own_request: seed con requested_by=veedor2,
@@ -156,17 +168,17 @@ select _seed_request(
   '00000000-0000-0000-0000-0000000000a3'::uuid
 );
 select _as('00000000-0000-0000-0000-0000000000a3');
-select throws_like(
-  $$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c2'::uuid)$$,
-  '%cannot_approve_own_request%',
-  'approve: cannot_approve_own_request (P0005) si reviewer = requester'
+select is(
+  _try($$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c2'::uuid)$$),
+  'cannot_approve_own_request',
+  'approve: P0005 cannot_approve_own_request'
 );
 
 -- 5. Happy path update_sensitive_fields: veedor1 aprueba request del admin.
---    Verifica que player.technical cambia y el request queda approved.
 select _as('00000000-0000-0000-0000-0000000000a2');
-select lives_ok(
-  $$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c1'::uuid)$$,
+select is(
+  _try($$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c1'::uuid)$$),
+  'NO_ERROR',
   'approve update_sensitive_fields: lives_ok'
 );
 
@@ -195,10 +207,10 @@ select is(
 
 -- 6. P0004 invalid_status: intentar approve sobre uno ya approved.
 select _as('00000000-0000-0000-0000-0000000000a2');
-select throws_like(
-  $$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c1'::uuid)$$,
-  '%invalid_status%',
-  'approve: invalid_status (P0004) sobre request ya approved'
+select is(
+  _try($$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c1'::uuid)$$),
+  'invalid_status',
+  'approve: P0004 invalid_status sobre request ya approved'
 );
 
 -- 7. P0007 stale_request: seed con old_values que NO coincide con player.
@@ -211,10 +223,10 @@ select _seed_request(
   jsonb_build_object('technical', '99')
 );
 select _as('00000000-0000-0000-0000-0000000000a2');
-select throws_like(
-  $$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c3'::uuid)$$,
-  '%stale_request%',
-  'approve: stale_request (P0007) si old_values no coincide con player actual'
+select is(
+  _try($$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c3'::uuid)$$),
+  'stale_request',
+  'approve: P0007 stale_request si old_values no coincide'
 );
 
 -- 8. Happy path deactivate_player.
@@ -225,8 +237,9 @@ select _seed_request(
   '{}'::jsonb
 );
 select _as('00000000-0000-0000-0000-0000000000a2');
-select lives_ok(
-  $$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c4'::uuid)$$,
+select is(
+  _try($$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c4'::uuid)$$),
+  'NO_ERROR',
   'approve deactivate_player: lives_ok'
 );
 
@@ -247,26 +260,26 @@ select _seed_request(
   '00000000-0000-0000-0000-0000000000a1'::uuid
 );
 select _as('00000000-0000-0000-0000-0000000000a1');
-select throws_like(
-  $$select public.reject_player_change_request('00000000-0000-0000-0000-0000000000d1'::uuid)$$,
-  '%not_a_veedor%',
-  'reject: not_a_veedor (P0003)'
+select is(
+  _try($$select public.reject_player_change_request('00000000-0000-0000-0000-0000000000d1'::uuid)$$),
+  'not_a_veedor',
+  'reject: P0003 not_a_veedor'
 );
 
--- 10. P0005 cannot_reject_own_request: veedor2 reject sobre su propio.
+-- 10. P0005 cannot_reject_own_request.
 select _seed_request(
   '00000000-0000-0000-0000-0000000000d2'::uuid,
   '00000000-0000-0000-0000-0000000000a3'::uuid
 );
 select _as('00000000-0000-0000-0000-0000000000a3');
-select throws_like(
-  $$select public.reject_player_change_request('00000000-0000-0000-0000-0000000000d2'::uuid)$$,
-  '%cannot_reject_own_request%',
-  'reject: cannot_reject_own_request (P0005)'
+select is(
+  _try($$select public.reject_player_change_request('00000000-0000-0000-0000-0000000000d2'::uuid)$$),
+  'cannot_reject_own_request',
+  'reject: P0005 cannot_reject_own_request'
 );
 
--- 11. Happy path reject + audit + player intacto.
---     Antes del reject, reactivamos el player que el test 8 dejo inactive.
+-- 11. Happy path reject.
+--     Reactivamos el player que el test 8 dejo inactive (con session var).
 select _as_postgres();
 select set_config('app.applying_change_request', 'true', true);
 update public.players set status = 'approved'
@@ -274,8 +287,9 @@ update public.players set status = 'approved'
 select set_config('app.applying_change_request', '', true);
 
 select _as('00000000-0000-0000-0000-0000000000a2');
-select lives_ok(
-  $$select public.reject_player_change_request('00000000-0000-0000-0000-0000000000d1'::uuid, 'no convence')$$,
+select is(
+  _try($$select public.reject_player_change_request('00000000-0000-0000-0000-0000000000d1'::uuid, 'no convence')$$),
+  'NO_ERROR',
   'reject: lives_ok'
 );
 
@@ -297,10 +311,10 @@ select _seed_request(
   '00000000-0000-0000-0000-0000000000a3'::uuid
 );
 select _as('00000000-0000-0000-0000-0000000000a3');
-select throws_like(
-  $$select public.flag_player_change_request('00000000-0000-0000-0000-0000000000e1'::uuid)$$,
-  '%cannot_flag_own_request%',
-  'flag: cannot_flag_own_request (P0005)'
+select is(
+  _try($$select public.flag_player_change_request('00000000-0000-0000-0000-0000000000e1'::uuid)$$),
+  'cannot_flag_own_request',
+  'flag: P0005 cannot_flag_own_request'
 );
 
 -- 13. Happy path flag: pending -> flagged.
@@ -309,8 +323,9 @@ select _seed_request(
   '00000000-0000-0000-0000-0000000000a1'::uuid
 );
 select _as('00000000-0000-0000-0000-0000000000a2');
-select lives_ok(
-  $$select public.flag_player_change_request('00000000-0000-0000-0000-0000000000e2'::uuid, 'segunda opinion')$$,
+select is(
+  _try($$select public.flag_player_change_request('00000000-0000-0000-0000-0000000000e2'::uuid, 'segunda opinion')$$),
+  'NO_ERROR',
   'flag: lives_ok'
 );
 
@@ -324,10 +339,10 @@ select is(
 
 -- 14. P0004 invalid_status: intentar flag sobre uno ya flagged.
 select _as('00000000-0000-0000-0000-0000000000a2');
-select throws_like(
-  $$select public.flag_player_change_request('00000000-0000-0000-0000-0000000000e2'::uuid)$$,
-  '%invalid_status%',
-  'flag: invalid_status (P0004) sobre request ya flagged'
+select is(
+  _try($$select public.flag_player_change_request('00000000-0000-0000-0000-0000000000e2'::uuid)$$),
+  'invalid_status',
+  'flag: P0004 invalid_status sobre request ya flagged'
 );
 
 -- ---------------------------------------------------------------------------
