@@ -113,7 +113,12 @@ El `.npmrc` del repo tenía un path absoluto local que rompía CI en Ubuntu. Caf
 #### Audit Fase 0
 **Labels**: `fase-0`, `tipo:auditoria`, `gate`
 **Descripción**:
-Auditoría externa. NO-GO inicial por el bug del .npmrc; tras fix, GO para Fase 1.
+Auditoría externa con múltiples iteraciones. Bloqueantes resueltos en orden:
+1. `.npmrc` del repo con path absoluto local rompía CI → movido a `~/.npmrc` user-level.
+2. Workflow corría Node 20; pnpm 11 requiere Node ≥22.13 → subido a Node 22 vía `.nvmrc`.
+3. CI no validaba deploy readiness (solo typecheck + lint) → agregados `format:check` y `build`.
+
+GO para Fase 1 solo cuando todos esos majors cerraron.
 
 ---
 
