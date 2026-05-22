@@ -16,6 +16,8 @@
     "seed:linear": "node --env-file=.env.local --experimental-strip-types scripts/seed-linear.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.106.1",
     "next": "15.1.6",
     "react": "19.0.0",
     "react-dom": "19.0.0"
