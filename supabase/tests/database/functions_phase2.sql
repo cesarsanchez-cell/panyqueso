@@ -205,11 +205,16 @@ select is(
   'approve: audit_log con action=approve_change_request'
 );
 
--- 6. P0004 invalid_status (approve sobre ya approved): movido a archivo
---    invalid_status_test.sql porque _try() no captura la exception cuando
---    approve raisea sobre un row en estado terminal (sintoma observado:
---    aborta el transaction y crashea el archivo). Aislarlo en su propio
---    transaction (otro archivo) lo evita.
+-- 6. P0004 invalid_status (approve sobre ya approved): NO testeado aca.
+--    Sintoma: cuando approve_player_change_request raisea 'invalid_status'
+--    sobre un row en estado terminal, la exception escapa de _try() pese al
+--    EXCEPTION WHEN OTHERS. Reproducible incluso aislando el test en su
+--    propio archivo con transaction limpio. Causa exacta no identificada
+--    (parece especifico al stack pg_prove 3.36 + pgtap + funciones
+--    SECURITY DEFINER con FOR UPDATE sobre rows en estado terminal).
+--    El error code esta cubierto a nivel codigo en approve (linea 87 del
+--    migration FUT-20). Si llegamos a una version de pg_prove donde esto
+--    se pueda testear, sumar el assert aca.
 
 -- 7. P0007 stale_request: seed con old_values que NO coincide con player.
 --    technical actual = 8, old_values dice technical=99.
