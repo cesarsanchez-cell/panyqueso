@@ -103,8 +103,8 @@ begin
     (id, player_id, action_type, requested_by, proposed_values, old_values, reason)
   values
     (p_id,
-     case when p_action = 'create_player' then null
-          else '00000000-0000-0000-0000-0000000000b1' end,
+     case when p_action = 'create_player' then null::uuid
+          else '00000000-0000-0000-0000-0000000000b1'::uuid end,
      p_action, p_requested_by, p_proposed, p_old, 'test seed');
 end;
 $$;
