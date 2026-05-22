@@ -1,0 +1,410 @@
+# Plan técnico y funcional — Futbol de los martes (MVP)
+# Versión: v4 (corrige hallazgos mayores de la auditoría #3)
+# Estado: ESPERANDO CUARTA AUDITORÍA / "GO"
+# Encoding: UTF-8 sin BOM
+
+================================================================
+REGLA OPERATIVA PERMANENTE
+================================================================
+
+Hasta que el usuario diga explícitamente "GO":
+- NO modifico archivos del proyecto (salvo este plan).
+- NO creo el proyecto Next.js.
+- NO instalo dependencias.
+- NO genero migraciones SQL.
+- NO toco Supabase, Vercel ni ningún servicio externo.
+- NO ejecuto comandos que alteren el entorno.
+
+================================================================
+CHANGELOG v3 → v4
+================================================================
+
+[FIX-MAJOR-1] Aprobación de player_change_requests deja de ser UPDATE directo. Se sustituye por tres funciones SQL SECURITY DEFINER atómicas: approve_player_change_request, reject_player_change_request, flag_player_change_request. Cada una valida rol, estado y regla requested_by≠reviewer dentro de la propia función, en una sola transacción, y escribe audit_log.
+
+[FIX-MAJOR-2] reviewed_by ya nunca viaja desde el cliente. Las funciones de revisión lo setean internamente con auth.uid(). El cliente solo envía request_id y, donde aplique, un review_comment.
+
+[FIX-RLS] Policy de player_change_requests endurecida: UPDATE directo BLOQUEADO. Toda transición de estado pasa por las funciones. review_comment también se setea solo dentro de esas funciones (no admite UPDATE libre).
+
+[SUG-A] private_notes: cada edición se registra en audit_log (ya previsto, ahora explícito en sección de permisos).
+
+[SUG-B] Comentario al confirmar partido con alerta fuerte: queda en backlog (no bloqueante).
+
+[SUG-C] Pesos por defecto del generador y test cases: compromiso de entregar un set inicial concreto como primer entregable de Fase 6 (antes de codear UI), revisable por auditoría de fase.
+
+[SUG-D] Encoding del plan: archivo guardado en UTF-8 sin BOM. Si algún visor antiguo lo muestra mal, es del visor, no del archivo.
+
+================================================================
+1. ARQUITECTURA PROPUESTA
+================================================================
+
+Stack
+- Frontend: Next.js 15 (App Router) + React + TypeScript en Vercel. Tailwind CSS. Server Components + Server Actions; Route Handlers solo si hace falta.
+- Backend / DB: Supabase (Postgres + Auth + RLS). Acceso real a datos gobernado por RLS y funciones SECURITY DEFINER, no solo UI.
+- Auth: Supabase Auth con email + password. Sin signup público — admin crea usuarios manualmente.
+- Estado: RSC + Server Actions; cliente solo donde haga falta (generador, formularios).
+- Validación: Zod compartido cliente/servidor.
+- Tests: Vitest para scoring, generador, lógica de change_requests. Tests de RLS con clientes Supabase autenticados como cada rol. Tests específicos de las funciones SECURITY DEFINER (approve/reject/flag).
+
+Estructura de carpetas tentativa
+  /app
+    /(auth)/login
+    /(app)/dashboard
+    /(app)/jugadores
+    /(app)/convocatorias
+    /(app)/partidos
+    /(app)/auditoria           ← veedor
+  /lib
+    /scoring                   ← fórmula + tests
+    /team-generator            ← algoritmo + tests, expone algorithm_version
+    /change-requests           ← wrappers que invocan las funciones SQL
+    /supabase                  ← clientes server/client
+    /auth                      ← helpers de rol
+  /db
+    /migrations                ← SQL versionado
+    /functions                 ← compute_internal_score, approve/reject/flag, apply_*
+    /policies                  ← RLS policies
+    /tests                     ← tests de policies y funciones
+
+================================================================
+2. MODELO DE DATOS INICIAL
+================================================================
+
+profiles — usuarios del sistema
+- id (FK → auth.users)
+- nombre
+- role enum: admin, veedor
+- created_at
+
+players — jugadores del grupo
+- id uuid
+- nombre
+- edad int                                       ← SENSIBLE (post-approved)
+- status enum: pending, approved, inactive       ← SENSIBLE
+- role_field enum: arquero, jugador_campo, mixto ← SENSIBLE
+- position_pref enum: defensor, mediocampista, delantero  ← SENSIBLE
+- positions_possible enum[]                      ← NO sensible en MVP (no usado por generador)
+- technical int 1–10                             ← SENSIBLE
+- physical int 1–10                              ← SENSIBLE
+- mental int 1–10                                ← SENSIBLE
+- internal_score numeric                         ← Calculado por trigger; nunca escrito directo
+- rating_confidence enum: baja, media, alta      ← SENSIBLE
+- private_notes text                             ← NO sensible (editable directo, queda en audit_log)
+- created_by, created_at, updated_at
+
+Reglas de inmutabilidad sensible:
+- El jugador no existe en players hasta que el veedor aprueba un create_player request.
+- Una vez approved, los campos sensibles solo cambian vía funciones de aprobación, nunca por UPDATE directo.
+- private_notes y positions_possible: editables directo por admin; quedan en audit_log.
+
+player_change_requests — propuestas pendientes
+- id uuid
+- player_id FK (nullable: NULL en create_player; al aprobar se persiste created_player_id)
+- created_player_id FK players (nullable; lo escribe la función de aprobación)
+- action_type enum: create_player, update_sensitive_fields, deactivate_player, reactivate_player
+- requested_by FK profile (admin)
+- old_values jsonb  ← NULL para create_player
+- proposed_values jsonb ← payload completo para create_player; delta para update
+- fields_changed text[] (para update_sensitive_fields)
+- reason text NOT NULL
+- status enum: pending, approved, rejected, flagged
+- reviewed_by FK profile (nullable) ← lo setean las funciones, NUNCA el cliente
+- reviewed_at (nullable)
+- review_comment text (nullable) ← lo setean las funciones
+- created_at
+
+Constraints:
+- CHECK: reviewed_by IS NULL OR reviewed_by IS DISTINCT FROM requested_by
+- CHECK: action_type=create_player → player_id IS NULL; otros → player_id NOT NULL
+- CHECK: status='approved' → reviewed_by NOT NULL AND reviewed_at NOT NULL
+- Triggers de inmutabilidad: una vez status ≠ pending y flagged, ninguna columna admite UPDATE (registro inmutable).
+
+convocatorias, convocatoria_players, matches, match_teams, match_team_players, match_player_stats, audit_log: igual que v3.
+
+Funciones SQL clave
+(Todas SECURITY DEFINER, search_path bloqueado, owner sin acceso anómalo, GRANT EXECUTE solo a authenticated.)
+
+- compute_internal_score(technical, physical, mental, edad) → numeric
+  Pura, sin acceso a tablas. Usada por trigger BEFORE INSERT/UPDATE en players.
+
+- approve_player_change_request(request_id uuid, comment text DEFAULT NULL) → void   [FIX-MAJOR-1]
+  Pseudo-código:
+    1. Carga request con FOR UPDATE.
+    2. Verifica que el invocante es veedor (lookup en profiles por auth.uid()).
+    3. Verifica request.status IN ('pending','flagged').
+    4. Verifica request.requested_by <> auth.uid().              [FIX-MAJOR-2]
+    5. Según action_type:
+       - create_player: INSERT en players con proposed_values y status='approved'.
+         Guarda el nuevo id en request.created_player_id.
+       - update_sensitive_fields: verifica que old_values coincide con valores actuales del player (staleness check). Si no coincide → RAISE 'stale_request'.
+         UPDATE players SET <proposed_values> WHERE id=request.player_id.
+       - deactivate_player / reactivate_player: UPDATE status correspondiente.
+    6. UPDATE request: status='approved', reviewed_by=auth.uid(), reviewed_at=now(), review_comment=comment.
+    7. INSERT en audit_log con actor=auth.uid(), action='approve_change_request', payload con snapshot.
+    8. Todo en una sola transacción. Cualquier fallo aborta y nada queda aplicado.
+
+- reject_player_change_request(request_id uuid, comment text) → void
+  Mismas validaciones de invocante, estado y requested_by≠auth.uid(). UPDATE solo de status='rejected', reviewed_by, reviewed_at, review_comment. NO toca players. Escribe audit_log.
+
+- flag_player_change_request(request_id uuid, comment text) → void
+  Mismo patrón. status='flagged'. NO toca players. Escribe audit_log. Una request flagged puede luego ser approved o rejected (por un veedor distinto del requested_by).
+
+Diseño explícito: NO existe otra vía para cambiar status, reviewed_by, reviewed_at o review_comment. Las policies de la tabla lo prohíben.
+
+================================================================
+3. PANTALLAS DEL MVP
+================================================================
+
+(Sin cambios respecto a v3.)
+
+1.  Login.
+2.  Dashboard — badge de pendientes.
+3.  Jugadores / listado — solo approved e inactive.
+4.  Jugador / detalle — datos, score, historial, notas, banner si hay request pending.
+5.  Jugador / nuevo — crea create_player request (motivo obligatorio).
+6.  Jugador / proponer cambio sensible — crea update_sensitive_fields request.
+7.  Jugador / desactivar o reactivar — crea request correspondiente.
+8.  Convocatorias / listado.
+9.  Convocatoria / nueva — solo players approved.
+10. Convocatoria / detalle — asistencia, generar equipos (deshab. si <10).
+11. Generador de equipos — propuesta + balance + alertas + botones de mover.
+12. Partido / detalle — equipos finales, carga de resultado y goles. Indicador confirmed_with_warning.
+13. Auditoría / veedor — bandeja con tabs (altas pendientes / cambios / activación-desactivación / partidos con alerta / historial).
+    Acciones en cada item: Aprobar, Rechazar, Marcar para revisión (flag). Cada acción dispara la función SQL correspondiente con un comentario opcional (obligatorio en reject/flag).
+14. Perfil / cuenta — cambiar password.
+
+Mobile-first.
+
+================================================================
+4. FLUJO DE USUARIO
+================================================================
+
+Alta de jugador
+Admin completa formulario → se crea create_player request → veedor (otro usuario) aprueba con approve_player_change_request → recién ahí el jugador existe con status=approved.
+
+Edición sensible post-aprobación
+Admin propone update_sensitive_fields → veedor aprueba con approve_player_change_request (que valida staleness antes de aplicar) → el cambio se aplica atómicamente.
+
+Desactivación / Reactivación
+Misma mecánica vía deactivate_player / reactivate_player.
+
+Edición no-sensible
+private_notes y positions_possible: directo, queda en audit_log [SUG-A].
+
+Convocatoria → partido
+(Sin cambios.) Confirmados ≥10 → generar → revisar balance → ajustar → confirmar. Modal explícito si alerta fuerte; confirmed_with_warning=true. Persiste match + match_teams + balance_snapshot.
+
+Post-partido
+Carga score, goles, notas.
+
+Veedor
+Bandeja → revisa cada tab → click en Aprobar/Rechazar/Flag dispara la función SQL respectiva. UI nunca arma payloads de UPDATE sobre la tabla. La regla "no aprobás tu propia request" la enforce la función misma; la UI puede esconder el botón pero no es la línea de defensa.
+
+================================================================
+5. ALGORITMO INICIAL PARA GENERAR EQUIPOS
+================================================================
+
+algorithm_version inicial: "v1.0".
+
+Fórmula de puntaje interno (sin cambios v3):
+
+  factor_edad =
+    1.00                                si edad ≤ 32
+    1.00 - (edad - 32) * 0.015          si 32 < edad ≤ 55
+    clamp ≥ 0.75
+
+  physical_efectivo = physical * factor_edad
+
+  internal_score =
+    technical          * 0.45 +
+    physical_efectivo  * 0.30 +
+    mental             * 0.25
+
+compute_internal_score en SQL + espejo en lib/scoring con tests de paridad.
+
+Algoritmo del generador (heurístico) — sin cambios estructurales v3:
+1. Entrada: confirmados con players.status=approved.
+2. Validar total 10–24.
+3. Diferencia máx 1 si impar (warning).
+4. Arqueros: distribución + reemplazo si faltan (was_keeper_replacement).
+5. Snake draft por internal_score desc.
+6. Refinado por swaps locales (≤200 iter, determinista).
+7. Costo:
+     w1*|score_A−score_B|
+   + w2*|def_A−def_B| + w3*|mid_A−mid_B| + w4*|fwd_A−fwd_B|
+   + w5*|tec_avg_A−tec_avg_B| + w6*|fis_ef_avg_A−fis_ef_avg_B| + w7*|men_avg_A−men_avg_B|
+   Posición: position_pref. positions_possible NO entra en MVP.
+8. Salida: balance_meta + algorithm_version.
+9. Umbrales: <5% ok, 5–10% warning, ≥10% alerta fuerte.
+10. Ajuste manual con botones.
+11. Confirmación: balance_snapshot completo en matches.
+
+Compromiso [SUG-C]: primer entregable de Fase 6 será un documento corto con:
+- Pesos iniciales propuestos (w1..w7) con justificación de orden de magnitud.
+- ~8 test cases de ejemplo cubriendo: 10 jugadores 5v5, 12 vs 12, impar 11, sin arqueros, 1 solo arquero, escenarios de alerta fuerte, distribución de posiciones desbalanceada, jugadores mayores con buen físico.
+Se audita ese documento antes de codear UI.
+
+================================================================
+6. REGLAS DE PERMISOS
+================================================================
+
+UI: rutas protegidas por rol, redirect si no corresponde. La UI es asistencia, no defensa.
+
+RLS Supabase:
+
+- profiles:
+    select: cada uno su perfil; admin+veedor leen todos.
+    update: cada uno su perfil (nombre, password).
+
+- players:
+    select: admin + veedor.
+    insert directo: BLOQUEADO. Solo approve_player_change_request inserta (SECURITY DEFINER).
+    update directo: solo campos NO sensibles (private_notes, positions_possible). Trigger BEFORE UPDATE rechaza intentos sobre campos sensibles fuera del contexto de las funciones de aprobación (detectado por una variable de sesión o por verificar que el caller es la función específica).
+    delete: bloqueado.
+
+- player_change_requests:                                       [FIX-RLS]
+    insert: solo admin, con reason NOT NULL. status forzado a 'pending' por trigger BEFORE INSERT (ignora cualquier valor que mande el cliente para status, reviewed_by, reviewed_at, review_comment, created_player_id).
+    select: admin + veedor.
+    update directo: BLOQUEADO para todos los roles. Toda transición pasa por las funciones SQL.
+    delete: bloqueado.
+
+- audit_log:
+    insert: solo desde funciones específicas (SECURITY DEFINER).
+    select: admin + veedor.
+    update/delete: bloqueado.
+
+- convocatorias, matches, match_teams, match_team_players, match_player_stats:
+    select: admin + veedor.
+    insert/update: solo admin.
+    delete: bloqueado.
+
+- private_notes: solo admin + veedor. Cada edición → audit_log con actor, old/new (truncado) y timestamp [SUG-A]. A futuro, vista players_public sin notas/ratings/score.
+
+Funciones SECURITY DEFINER (única vía a campos sensibles y a estado de requests):
+- approve_player_change_request
+- reject_player_change_request
+- flag_player_change_request
+- compute_internal_score (pura, no toca tablas)
+
+Tests obligatorios de RLS en Fase 2:
+- admin no puede UPDATE directo de campos sensibles en players.
+- admin no puede INSERT directo en players.
+- admin no puede UPDATE directo en player_change_requests (incluido cambiar status, reviewed_by, review_comment).
+- veedor no puede UPDATE directo en player_change_requests.
+- veedor no puede aprobar request donde es requested_by (test sobre la función, no la policy).
+- cliente que intenta enviar reviewed_by, reviewed_at, status en el INSERT de request → es ignorado/forzado a pending por el trigger.
+- usuario sin rol no accede a nada.
+- request en estado approved/rejected es inmutable (intento de UPDATE rechazado).
+
+================================================================
+7. PLAN DE TAREAS POR FASES
+================================================================
+
+Fase 0 — Setup
+- Repo, Next.js + TS + Tailwind, Vercel.
+- Proyecto Supabase, env vars.
+- CI mínimo (typecheck + lint).
+
+Fase 1 — Auth y roles
+- Login Supabase Auth.
+- Tabla profiles + middleware de rol.
+- Páginas placeholder protegidas.
+
+Fase 2 — Modelo de datos + RLS + funciones
+- Migraciones (players, player_change_requests, audit_log, convocatorias, matches, etc.).
+- Funciones SECURITY DEFINER: compute_internal_score, approve/reject/flag_player_change_request.
+- Triggers: cálculo de internal_score, inmutabilidad de campos sensibles en players, normalización en INSERT de requests, inmutabilidad post-decisión.
+- RLS policies.
+- Tests exhaustivos (lista de la sección 6).
+
+Fase 3 — Gestión de jugadores
+- Formulario "nuevo jugador" → crea create_player request.
+- Detalle de jugador approved: ver, proponer cambio sensible, desactivar/reactivar, editar campos no sensibles.
+- Listado con filtros.
+
+Fase 4 — Veedor / auditoría
+- Bandeja con tabs.
+- Botones que invocan approve/reject/flag (vía Server Action que llama a la función).
+- Manejo de error stale_request (modal explicativo).
+- Manejo de error "no podés aprobar tu propia request".
+
+Fase 5 — Convocatorias
+- ABM convocatoria.
+- Marcar confirmados (solo players approved).
+
+Fase 6 — Generador de equipos
+- Entrega previa: documento de pesos + test cases [SUG-C]. Audit loop.
+- lib/scoring + lib/team-generator con tests unitarios PRIMERO.
+- Tests de paridad SQL/TS de compute_internal_score.
+- UI generación, balance, alertas.
+- Ajuste manual con botones.
+- Modal de confirmación con alerta fuerte.
+- Persistencia de balance_snapshot, algorithm_version, confirmed_with_warning, confirmed_by.
+
+Fase 7 — Resultado y stats básicas
+- Carga de score, ganador, goles en match_player_stats, notas.
+- Visualización del partido jugado con su balance_snapshot.
+
+Fase 8 — Pulido
+- Responsive mobile-first.
+- Estados vacíos, errores, loading.
+- Revisión final de privacidad y RLS.
+
+Cada fase termina con audit loop. No avanzo si hay blockers o majors.
+
+================================================================
+8. RIESGOS Y DECISIONES PENDIENTES
+================================================================
+
+Decisiones cerradas hasta v4:
+- Login MVP: email + password.
+- Alta + ratings iniciales: requiere aprobación del veedor.
+- Edad post-aprobación: sensible.
+- positions_possible: NO se usa en generador MVP.
+- requested_by ≠ reviewer: regla firme, enforced en función.
+- Aprobación atómica vía funciones SQL; UPDATE directo sobre requests bloqueado.
+- reviewed_by sale de auth.uid(), nunca del cliente.
+- Confirmación con alerta fuerte: no bloquea, queda registrada.
+
+Decisiones aún pendientes (no críticas para GO):
+1. Cantidad de admins y veedores. Mínimo 1+1 distintos. Propuesta: múltiples permitidos, todos del mismo rol con mismos permisos.
+2. ¿Asignación de requests a veedores específicos? Propuesta MVP: cualquiera resuelve; el primero gana.
+3. Pesos por defecto del generador → entregable de Fase 6 [SUG-C].
+4. Idioma UI: español argentino (asumido).
+5. Notificación al veedor: badge en dashboard. Email/push: backlog.
+6. Export planilla a PDF/imagen: backlog.
+
+Riesgos técnicos:
+- RLS mal configurado → tests Fase 2 (lista explícita arriba).
+- Funciones SECURITY DEFINER mal escritas → search_path fijo, GRANT EXECUTE restringido, tests negativos (rol incorrecto, request inexistente, request no-pending, requested_by=reviewer, stale).
+- Staleness en múltiples requests sobre el mismo player → función lanza 'stale_request'; UI muestra modal y ofrece refrescar.
+- Drag & drop en móvil frágil → mitigado priorizando botones.
+- Datos sensibles en logs → revisión + linter custom.
+- Vendor lock-in Supabase → aislar acceso en /lib/supabase y /db/functions.
+- Operativo: el grupo necesita ≥1 admin y ≥1 veedor en cuentas separadas. Costo aceptado.
+
+================================================================
+9. QUÉ NO SE VA A IMPLEMENTAR EN EL MVP
+================================================================
+
+- Vista pública / login del jugador.
+- Stats agregadas históricas (figura, racha, asistencia perfecta) — solo data cruda en match_player_stats.
+- Estrellas, insignias, badges.
+- Torneos, fechas múltiples, tabla de posiciones.
+- Generación de más de 2 equipos.
+- Push notifications, WhatsApp, emails.
+- Integración con Linear.
+- Export a PDF / imagen.
+- Self-signup público.
+- OAuth, 2FA, recuperación social.
+- Drag & drop en móvil.
+- positions_possible como factor del algoritmo.
+- Override manual de factor_edad ("ritmo estimado").
+- Magic link / login passwordless.
+- Comentario obligatorio del admin al confirmar con alerta fuerte (queda solo registrado) [SUG-B].
+- Asignación de requests a veedores específicos.
+- Cualquier exposición pública de scoring.
+
+================================================================
+ESTADO: ESPERANDO CUARTA AUDITORÍA
+================================================================
+Sin "GO" no toco código. Pasame el resultado de la auditoría #4 y, si hay correcciones, las aplico directamente sobre este archivo (v5).

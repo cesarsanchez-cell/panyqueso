@@ -1,0 +1,162 @@
+Antes de programar, quiero que trabajemos solo en etapa de planificación.
+
+Regla principal
+No modifiques archivos, no crees código y no implementes nada hasta que yo apruebe explícitamente el plan con un “GO”.
+
+Proyecto
+Quiero construir una web responsive para organizar partidos de fútbol entre amigos, llamada “Futbol de los martes”.
+
+Objetivo
+Crear una herramienta para que los equipos se armen de forma equilibrada, entretenida y leal, combinando jugadores según habilidades técnicas, físicas, mentales, edad, rol y posición.
+
+Stack deseado
+- Frontend responsive deployado en Vercel.
+- Supabase para autenticación y base de datos.
+- No usar Convex en el MVP salvo que se justifique muy bien.
+- Linear se usará para organizar tareas, pero no hace falta integrarlo todavía.
+
+Usuarios iniciales
+La primera versión solo será usada por
+- Admin
+- Veedor  controller
+
+No implementar todavía una vista para jugadores.
+
+Roles
+Admin
+- Crea jugadores.
+- Edita datos.
+- Aprueba ingresos.
+- Desactiva jugadores.
+- Crea convocatorias.
+- Genera equipos.
+- Ajusta manualmente equipos antes de confirmar.
+- Carga resultados y estadísticas básicas.
+
+Veedor  controller
+- Revisa calificaciones.
+- Valida cambios sensibles.
+- Ayuda a evitar abusos, favoritismos o desequilibrios subjetivos.
+- Puede aprobar, rechazar o marcar para revisión cambios importantes.
+
+Jugador
+- No entra al sistema en el MVP.
+- A futuro podrá ver datos positivos o neutrales.
+- Nunca debe poder editar su propia calificación.
+- Nunca debe ver defectos, notas privadas ni puntajes internos exactos.
+
+Datos del jugador
+- Nombre
+- Edad
+- Estado pendiente, aprobado, inactivo
+- Rol arquero, jugador de campo, mixto
+- Posición preferida defensor, mediocampista, delantero
+- Técnica 1 a 10
+- Estado físico 1 a 10
+- Mentalidad  compromiso  juego en equipo 1 a 10
+- Puntaje interno calculado
+- Confianza de calificación baja, media, alta
+- Notas privadas visibles solo para admin y veedor
+- Historial de cambios de calificación
+
+Importante
+La edad es un parámetro de rendimiento, pero no debe castigar automáticamente. Debe funcionar como ajuste suave combinado con estado físico y rendimiento observado.
+
+Puntaje interno
+Proponer una fórmula inicial simple, explícita y testeable. Por ejemplo
+
+puntaje_interno =
+  técnica  0.40 +
+  físico  0.30 +
+  mentalidad  0.20 +
+  ajuste_edad  0.10
+
+Pero podés proponer mejoras si están justificadas.
+
+Reglas de privacidad
+El puntaje interno sirve para equilibrar equipos, no para exponer ni comparar jugadores.
+No diseñar pantallas públicas con
+- Defectos
+- Puntajes internos exactos
+- Notas privadas
+- Comparaciones directas entre jugadores
+- Etiquetas negativas
+
+En una futura vista pública del jugador se podrán mostrar solo cosas positivas o neutrales
+- Partidos jugados
+- Partidos ganados
+- Goles
+- Asistencias
+- Estrellas o insignias
+- Figura del partido
+- Arquero destacado
+- Asistencia perfecta
+- Posición habitual
+
+Generador de equipos
+- Genera siempre 2 equipos en el MVP.
+- Cada equipo puede tener entre 5 y 12 jugadores.
+- Debe intentar que ambos equipos tengan la misma cantidad de jugadores.
+- Debe intentar poner al menos 1 arquero por equipo.
+- Si no hay suficientes arqueros, debe sugerir como reemplazo un jugador de campo de puntaje medio-alto.
+- Debe equilibrar
+  - Puntaje total
+  - Distribución de defensores, mediocampistas y delanteros
+  - Técnica
+  - Estado físico
+  - Mentalidad
+  - Edadrendimiento
+  - Arqueros
+- Debe mostrar un resumen de equilibrio
+  - Puntaje total de cada equipo
+  - Diferencia de puntaje
+  - Distribución por posiciones
+  - Estado de arqueros
+  - Alertas si hay desequilibrio
+- El admin debe poder mover jugadores manualmente entre equipos antes de confirmar.
+
+Historial
+Guardar
+- Fecha del partido
+- Equipos confirmados
+- Resultado
+- Ganadores
+- Goles por jugador cuando se carguen
+- Notas opcionales
+
+Preparar estructura futura para
+- Estadísticas
+- Estrellas
+- Torneos
+- Vista para jugadores
+
+Criterio de MVP
+Debe incluir
+- Login para admin y veedor
+- Gestión de jugadores
+- Calificaciones internas
+- Historial de cambios
+- Convocatorias
+- Generación de equipos
+- Ajuste manual de equipos
+- Confirmación de partido
+- Carga de resultado básico
+- Diseño responsive usable desde celular
+
+Forma de trabajo
+Quiero que primero me propongas un plan técnico y funcional, sin programar nada.
+
+Tu respuesta debe incluir
+1. Arquitectura propuesta.
+2. Modelo de datos inicial.
+3. Pantallas del MVP.
+4. Flujo de usuario.
+5. Algoritmo inicial para generar equipos.
+6. Reglas de permisos.
+7. Plan de tareas por fases.
+8. Riesgos o decisiones pendientes.
+9. Qué NO se va a implementar en el MVP.
+
+Después voy a pasar tu respuesta a un auditor antes de aprobar.
+Si el auditor detecta bloqueantes o problemas mayores, vas a corregir el plan.
+Solo cuando yo diga “GO”, recién ahí vas a poder programar.
