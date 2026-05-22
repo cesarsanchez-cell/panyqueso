@@ -33,6 +33,63 @@ export type Database = {
   };
   public: {
     Tables: {
+      players: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          edad: number;
+          id: string;
+          internal_score: number;
+          mental: number;
+          nombre: string;
+          physical: number;
+          position_pref: Database["public"]["Enums"]["position_pref"];
+          positions_possible: Database["public"]["Enums"]["position_pref"][];
+          private_notes: string | null;
+          rating_confidence: Database["public"]["Enums"]["rating_confidence"];
+          role_field: Database["public"]["Enums"]["player_role_field"];
+          status: Database["public"]["Enums"]["player_status"];
+          technical: number;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          edad: number;
+          id?: string;
+          internal_score?: number;
+          mental: number;
+          nombre: string;
+          physical: number;
+          position_pref: Database["public"]["Enums"]["position_pref"];
+          positions_possible?: Database["public"]["Enums"]["position_pref"][];
+          private_notes?: string | null;
+          rating_confidence?: Database["public"]["Enums"]["rating_confidence"];
+          role_field: Database["public"]["Enums"]["player_role_field"];
+          status?: Database["public"]["Enums"]["player_status"];
+          technical: number;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          edad?: number;
+          id?: string;
+          internal_score?: number;
+          mental?: number;
+          nombre?: string;
+          physical?: number;
+          position_pref?: Database["public"]["Enums"]["position_pref"];
+          positions_possible?: Database["public"]["Enums"]["position_pref"][];
+          private_notes?: string | null;
+          rating_confidence?: Database["public"]["Enums"]["rating_confidence"];
+          role_field?: Database["public"]["Enums"]["player_role_field"];
+          status?: Database["public"]["Enums"]["player_status"];
+          technical?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           created_at: string;
@@ -65,6 +122,10 @@ export type Database = {
       };
     };
     Enums: {
+      player_role_field: "arquero" | "jugador_campo" | "mixto";
+      player_status: "pending" | "approved" | "inactive";
+      position_pref: "defensor" | "mediocampista" | "delantero";
+      rating_confidence: "baja" | "media" | "alta";
       user_role: "admin" | "veedor";
     };
     CompositeTypes: {
@@ -194,6 +255,10 @@ export const Constants = {
   },
   public: {
     Enums: {
+      player_role_field: ["arquero", "jugador_campo", "mixto"],
+      player_status: ["pending", "approved", "inactive"],
+      position_pref: ["defensor", "mediocampista", "delantero"],
+      rating_confidence: ["baja", "media", "alta"],
       user_role: ["admin", "veedor"],
     },
   },
