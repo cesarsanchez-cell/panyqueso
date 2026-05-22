@@ -98,18 +98,23 @@ export default async function JugadoresPage({
       ) : (
         <ul className="divide-y divide-neutral-200 overflow-hidden rounded-lg border border-neutral-200 bg-white">
           {players.map((p) => (
-            <li key={p.id} className="flex items-center justify-between gap-4 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-neutral-900">{p.nombre}</p>
-                <p className="text-xs text-neutral-500">
-                  {p.edad} años · {ROLE_FIELD_LABEL[p.role_field]}
-                </p>
-              </div>
-              <span
-                className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[p.status]}`}
+            <li key={p.id}>
+              <Link
+                href={`/jugadores/${p.id}`}
+                className="flex items-center justify-between gap-4 px-4 py-3 transition hover:bg-neutral-50"
               >
-                {STATUS_LABEL[p.status]}
-              </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-neutral-900">{p.nombre}</p>
+                  <p className="text-xs text-neutral-500">
+                    {p.edad} años · {ROLE_FIELD_LABEL[p.role_field]}
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[p.status]}`}
+                >
+                  {STATUS_LABEL[p.status]}
+                </span>
+              </Link>
             </li>
           ))}
         </ul>
