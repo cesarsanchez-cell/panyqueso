@@ -37,11 +37,15 @@ los tests no contaminan la DB local entre corridas.
   normaliza status='pending' en INSERT, request approved es inmutable,
   usuario sin rol no accede a nada.
 
-- `functions_phase2.sql` — 20 asserts sobre las funciones SECURITY DEFINER
-  `approve` / `reject` / `flag` _player_change_request_. Cubre todos los
-  error codes (P0001 auth_required, P0002 request_not_found, P0003
-  not_a_veedor, P0004 invalid_status, P0005 cannot_*_own_request, P0007
-  stale_request) y los happy paths principales.
+- `functions_phase2.sql` — 18 asserts sobre las funciones SECURITY DEFINER
+  `approve` / `reject` / `flag` _player_change_request_. Cubre P0001
+  auth_required, P0002 request_not_found, P0003 not_a_veedor, P0005
+  cannot_*_own_request, P0007 stale_request y los happy paths principales.
+
+- `invalid_status_test.sql` — 2 asserts dedicados a P0004 invalid_status
+  (approve sobre approved, flag sobre flagged). Aislado en transaction
+  propio porque el row necesita estar en estado terminal sin pasar por
+  un UPDATE previo en el mismo transaction.
 
 ### Bajar el stack
 

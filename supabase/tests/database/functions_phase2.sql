@@ -161,7 +161,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- pgTAP plan
 -- ---------------------------------------------------------------------------
-select plan(20);
+select plan(18);
 
 -- ===========================================================================
 -- approve_player_change_request
@@ -241,29 +241,10 @@ select is(
   'approve: audit_log con action=approve_change_request'
 );
 
--- 6. P0004 invalid_status: approve sobre uno ya approved.
---    Usamos un row distinto al del happy path (c6) puesto en 'approved'
---    via session var, y _call_approve (PERFORM directo) en lugar de _try
---    (EXECUTE dinamico) para evitar el bug previo.
-select _seed_request(
-  '00000000-0000-0000-0000-0000000000c6'::uuid,
-  '00000000-0000-0000-0000-0000000000a1'::uuid
-);
-select _as_postgres();
-select set_config('app.applying_change_request', 'true', true);
-update public.player_change_requests
-   set status = 'approved',
-       reviewed_by = '00000000-0000-0000-0000-0000000000a2',
-       reviewed_at = now()
- where id = '00000000-0000-0000-0000-0000000000c6';
-select set_config('app.applying_change_request', '', true);
-
-select _as('00000000-0000-0000-0000-0000000000a2');
-select is(
-  _call_approve('00000000-0000-0000-0000-0000000000c6'::uuid),
-  'invalid_status',
-  'approve: P0004 invalid_status sobre request ya approved'
-);
+-- 6. P0004 invalid_status (approve sobre ya approved): se testea en el
+--    archivo invalid_status_test.sql porque el row necesita estar en
+--    estado terminal SIN haber pasado por un UPDATE previo en el mismo
+--    transaction (que dispara el bug observado).
 
 -- 7. P0007 stale_request: seed con old_values que NO coincide con player.
 --    technical actual = 8, old_values dice technical=99.
@@ -389,14 +370,8 @@ select is(
   'flag: request queda en status=flagged'
 );
 
--- 14. P0004 invalid_status: flag sobre uno ya flagged.
---     e2 quedo flagged en el test 13. Usamos _call_flag (PERFORM directo).
-select _as('00000000-0000-0000-0000-0000000000a2');
-select is(
-  _call_flag('00000000-0000-0000-0000-0000000000e2'::uuid),
-  'invalid_status',
-  'flag: P0004 invalid_status sobre request ya flagged'
-);
+-- 14. P0004 invalid_status (flag sobre ya flagged): se testea en
+--     invalid_status_test.sql (misma razon que test 6).
 
 -- ---------------------------------------------------------------------------
 select * from finish();
