@@ -33,6 +33,86 @@ export type Database = {
   };
   public: {
     Tables: {
+      player_change_requests: {
+        Row: {
+          action_type: Database["public"]["Enums"]["change_request_action"];
+          created_at: string;
+          created_player_id: string | null;
+          fields_changed: string[] | null;
+          id: string;
+          old_values: Json | null;
+          player_id: string | null;
+          proposed_values: Json;
+          reason: string;
+          requested_by: string;
+          review_comment: string | null;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+          status: Database["public"]["Enums"]["change_request_status"];
+        };
+        Insert: {
+          action_type: Database["public"]["Enums"]["change_request_action"];
+          created_at?: string;
+          created_player_id?: string | null;
+          fields_changed?: string[] | null;
+          id?: string;
+          old_values?: Json | null;
+          player_id?: string | null;
+          proposed_values: Json;
+          reason: string;
+          requested_by: string;
+          review_comment?: string | null;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          status?: Database["public"]["Enums"]["change_request_status"];
+        };
+        Update: {
+          action_type?: Database["public"]["Enums"]["change_request_action"];
+          created_at?: string;
+          created_player_id?: string | null;
+          fields_changed?: string[] | null;
+          id?: string;
+          old_values?: Json | null;
+          player_id?: string | null;
+          proposed_values?: Json;
+          reason?: string;
+          requested_by?: string;
+          review_comment?: string | null;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          status?: Database["public"]["Enums"]["change_request_status"];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "player_change_requests_created_player_id_fkey";
+            columns: ["created_player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "player_change_requests_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "player_change_requests_requested_by_fkey";
+            columns: ["requested_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "player_change_requests_reviewed_by_fkey";
+            columns: ["reviewed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       players: {
         Row: {
           created_at: string;
@@ -122,6 +202,12 @@ export type Database = {
       };
     };
     Enums: {
+      change_request_action:
+        | "create_player"
+        | "update_sensitive_fields"
+        | "deactivate_player"
+        | "reactivate_player";
+      change_request_status: "pending" | "approved" | "rejected" | "flagged";
       player_role_field: "arquero" | "jugador_campo" | "mixto";
       player_status: "pending" | "approved" | "inactive";
       position_pref: "defensor" | "mediocampista" | "delantero";
@@ -255,6 +341,13 @@ export const Constants = {
   },
   public: {
     Enums: {
+      change_request_action: [
+        "create_player",
+        "update_sensitive_fields",
+        "deactivate_player",
+        "reactivate_player",
+      ],
+      change_request_status: ["pending", "approved", "rejected", "flagged"],
       player_role_field: ["arquero", "jugador_campo", "mixto"],
       player_status: ["pending", "approved", "inactive"],
       position_pref: ["defensor", "mediocampista", "delantero"],
