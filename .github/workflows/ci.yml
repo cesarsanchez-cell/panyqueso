@@ -43,7 +43,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.101.0
 
       - name: Start Supabase local stack
         run: supabase start
