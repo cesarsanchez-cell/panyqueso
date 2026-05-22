@@ -234,6 +234,15 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      compute_internal_score: {
+        Args: {
+          p_edad: number;
+          p_mental: number;
+          p_physical: number;
+          p_technical: number;
+        };
+        Returns: number;
+      };
       current_user_role: {
         Args: never;
         Returns: Database["public"]["Enums"]["user_role"];
