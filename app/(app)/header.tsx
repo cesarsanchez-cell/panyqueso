@@ -9,6 +9,11 @@ const ROLE_LABEL: Record<NonNullable<AuthContext["profile"]["role"]>, string> = 
   veedor: "Veedor",
 };
 
+const NAV_ITEMS: { label: string; href: string }[] = [
+  { label: "Inicio", href: "/" },
+  { label: "Jugadores", href: "/jugadores" },
+];
+
 export function AppHeader({ ctx }: { ctx: AuthContext }) {
   const displayName = ctx.profile.nombre?.trim() || ctx.email;
   const roleLabel = ctx.profile.role ? ROLE_LABEL[ctx.profile.role] : null;
@@ -29,6 +34,17 @@ export function AppHeader({ ctx }: { ctx: AuthContext }) {
           </button>
         </form>
       </div>
+      <nav className="mx-auto flex max-w-5xl gap-1 overflow-x-auto border-t border-neutral-100 px-2 sm:px-4">
+        {NAV_ITEMS.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="shrink-0 px-3 py-2 text-sm font-medium text-neutral-600 transition hover:text-neutral-900"
+          >
+            {item.label}
+          </Link>
+        ))}
+      </nav>
     </header>
   );
 }
