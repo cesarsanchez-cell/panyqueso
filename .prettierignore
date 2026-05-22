@@ -6,3 +6,6 @@ coverage
 pnpm-lock.yaml
 plan.txt
 *.md
+supabase/.temp
+supabase/config.toml
+supabase/migrations
