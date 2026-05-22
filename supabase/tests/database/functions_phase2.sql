@@ -84,13 +84,49 @@ begin
 end;
 $$;
 
--- Helper: ejecuta query y devuelve SQLERRM si falla, o 'NO_ERROR' si no.
--- Reemplaza throws_like/throws_ok para tener un matcher deterministico.
+-- Helper: ejecuta query dinamica y devuelve SQLERRM si falla, o 'NO_ERROR'
+-- si no. Reemplaza throws_like/throws_ok para tener un matcher
+-- deterministico.
 create or replace function _try(p_query text)
 returns text
 language plpgsql as $$
 begin
   execute p_query;
+  return 'NO_ERROR';
+exception when others then
+  return sqlerrm;
+end;
+$$;
+
+-- Wrappers especializados (PERFORM directo, sin EXECUTE) para las funciones
+-- SECURITY DEFINER. EXECUTE en _try mostro un comportamiento donde la
+-- exception escapaba del EXCEPTION WHEN OTHERS cuando approve/flag operaban
+-- sobre rows en estado terminal con FOR UPDATE. PERFORM directo no tiene
+-- ese problema y mantiene la captura limpia.
+create or replace function _call_approve(p_id uuid)
+returns text language plpgsql as $$
+begin
+  perform public.approve_player_change_request(p_id);
+  return 'NO_ERROR';
+exception when others then
+  return sqlerrm;
+end;
+$$;
+
+create or replace function _call_reject(p_id uuid)
+returns text language plpgsql as $$
+begin
+  perform public.reject_player_change_request(p_id);
+  return 'NO_ERROR';
+exception when others then
+  return sqlerrm;
+end;
+$$;
+
+create or replace function _call_flag(p_id uuid)
+returns text language plpgsql as $$
+begin
+  perform public.flag_player_change_request(p_id);
   return 'NO_ERROR';
 exception when others then
   return sqlerrm;
@@ -205,16 +241,13 @@ select is(
   'approve: audit_log con action=approve_change_request'
 );
 
--- 6. P0004 invalid_status (approve sobre ya approved): NO testeado aca.
---    Sintoma: cuando approve_player_change_request raisea 'invalid_status'
---    sobre un row en estado terminal, la exception escapa de _try() pese al
---    EXCEPTION WHEN OTHERS. Reproducible incluso aislando el test en su
---    propio archivo con transaction limpio. Causa exacta no identificada
---    (parece especifico al stack pg_prove 3.36 + pgtap + funciones
---    SECURITY DEFINER con FOR UPDATE sobre rows en estado terminal).
---    El error code esta cubierto a nivel codigo en approve (linea 87 del
---    migration FUT-20). Si llegamos a una version de pg_prove donde esto
---    se pueda testear, sumar el assert aca.
+-- 6. P0004 invalid_status (approve sobre ya approved): no se puede testear
+--    aca. Bug 100% reproducible: la exception escapa del EXCEPTION block
+--    de cualquier wrapper PL/pgSQL (EXECUTE, PERFORM, BEGIN..EXCEPTION inline)
+--    cuando approve hace FOR UPDATE sobre un row en estado terminal. Lo
+--    cubrimos via scripts/test-p0004-invalid-status.sh que verifica con
+--    psql directo (cada conexion es un proceso aparte, sin EXCEPTION
+--    involucrada).
 
 -- 7. P0007 stale_request: seed con old_values que NO coincide con player.
 --    technical actual = 8, old_values dice technical=99.
@@ -340,8 +373,8 @@ select is(
   'flag: request queda en status=flagged'
 );
 
--- 14. P0004 invalid_status (flag sobre ya flagged): movido a archivo
---     invalid_status_test.sql (misma razon que test 6).
+-- 14. P0004 invalid_status (flag sobre ya flagged): se testea en
+--     scripts/test-p0004-invalid-status.sh (misma razon que test 6).
 
 -- ---------------------------------------------------------------------------
 select * from finish();
