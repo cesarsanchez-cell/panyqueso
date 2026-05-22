@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -13,41 +14,43 @@ export type AuthContext = {
 };
 
 /**
- * Devuelve el usuario autenticado y su profile.
- * Redirige a /login si no hay sesion.
- *
- * Pensado para usarse en Server Components, Server Actions y Route Handlers
- * que no requieren un rol especifico (ej. /perfil).
+ * Lee el usuario actual y su profile. Cacheado por render: multiples
+ * Server Components que llamen a requireUser/requireRole en el mismo
+ * request comparten el resultado (una sola query a profiles).
  */
-export async function requireUser(): Promise<AuthContext> {
+const getAuthContext = cache(async (): Promise<AuthContext | null> => {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) return null;
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
 
-  if (!profile) {
-    // Edge case: usuario en auth.users sin row en profiles. No deberia pasar
-    // porque el trigger on_auth_user_created lo crea. Si pasa, forzamos
-    // re-login para evitar estados inconsistentes.
-    redirect("/login");
-  }
+  if (!profile) return null;
 
   return {
     userId: user.id,
     email: user.email ?? "",
     profile,
   };
+});
+
+/**
+ * Devuelve { userId, email, profile } o redirige a /login.
+ * Para Server Components / Server Actions / Route Handlers que solo
+ * exigen sesion (no rol especifico).
+ */
+export async function requireUser(): Promise<AuthContext> {
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  return ctx;
 }
 
 /**
- * Asegura que el usuario autenticado tenga uno de los roles permitidos.
- * - Sin sesion -> /login.
+ * requireUser + chequea que profile.role este en la lista permitida.
+ * - Sin sesion -> /login (via requireUser).
  * - Sin rol asignado (NULL) o rol no permitido -> /sin-rol.
  *
  * Uso:
