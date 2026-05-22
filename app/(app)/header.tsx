@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { AuthContext } from "@/lib/auth/require-role";
 
 import { logout } from "./actions";
@@ -14,10 +16,10 @@ export function AppHeader({ ctx }: { ctx: AuthContext }) {
   return (
     <header className="border-b border-neutral-200 bg-white">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-        <div className="min-w-0">
+        <Link href="/perfil" className="min-w-0 rounded-md transition hover:opacity-80">
           <p className="truncate text-sm font-semibold text-neutral-900">{displayName}</p>
           {roleLabel ? <p className="text-xs text-neutral-500">{roleLabel}</p> : null}
-        </div>
+        </Link>
         <form action={logout}>
           <button
             type="submit"
