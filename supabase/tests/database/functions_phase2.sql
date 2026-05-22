@@ -125,7 +125,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- pgTAP plan
 -- ---------------------------------------------------------------------------
-select plan(20);
+select plan(18);
 
 -- ===========================================================================
 -- approve_player_change_request
@@ -205,28 +205,11 @@ select is(
   'approve: audit_log con action=approve_change_request'
 );
 
--- 6. P0004 invalid_status: usar un request DIFERENTE puesto en estado
---    approved directamente con session var (no via la funcion approve, para
---    que el row no quede tocado por el FOR UPDATE del test 5).
-select _seed_request(
-  '00000000-0000-0000-0000-0000000000c6'::uuid,
-  '00000000-0000-0000-0000-0000000000a1'::uuid
-);
-select _as_postgres();
-select set_config('app.applying_change_request', 'true', true);
-update public.player_change_requests
-   set status = 'approved',
-       reviewed_by = '00000000-0000-0000-0000-0000000000a2',
-       reviewed_at = now()
- where id = '00000000-0000-0000-0000-0000000000c6';
-select set_config('app.applying_change_request', '', true);
-
-select _as('00000000-0000-0000-0000-0000000000a2');
-select is(
-  _try($$select public.approve_player_change_request('00000000-0000-0000-0000-0000000000c6'::uuid)$$),
-  'invalid_status',
-  'approve: P0004 invalid_status sobre request ya approved'
-);
+-- 6. P0004 invalid_status (approve sobre ya approved): movido a archivo
+--    invalid_status_test.sql porque _try() no captura la exception cuando
+--    approve raisea sobre un row en estado terminal (sintoma observado:
+--    aborta el transaction y crashea el archivo). Aislarlo en su propio
+--    transaction (otro archivo) lo evita.
 
 -- 7. P0007 stale_request: seed con old_values que NO coincide con player.
 --    technical actual = 8, old_values dice technical=99.
@@ -352,13 +335,8 @@ select is(
   'flag: request queda en status=flagged'
 );
 
--- 14. P0004 invalid_status: intentar flag sobre uno ya flagged.
-select _as('00000000-0000-0000-0000-0000000000a2');
-select is(
-  _try($$select public.flag_player_change_request('00000000-0000-0000-0000-0000000000e2'::uuid)$$),
-  'invalid_status',
-  'flag: P0004 invalid_status sobre request ya flagged'
-);
+-- 14. P0004 invalid_status (flag sobre ya flagged): movido a archivo
+--     invalid_status_test.sql (misma razon que test 6).
 
 -- ---------------------------------------------------------------------------
 select * from finish();
