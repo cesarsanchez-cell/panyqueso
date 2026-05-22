@@ -251,6 +251,10 @@ export type Database = {
         Args: never;
         Returns: Database["public"]["Enums"]["user_role"];
       };
+      flag_player_change_request: {
+        Args: { p_comment?: string; p_request_id: string };
+        Returns: undefined;
+      };
       reject_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
