@@ -71,7 +71,7 @@ insert into public.players (
 ) values (
   '00000000-0000-0000-0000-0000000000b1',
   'Player Approved',
-  30, 'field_player', 'midfielder',
+  30, 'jugador_campo', 'mediocampista',
   6, 6, 6, 'approved',
   '00000000-0000-0000-0000-0000000000a1'
 );
@@ -198,7 +198,7 @@ select is(
 select _as('00000000-0000-0000-0000-0000000000a1');
 select throws_like(
   $$insert into public.players (nombre, edad, role_field, position_pref, technical, physical, mental, status)
-    values ('X', 25, 'field_player', 'forward', 5, 5, 5, 'approved')$$,
+    values ('X', 25, 'jugador_campo', 'delantero', 5, 5, 5, 'approved')$$,
   '%row-level security%',
   'admin NO puede INSERT directo en players'
 );
