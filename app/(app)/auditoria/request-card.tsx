@@ -5,7 +5,7 @@ import { useActionState } from "react";
 
 import type { Database, Json } from "@/lib/supabase/database.types";
 
-import { decideRequest, type DecisionState } from "./actions";
+import { decideRequest, type DecisionState, type StaleField } from "./actions";
 
 type ActionType = Database["public"]["Enums"]["change_request_action"];
 type Status = Database["public"]["Enums"]["change_request_status"];
@@ -230,6 +230,65 @@ export function RequestCard({
           ) : null}
         </form>
       ) : null}
+
+      {canDecide && !isOwn && state && "stale" in state && state.stale.length > 0 ? (
+        <StaleBlock requestId={request.id} stale={state.stale} formAction={formAction} />
+      ) : null}
     </article>
+  );
+}
+
+function buildStaleComment(stale: StaleField[]): string {
+  const lines = stale.map((s) => `- ${s.label}: era ${s.was}, ahora es ${s.now}`);
+  return `Stale request — el jugador cambió desde que se propuso esta solicitud:\n${lines.join("\n")}`;
+}
+
+function StaleBlock({
+  requestId,
+  stale,
+  formAction,
+}: {
+  requestId: string;
+  stale: StaleField[];
+  formAction: (formData: FormData) => void;
+}) {
+  const autoComment = buildStaleComment(stale);
+
+  return (
+    <div className="mt-4 space-y-3 rounded-md border border-orange-200 bg-orange-50 p-4">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-orange-900">
+          Conflicto: el jugador cambió
+        </p>
+        <p className="mt-1 text-sm text-orange-900">
+          Los siguientes campos difieren del valor que tenía el jugador cuando se propuso esta
+          solicitud. Revisá antes de decidir.
+        </p>
+      </div>
+
+      <ul className="space-y-1 text-sm">
+        {stale.map((s) => (
+          <li key={s.field} className="flex flex-wrap gap-2">
+            <span className="font-medium text-orange-900">{s.label}:</span>
+            <span className="text-orange-900">
+              era <span className="line-through opacity-70">{s.was}</span> · ahora{" "}
+              <span className="font-semibold">{s.now}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <form action={formAction}>
+        <input type="hidden" name="request_id" value={requestId} />
+        <input type="hidden" name="decision" value="reject" />
+        <input type="hidden" name="comment" value={autoComment} />
+        <button
+          type="submit"
+          className="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
+        >
+          Rechazar por stale
+        </button>
+      </form>
+    </div>
   );
 }
