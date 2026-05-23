@@ -117,8 +117,11 @@ export type Database = {
         Row: {
           created_at: string;
           created_by: string;
+          cupo_maximo: number;
           fecha: string;
+          hora: string;
           id: string;
+          lugar_id: string | null;
           notas: string | null;
           status: Database["public"]["Enums"]["convocatoria_status"];
           updated_at: string;
@@ -126,8 +129,11 @@ export type Database = {
         Insert: {
           created_at?: string;
           created_by: string;
+          cupo_maximo?: number;
           fecha: string;
+          hora?: string;
           id?: string;
+          lugar_id?: string | null;
           notas?: string | null;
           status?: Database["public"]["Enums"]["convocatoria_status"];
           updated_at?: string;
@@ -135,8 +141,11 @@ export type Database = {
         Update: {
           created_at?: string;
           created_by?: string;
+          cupo_maximo?: number;
           fecha?: string;
+          hora?: string;
           id?: string;
+          lugar_id?: string | null;
           notas?: string | null;
           status?: Database["public"]["Enums"]["convocatoria_status"];
           updated_at?: string;
@@ -144,6 +153,42 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "convocatorias_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "convocatorias_lugar_id_fkey";
+            columns: ["lugar_id"];
+            isOneToOne: false;
+            referencedRelation: "lugares";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      lugares: {
+        Row: {
+          created_at: string;
+          created_by: string;
+          id: string;
+          nombre: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by: string;
+          id?: string;
+          nombre: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string;
+          id?: string;
+          nombre?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "lugares_created_by_fkey";
             columns: ["created_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
