@@ -90,7 +90,5 @@ export async function createConvocatoria(
   }
 
   revalidatePath("/convocatorias");
-  // PR 3 va a crear /convocatorias/[id]. Por ahora redirigimos al listado
-  // con un flash + abrimos en el tab correcto (status='abierta').
-  redirect(`/convocatorias?created=${data.id}`);
+  redirect(`/convocatorias/${data.id}`);
 }

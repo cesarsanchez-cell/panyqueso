@@ -8,7 +8,7 @@ type Status = Database["public"]["Enums"]["convocatoria_status"];
 
 type Tab = Status | "todas";
 
-type SearchParams = { tab?: string; created?: string };
+type SearchParams = { tab?: string };
 
 const STATUS_LABEL: Record<Status, string> = {
   abierta: "Abierta",
@@ -65,7 +65,6 @@ export default async function ConvocatoriasPage({
 
   const sp = await searchParams;
   const tab = parseTab(sp.tab);
-  const showCreatedFlash = Boolean(sp.created);
 
   const supabase = await createClient();
 
@@ -108,12 +107,6 @@ export default async function ConvocatoriasPage({
         ) : null}
       </div>
 
-      {showCreatedFlash ? (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          Convocatoria creada. Próximamente vas a poder agregar jugadores desde el detalle.
-        </div>
-      ) : null}
-
       <nav
         aria-label="Filtros por estado"
         className="flex flex-wrap gap-1 border-b border-neutral-200"
@@ -145,25 +138,30 @@ export default async function ConvocatoriasPage({
       ) : (
         <ul className="space-y-3">
           {convocatorias.map((c) => (
-            <li key={c.id} className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-neutral-900">
-                    {formatDate(c.fecha)} · {formatHora(c.hora)}
-                  </p>
-                  <p className="mt-0.5 text-sm text-neutral-600">
-                    {c.lugar?.nombre ?? "Lugar sin definir"} · cupo {c.cupo_maximo}
-                  </p>
-                  {c.notas ? (
-                    <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{c.notas}</p>
-                  ) : null}
+            <li key={c.id}>
+              <Link
+                href={`/convocatorias/${c.id}`}
+                className="block rounded-lg border border-neutral-200 bg-white p-4 shadow-sm transition hover:border-neutral-300 hover:shadow-md"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-neutral-900">
+                      {formatDate(c.fecha)} · {formatHora(c.hora)}
+                    </p>
+                    <p className="mt-0.5 text-sm text-neutral-600">
+                      {c.lugar?.nombre ?? "Lugar sin definir"} · cupo {c.cupo_maximo}
+                    </p>
+                    {c.notas ? (
+                      <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{c.notas}</p>
+                    ) : null}
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[c.status]}`}
+                  >
+                    {STATUS_LABEL[c.status]}
+                  </span>
                 </div>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[c.status]}`}
-                >
-                  {STATUS_LABEL[c.status]}
-                </span>
-              </div>
+              </Link>
             </li>
           ))}
         </ul>
