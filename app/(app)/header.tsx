@@ -9,10 +9,20 @@ const ROLE_LABEL: Record<NonNullable<AuthContext["profile"]["role"]>, string> = 
   veedor: "Veedor",
 };
 
-const NAV_ITEMS: { label: string; href: string }[] = [
-  { label: "Inicio", href: "/" },
-  { label: "Jugadores", href: "/jugadores" },
-];
+const NAV_ITEMS_BY_ROLE: Record<
+  NonNullable<AuthContext["profile"]["role"]>,
+  { label: string; href: string }[]
+> = {
+  admin: [
+    { label: "Inicio", href: "/" },
+    { label: "Jugadores", href: "/jugadores" },
+  ],
+  veedor: [
+    { label: "Inicio", href: "/" },
+    { label: "Jugadores", href: "/jugadores" },
+    { label: "Auditoría", href: "/auditoria" },
+  ],
+};
 
 export function AppHeader({ ctx }: { ctx: AuthContext }) {
   const displayName = ctx.profile.nombre?.trim() || ctx.email;
@@ -35,7 +45,7 @@ export function AppHeader({ ctx }: { ctx: AuthContext }) {
         </form>
       </div>
       <nav className="mx-auto flex max-w-5xl gap-1 overflow-x-auto border-t border-neutral-100 px-2 sm:px-4">
-        {NAV_ITEMS.map((item) => (
+        {(ctx.profile.role ? NAV_ITEMS_BY_ROLE[ctx.profile.role] : []).map((item) => (
           <Link
             key={item.href}
             href={item.href}
