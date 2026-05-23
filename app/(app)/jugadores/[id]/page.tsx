@@ -132,6 +132,11 @@ export default async function JugadorDetallePage({
 
   const requests = requestsRaw ?? [];
   const pendingRequests = requests.filter((r) => r.status === "pending" || r.status === "flagged");
+  const hasPendingSensitive = pendingRequests.some(
+    (r) => r.action_type === "update_sensitive_fields",
+  );
+  const hasPendingDeactivate = pendingRequests.some((r) => r.action_type === "deactivate_player");
+  const hasPendingReactivate = pendingRequests.some((r) => r.action_type === "reactivate_player");
 
   return (
     <div className="space-y-6">
@@ -194,7 +199,7 @@ export default async function JugadorDetallePage({
         </div>
       ) : null}
 
-      {isAdmin && player.status === "approved" ? (
+      {isAdmin && player.status === "approved" && !hasPendingSensitive ? (
         <div>
           <Link
             href={`/jugadores/${player.id}/proponer-cambio`}
@@ -292,10 +297,10 @@ export default async function JugadorDetallePage({
         <Field label="Actualizado" value={formatDate(player.updated_at)} />
       </Section>
 
-      {isAdmin && player.status === "approved" ? (
+      {isAdmin && player.status === "approved" && !hasPendingDeactivate ? (
         <StatusChangeForm playerId={player.id} action="deactivate_player" />
       ) : null}
-      {isAdmin && player.status === "inactive" ? (
+      {isAdmin && player.status === "inactive" && !hasPendingReactivate ? (
         <StatusChangeForm playerId={player.id} action="reactivate_player" />
       ) : null}
     </div>
