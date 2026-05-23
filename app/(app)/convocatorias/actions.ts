@@ -23,7 +23,9 @@ function isYYYYMMDD(raw: string): boolean {
 }
 
 function isHHMM(raw: string): boolean {
-  return /^\d{2}:\d{2}$/.test(raw);
+  // 00..23 : 00..59. Rechaza valores fuera de rango tipo "99:99" que el
+  // regex previo \d{2}:\d{2} dejaba pasar.
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(raw);
 }
 
 export async function createConvocatoria(
