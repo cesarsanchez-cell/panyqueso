@@ -10,6 +10,7 @@ import { AddPlayerForm } from "./add-player-form";
 import { CancelForm } from "./cancel-form";
 import { ConfirmMatchForm } from "./confirm-match-form";
 import { ClearDraftForm, GenerateDraftForm, PromoteToGKForm, SwapPlayerForm } from "./draft-forms";
+import { GoalsForm, type GoalsFormTeam } from "./goals-form";
 import { RemovePlayerForm } from "./remove-player-form";
 import { ResultForm } from "./result-form";
 
@@ -161,6 +162,20 @@ export default async function ConvocatoriaDetallePage({
   // cargamos matches + match_teams + match_team_players para renderizar la
   // vista oficial del partido (no del draft).
   const match = isClosed || isPlayed ? await loadMatch(supabase, id) : null;
+
+  // Stats de goles por jugador (Fase 7 PR 2). Solo si hay match.
+  let goalsByPlayerId: Record<string, number> = {};
+  if (match) {
+    const { data: statsRows, error: statsErr } = await supabase
+      .from("match_player_stats")
+      .select("player_id, goals")
+      .eq("match_id", match.id);
+
+    if (statsErr) {
+      throw new Error(`No se pudieron cargar los goles: ${statsErr.message}`);
+    }
+    goalsByPlayerId = Object.fromEntries((statsRows ?? []).map((r) => [r.player_id, r.goals]));
+  }
 
   // Selector: solo se muestra si admin + abierta. Carga players approved
   // filtrados por searchParams, excluyendo los ya convocados.
@@ -401,6 +416,7 @@ export default async function ConvocatoriaDetallePage({
           convocatoriaId={convocatoria.id}
           isAdmin={isAdmin}
           isPlayed={isPlayed}
+          goalsByPlayerId={goalsByPlayerId}
         />
       ) : null}
 
@@ -497,14 +513,26 @@ function MatchSection({
   convocatoriaId,
   isAdmin,
   isPlayed,
+  goalsByPlayerId,
 }: {
   match: MatchData;
   convocatoriaId: string;
   isAdmin: boolean;
   isPlayed: boolean;
+  goalsByPlayerId: Record<string, number>;
 }) {
   const hasResult = match.score_team_a !== null && match.score_team_b !== null;
   const teams = [...(match.teams ?? [])].sort((a, b) => a.team_label.localeCompare(b.team_label));
+
+  const goalsFormTeams: GoalsFormTeam[] = teams.map((t) => ({
+    label: t.team_label,
+    score: t.team_label === "A" ? match.score_team_a : match.score_team_b,
+    players: (t.players ?? []).flatMap((mtp) => {
+      const p = mtp.player;
+      if (!p) return [];
+      return [{ playerId: p.id, nombre: p.nombre, isGoalkeeper: mtp.is_goalkeeper }];
+    }),
+  }));
 
   return (
     <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
@@ -564,9 +592,23 @@ function MatchSection({
         </div>
       ) : null}
 
-      {/* isPlayed referenciado solo para futuras secciones (PR 2 de Fase 7
-          va a usar este flag para habilitar inputs de goles por jugador). */}
-      <span hidden>{isPlayed ? "1" : "0"}</span>
+      {isAdmin ? (
+        <div className="mt-5 border-t border-neutral-200 pt-5">
+          <h3 className="text-sm font-semibold text-neutral-900">Goles por jugador</h3>
+          <p className="mt-1 text-xs text-neutral-500">
+            {isPlayed
+              ? "La suma de goles por team debería coincidir con el resultado."
+              : "Podés precargar goles ahora; el resultado se carga más arriba."}
+          </p>
+          <div className="mt-3">
+            <GoalsForm
+              convocatoriaId={convocatoriaId}
+              teams={goalsFormTeams}
+              initialGoalsByPlayerId={goalsByPlayerId}
+            />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
