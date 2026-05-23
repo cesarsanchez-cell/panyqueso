@@ -89,7 +89,7 @@ function renderProposed(action: ActionType, proposed: Json, old: Json): React.Re
   );
 }
 
-export function RequestCard({ request }: { request: RequestView }) {
+export function RequestCard({ request, canDecide }: { request: RequestView; canDecide: boolean }) {
   const [state, formAction, pending] = useActionState<DecisionState, FormData>(decideRequest, null);
 
   const targetLabel =
@@ -131,72 +131,74 @@ export function RequestCard({ request }: { request: RequestView }) {
         </div>
       </div>
 
-      <form action={formAction} className="mt-5 space-y-3">
-        <input type="hidden" name="request_id" value={request.id} />
-        <div>
-          <label
-            htmlFor={`comment-${request.id}`}
-            className="block text-xs font-medium text-neutral-700"
-          >
-            Comentario (obligatorio para rechazar / flag)
-          </label>
-          <textarea
-            id={`comment-${request.id}`}
-            name="comment"
-            rows={2}
-            className="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
-          />
-        </div>
+      {canDecide ? (
+        <form action={formAction} className="mt-5 space-y-3">
+          <input type="hidden" name="request_id" value={request.id} />
+          <div>
+            <label
+              htmlFor={`comment-${request.id}`}
+              className="block text-xs font-medium text-neutral-700"
+            >
+              Comentario (obligatorio para rechazar / flag)
+            </label>
+            <textarea
+              id={`comment-${request.id}`}
+              name="comment"
+              rows={2}
+              className="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+            />
+          </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="submit"
-            name="decision"
-            value="approve"
-            disabled={pending}
-            className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Aprobar
-          </button>
-          <button
-            type="submit"
-            name="decision"
-            value="reject"
-            disabled={pending}
-            className="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Rechazar
-          </button>
-          <button
-            type="submit"
-            name="decision"
-            value="flag"
-            disabled={pending}
-            className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-semibold text-neutral-700 shadow-sm transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Marcar
-          </button>
-        </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="submit"
+              name="decision"
+              value="approve"
+              disabled={pending}
+              className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Aprobar
+            </button>
+            <button
+              type="submit"
+              name="decision"
+              value="reject"
+              disabled={pending}
+              className="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Rechazar
+            </button>
+            <button
+              type="submit"
+              name="decision"
+              value="flag"
+              disabled={pending}
+              className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-semibold text-neutral-700 shadow-sm transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Marcar
+            </button>
+          </div>
 
-        {state && "error" in state ? (
-          <p
-            role="alert"
-            aria-live="polite"
-            className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
-          >
-            {state.error}
-          </p>
-        ) : null}
-        {state && "success" in state ? (
-          <p
-            role="status"
-            aria-live="polite"
-            className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
-          >
-            {state.success}
-          </p>
-        ) : null}
-      </form>
+          {state && "error" in state ? (
+            <p
+              role="alert"
+              aria-live="polite"
+              className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+            >
+              {state.error}
+            </p>
+          ) : null}
+          {state && "success" in state ? (
+            <p
+              role="status"
+              aria-live="polite"
+              className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+            >
+              {state.success}
+            </p>
+          ) : null}
+        </form>
+      ) : null}
     </article>
   );
 }
