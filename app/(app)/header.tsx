@@ -15,11 +15,13 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
   admin: [
     { label: "Inicio", href: "/" },
     { label: "Jugadores", href: "/jugadores" },
+    { label: "Convocatorias", href: "/convocatorias" },
     { label: "Lugares", href: "/lugares" },
   ],
   veedor: [
     { label: "Inicio", href: "/" },
     { label: "Jugadores", href: "/jugadores" },
+    { label: "Convocatorias", href: "/convocatorias" },
     { label: "Auditoría", href: "/auditoria", key: "auditoria" },
   ],
 };
