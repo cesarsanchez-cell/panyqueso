@@ -5,6 +5,8 @@ import { requireRole } from "@/lib/auth/require-role";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
+type SearchParams = { proposed?: string };
+
 type PlayerStatus = Database["public"]["Enums"]["player_status"];
 type PlayerRoleField = Database["public"]["Enums"]["player_role_field"];
 type PositionPref = Database["public"]["Enums"]["position_pref"];
@@ -48,10 +50,19 @@ function formatDate(iso: string): string {
   });
 }
 
-export default async function JugadorDetallePage({ params }: { params: Promise<{ id: string }> }) {
-  await requireRole(["admin", "veedor"]);
+export default async function JugadorDetallePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<SearchParams>;
+}) {
+  const ctx = await requireRole(["admin", "veedor"]);
 
   const { id } = await params;
+  const sp = await searchParams;
+  const isAdmin = ctx.profile.role === "admin";
+  const showProposedFlash = sp.proposed === "1";
 
   const supabase = await createClient();
   const { data: player, error } = await supabase
@@ -94,6 +105,23 @@ export default async function JugadorDetallePage({ params }: { params: Promise<{
           {STATUS_LABEL[player.status]}
         </span>
       </div>
+
+      {showProposedFlash ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          Solicitud de cambio creada. Queda pendiente de aprobación por un veedor.
+        </div>
+      ) : null}
+
+      {isAdmin && player.status === "approved" ? (
+        <div>
+          <Link
+            href={`/jugadores/${player.id}/proponer-cambio`}
+            className="inline-flex items-center rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-sm transition hover:bg-neutral-50"
+          >
+            Proponer cambio
+          </Link>
+        </div>
+      ) : null}
 
       <Section title="Posición">
         <Field label="Preferida" value={POSITION_LABEL[player.position_pref]} />
