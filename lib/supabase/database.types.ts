@@ -563,6 +563,10 @@ export type Database = {
         };
         Returns: number;
       };
+      confirm_match_cleanup: {
+        Args: { p_match_id: string };
+        Returns: undefined;
+      };
       current_user_role: {
         Args: never;
         Returns: Database["public"]["Enums"]["user_role"];

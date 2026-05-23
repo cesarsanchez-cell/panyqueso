@@ -8,6 +8,7 @@ import { parseTeamDraft, type TeamDraft, type TeamLabel } from "@/lib/teams/draf
 
 import { AddPlayerForm } from "./add-player-form";
 import { CancelForm } from "./cancel-form";
+import { ConfirmMatchForm } from "./confirm-match-form";
 import { ClearDraftForm, GenerateDraftForm, PromoteToGKForm, SwapPlayerForm } from "./draft-forms";
 import { RemovePlayerForm } from "./remove-player-form";
 
@@ -15,7 +16,7 @@ type Status = Database["public"]["Enums"]["convocatoria_status"];
 type RoleField = Database["public"]["Enums"]["player_role_field"];
 type PositionPref = Database["public"]["Enums"]["position_pref"];
 
-type SearchParams = { q?: string; rol?: string; pos?: string };
+type SearchParams = { q?: string; rol?: string; pos?: string; confirmed?: string };
 
 const STATUS_LABEL: Record<Status, string> = {
   abierta: "Abierta",
@@ -201,6 +202,12 @@ export default async function ConvocatoriaDetallePage({
           ← Volver al listado
         </Link>
       </div>
+
+      {sp.confirmed === "1" ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          Match confirmado. La convocatoria pasó a estado cerrada y se creó el partido.
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
@@ -393,6 +400,19 @@ export default async function ConvocatoriaDetallePage({
               Hacé click en &ldquo;Generar teams&rdquo; para armar el draft. Después vas a poder
               mover jugadores entre A y B.
             </p>
+          ) : null}
+
+          {teamDraft && isAdmin && isOpen ? (
+            <div className="mt-5 border-t border-neutral-200 pt-5">
+              <h3 className="text-sm font-semibold text-neutral-900">Confirmar match</h3>
+              <p className="mt-1 text-xs text-neutral-500">
+                Una vez confirmado, la convocatoria pasa a <code>cerrada</code>, se crea el partido
+                con su snapshot inmutable y no se pueden editar más los teams.
+              </p>
+              <div className="mt-3">
+                <ConfirmMatchForm convocatoriaId={convocatoria.id} />
+              </div>
+            </div>
           ) : null}
         </section>
       ) : null}
