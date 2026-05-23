@@ -44,6 +44,29 @@ export async function requestStatusChange(
   };
 
   const supabase = await createClient();
+
+  // Bloquear duplicacion: una sola solicitud activa del mismo action_type
+  // por jugador (deactivate y reactivate son acciones distintas, no se
+  // bloquean entre si — el flujo natural es approve uno y proponer el otro).
+  const { data: openSame, error: openErr } = await supabase
+    .from("player_change_requests")
+    .select("id")
+    .eq("player_id", playerId)
+    .eq("action_type", action)
+    .in("status", ["pending", "flagged"])
+    .limit(1)
+    .maybeSingle();
+
+  if (openErr) {
+    return { error: `No se pudo verificar duplicados: ${openErr.message}` };
+  }
+  if (openSame) {
+    const label = action === "deactivate_player" ? "desactivación" : "reactivación";
+    return {
+      error: `Ya hay una solicitud de ${label} pendiente para este jugador.`,
+    };
+  }
+
   const { error } = await supabase.from("player_change_requests").insert(insertRow);
 
   if (error) {

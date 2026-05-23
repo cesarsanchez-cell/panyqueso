@@ -97,6 +97,29 @@ export async function proposeChange(
     return { error: "El jugador no existe." };
   }
 
+  // Bloquear duplicacion: solo permitimos una solicitud sensible activa por
+  // jugador. RLS deja al admin ver solo las suyas, asi que si otro admin
+  // propuso un cambio, este check no lo detecta — pero el veedor lo resuelve
+  // y el segundo intento queda registrado igual. Aceptable para el MVP.
+  const { data: openSensitive, error: openErr } = await supabase
+    .from("player_change_requests")
+    .select("id")
+    .eq("player_id", playerId)
+    .eq("action_type", "update_sensitive_fields")
+    .in("status", ["pending", "flagged"])
+    .limit(1)
+    .maybeSingle();
+
+  if (openErr) {
+    return { error: `No se pudo verificar duplicados: ${openErr.message}` };
+  }
+  if (openSensitive) {
+    return {
+      error:
+        "Ya hay una solicitud de cambio sensible pendiente para este jugador. Esperá la decisión del veedor antes de proponer otra.",
+    };
+  }
+
   // Calcular delta. Solo los campos que cambian van a proposed_values + old_values.
   const proposed_values: { [k: string]: Json } = {};
   const old_values: { [k: string]: Json } = {};
