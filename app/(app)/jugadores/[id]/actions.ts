@@ -13,6 +13,8 @@ export type StatusChangeAction = "deactivate_player" | "reactivate_player";
 
 export type StatusChangeState = null | { error: string };
 
+export type PrivateNotesState = null | { error: string } | { success: string };
+
 function parseAction(raw: FormDataEntryValue | null): StatusChangeAction | null {
   if (raw === "deactivate_player" || raw === "reactivate_player") return raw;
   return null;
@@ -53,4 +55,31 @@ export async function requestStatusChange(
 
   const flashKey = action === "deactivate_player" ? "deactivate=1" : "reactivate=1";
   redirect(`/jugadores/${playerId}?${flashKey}`);
+}
+
+export async function updatePrivateNotes(
+  _prev: PrivateNotesState,
+  formData: FormData,
+): Promise<PrivateNotesState> {
+  await requireRole("admin");
+
+  const playerId = String(formData.get("player_id") ?? "").trim();
+  if (!playerId) return { error: "Falta el id del jugador." };
+
+  // private_notes vacio se interpreta como "borrar las notas" (NULL).
+  const raw = String(formData.get("private_notes") ?? "").trim();
+  const value = raw.length > 0 ? raw : null;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("players")
+    .update({ private_notes: value })
+    .eq("id", playerId);
+
+  if (error) {
+    return { error: `No se pudieron guardar las notas: ${error.message}` };
+  }
+
+  revalidatePath(`/jugadores/${playerId}`);
+  return { success: "Notas guardadas." };
 }

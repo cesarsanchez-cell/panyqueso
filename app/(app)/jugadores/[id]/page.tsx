@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
+import { PrivateNotesForm } from "./private-notes-form";
 import { StatusChangeForm } from "./status-change-form";
 
 type SearchParams = { proposed?: string; deactivate?: string; reactivate?: string };
@@ -160,7 +161,9 @@ export default async function JugadorDetallePage({
         <Field label="Confianza" value={CONFIDENCE_LABEL[player.rating_confidence]} />
       </Section>
 
-      {player.private_notes ? (
+      {isAdmin ? (
+        <PrivateNotesForm playerId={player.id} initial={player.private_notes ?? ""} />
+      ) : player.private_notes ? (
         <Section title="Notas privadas">
           <p className="whitespace-pre-line text-sm text-neutral-700">{player.private_notes}</p>
         </Section>
