@@ -1,11 +1,12 @@
 import Link from "next/link";
 
 import { requireRole } from "@/lib/auth/require-role";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database, Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
 type PlayerStatus = Database["public"]["Enums"]["player_status"];
 type PlayerRoleField = Database["public"]["Enums"]["player_role_field"];
+type ChangeRequestStatus = Database["public"]["Enums"]["change_request_status"];
 
 const STATUS_LABEL: Record<PlayerStatus, string> = {
   pending: "Pendiente",
@@ -19,10 +20,20 @@ const ROLE_FIELD_LABEL: Record<PlayerRoleField, string> = {
   mixto: "Mixto",
 };
 
-const STATUS_BADGE: Record<PlayerStatus, string> = {
+const PLAYER_STATUS_BADGE: Record<PlayerStatus, string> = {
   pending: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
   approved: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
   inactive: "bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200",
+};
+
+const REQUEST_STATUS_LABEL: Partial<Record<ChangeRequestStatus, string>> = {
+  pending: "En aprobación",
+  flagged: "Marcada",
+};
+
+const REQUEST_STATUS_BADGE: Partial<Record<ChangeRequestStatus, string>> = {
+  pending: "bg-sky-50 text-sky-700 ring-1 ring-sky-200",
+  flagged: "bg-orange-50 text-orange-700 ring-1 ring-orange-200",
 };
 
 const FILTERS: { label: string; value: PlayerStatus | "all" }[] = [
@@ -34,6 +45,28 @@ const FILTERS: { label: string; value: PlayerStatus | "all" }[] = [
 
 function parseStatus(raw: string | undefined): PlayerStatus | null {
   if (raw === "pending" || raw === "approved" || raw === "inactive") return raw;
+  return null;
+}
+
+function isJsonObject(v: Json): v is { [k: string]: Json | undefined } {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function readString(obj: Json, key: string): string | null {
+  if (!isJsonObject(obj)) return null;
+  const v = obj[key];
+  return typeof v === "string" ? v : null;
+}
+
+function readNumber(obj: Json, key: string): number | null {
+  if (!isJsonObject(obj)) return null;
+  const v = obj[key];
+  return typeof v === "number" ? v : null;
+}
+
+function readRoleField(obj: Json): PlayerRoleField | null {
+  const v = readString(obj, "role_field");
+  if (v === "arquero" || v === "jugador_campo" || v === "mixto") return v;
   return null;
 }
 
@@ -50,20 +83,44 @@ export default async function JugadoresPage({
   const showCreatedFlash = params.created === "1";
 
   const supabase = await createClient();
-  let query = supabase
+  let playersQuery = supabase
     .from("players")
     .select("id, nombre, edad, status, role_field")
     .order("nombre", { ascending: true });
 
   if (statusFilter) {
-    query = query.eq("status", statusFilter);
+    playersQuery = playersQuery.eq("status", statusFilter);
   }
 
-  const { data: players, error } = await query;
+  const { data: players, error } = await playersQuery;
 
   if (error) {
     throw new Error(`No se pudieron cargar los jugadores: ${error.message}`);
   }
+
+  // En la tab Pendientes incluimos las solicitudes create_player en
+  // pending/flagged: son "jugadores propuestos" que todavia no existen como
+  // row en players. RLS segrega: admin ve solo las propias, veedor ve todas.
+  const includeCreateRequests = statusFilter === "pending";
+  let createRequests: {
+    id: string;
+    proposed_values: Json;
+    status: ChangeRequestStatus;
+  }[] = [];
+  if (includeCreateRequests) {
+    const { data, error: reqError } = await supabase
+      .from("player_change_requests")
+      .select("id, proposed_values, status")
+      .eq("action_type", "create_player")
+      .in("status", ["pending", "flagged"])
+      .order("created_at", { ascending: false });
+    if (reqError) {
+      throw new Error(`No se pudieron cargar las solicitudes: ${reqError.message}`);
+    }
+    createRequests = data ?? [];
+  }
+
+  const isEmpty = players.length === 0 && createRequests.length === 0;
 
   return (
     <div className="space-y-6">
@@ -105,7 +162,7 @@ export default async function JugadoresPage({
         })}
       </nav>
 
-      {players.length === 0 ? (
+      {isEmpty ? (
         <div className="rounded-lg border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-500">
           {statusFilter
             ? `Sin jugadores en estado "${STATUS_LABEL[statusFilter]}".`
@@ -113,6 +170,33 @@ export default async function JugadoresPage({
         </div>
       ) : (
         <ul className="divide-y divide-neutral-200 overflow-hidden rounded-lg border border-neutral-200 bg-white">
+          {createRequests.map((r) => {
+            const nombre = readString(r.proposed_values, "nombre") ?? "(sin nombre)";
+            const edad = readNumber(r.proposed_values, "edad");
+            const roleField = readRoleField(r.proposed_values);
+            return (
+              <li
+                key={r.id}
+                className="flex items-center justify-between gap-4 bg-sky-50/30 px-4 py-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-neutral-900">
+                    {nombre}
+                    <span className="ml-2 text-xs font-normal text-neutral-500">· solicitud</span>
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    {edad !== null ? `${edad} años` : "edad —"}
+                    {roleField ? ` · ${ROLE_FIELD_LABEL[roleField]}` : ""}
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${REQUEST_STATUS_BADGE[r.status] ?? ""}`}
+                >
+                  {REQUEST_STATUS_LABEL[r.status] ?? r.status}
+                </span>
+              </li>
+            );
+          })}
           {players.map((p) => (
             <li key={p.id}>
               <Link
@@ -126,7 +210,7 @@ export default async function JugadoresPage({
                   </p>
                 </div>
                 <span
-                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[p.status]}`}
+                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${PLAYER_STATUS_BADGE[p.status]}`}
                 >
                   {STATUS_LABEL[p.status]}
                 </span>
