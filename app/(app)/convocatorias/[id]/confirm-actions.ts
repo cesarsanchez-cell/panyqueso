@@ -227,6 +227,15 @@ export async function confirmMatch(
     .single();
 
   if (matchErr || !matchRow) {
+    // 23505 = unique violation. La unique(convocatoria_id) en matches
+    // (Fase 6 self-audit hotfix) previene race conditions: si otro admin
+    // ya confirmo esta convocatoria, el segundo intento cae aca.
+    if (matchErr?.code === "23505") {
+      return {
+        error:
+          "Ya existe un partido confirmado para esta convocatoria. Refrescá la página para verlo.",
+      };
+    }
     return { error: `No se pudo crear el match: ${matchErr?.message ?? "sin detalle"}` };
   }
   const matchId = matchRow.id;
@@ -236,7 +245,21 @@ export async function confirmMatch(
   // SOLO si la convocatoria asociada sigue 'abierta' (escenario unico de
   // orphan). Ver migracion 20260524110000_confirm_match_cleanup.
   const rollback = async (reason: string): Promise<ConfirmMatchState> => {
-    await supabase.rpc("confirm_match_cleanup", { p_match_id: matchId });
+    const { error: cleanupErr } = await supabase.rpc("confirm_match_cleanup", {
+      p_match_id: matchId,
+    });
+    if (cleanupErr) {
+      // El rollback fallo despues de que el match ya estaba creado. Logueamos
+      // server-side para diagnostico y avisamos al user que hay un partido
+      // huerfano para limpiar manualmente.
+      console.error(
+        `confirmMatch rollback failed for match_id=${matchId} (reason=${reason}):`,
+        cleanupErr.message,
+      );
+      return {
+        error: `No se pudo confirmar (${reason}) y no se pudo deshacer automaticamente. Avisá al admin de la base: hay un partido huerfano con id ${matchId}.`,
+      };
+    }
     return { error: `No se pudo confirmar: ${reason}` };
   };
 
