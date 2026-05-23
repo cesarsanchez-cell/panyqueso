@@ -124,6 +124,7 @@ export type Database = {
           lugar_id: string | null;
           notas: string | null;
           status: Database["public"]["Enums"]["convocatoria_status"];
+          team_draft: Json | null;
           updated_at: string;
         };
         Insert: {
@@ -136,6 +137,7 @@ export type Database = {
           lugar_id?: string | null;
           notas?: string | null;
           status?: Database["public"]["Enums"]["convocatoria_status"];
+          team_draft?: Json | null;
           updated_at?: string;
         };
         Update: {
@@ -148,6 +150,7 @@ export type Database = {
           lugar_id?: string | null;
           notas?: string | null;
           status?: Database["public"]["Enums"]["convocatoria_status"];
+          team_draft?: Json | null;
           updated_at?: string;
         };
         Relationships: [

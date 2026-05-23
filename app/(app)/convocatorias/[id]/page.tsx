@@ -4,10 +4,11 @@ import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth/require-role";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
-import { generateTeams, type GeneratorInput } from "@/lib/teams/generate";
+import { parseTeamDraft, type TeamDraft, type TeamLabel } from "@/lib/teams/draft";
 
 import { AddPlayerForm } from "./add-player-form";
 import { CancelForm } from "./cancel-form";
+import { ClearDraftForm, GenerateDraftForm, PromoteToGKForm, SwapPlayerForm } from "./draft-forms";
 import { RemovePlayerForm } from "./remove-player-form";
 
 type Status = Database["public"]["Enums"]["convocatoria_status"];
@@ -94,7 +95,7 @@ export default async function ConvocatoriaDetallePage({
   const { data: convocatoria, error } = await supabase
     .from("convocatorias")
     .select(
-      `id, fecha, hora, status, cupo_maximo, notas, created_at,
+      `id, fecha, hora, status, cupo_maximo, notas, created_at, team_draft,
        lugar:lugares!lugar_id(id, nombre),
        creator:profiles!created_by(nombre)`,
     )
@@ -131,28 +132,34 @@ export default async function ConvocatoriaDetallePage({
   // filtrados por searchParams, excluyendo los ya convocados.
   const showSelector = isAdmin && isOpen;
 
-  // Preview de teams: admin + abierta + al menos 10 convocados (mínimo
-  // jugable: 5 vs 5 segun el plan v4).
+  // Teams: admin + abierta + al menos 10 convocados (5v5 minimo segun
+  // plan v4). El draft persistido vive en convocatorias.team_draft (PR 2).
   const MIN_CONVOCADOS_PARA_GENERAR = 10;
   const canGenerateTeams = isAdmin && isOpen && convocados.length >= MIN_CONVOCADOS_PARA_GENERAR;
 
-  const generatorInput: GeneratorInput[] = canGenerateTeams
-    ? convocados
-        .map((cp) => cp.player)
-        .filter(
-          (p): p is NonNullable<typeof p> & { internal_score: number } =>
-            p !== null && p.internal_score !== null,
-        )
-        .map((p) => ({
-          id: p.id,
-          nombre: p.nombre,
-          role_field: p.role_field,
-          position_pref: p.position_pref,
-          internal_score: Number(p.internal_score),
-        }))
-    : [];
+  const teamDraft = parseTeamDraft(convocatoria.team_draft);
 
-  const teamPreview = canGenerateTeams ? generateTeams(generatorInput) : null;
+  // Mapa playerId -> info para renderizar el draft con scores.
+  type PlayerInfo = {
+    id: string;
+    nombre: string;
+    role_field: RoleField;
+    position_pref: PositionPref;
+    internal_score: number;
+  };
+  const playerInfoById = new Map<string, PlayerInfo>();
+  for (const cp of convocados) {
+    const p = cp.player;
+    if (p && p.internal_score !== null) {
+      playerInfoById.set(p.id, {
+        id: p.id,
+        nombre: p.nombre,
+        role_field: p.role_field,
+        position_pref: p.position_pref,
+        internal_score: Number(p.internal_score),
+      });
+    }
+  }
 
   const q = (sp.q ?? "").trim();
   const rol = parseRol(sp.rol);
@@ -348,58 +355,51 @@ export default async function ConvocatoriaDetallePage({
         </section>
       ) : null}
 
-      {teamPreview ? (
+      {canGenerateTeams || teamDraft ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-              Teams sugeridos (preview)
+              Teams
             </h2>
-            <p className="text-xs text-neutral-500">
-              Algoritmo determinístico · diferencia de score{" "}
-              <span
-                className={
-                  teamPreview.totalDiff > 2 ? "font-semibold text-amber-700" : "text-neutral-700"
-                }
-              >
-                {teamPreview.totalDiff.toFixed(2)}
-              </span>
-            </p>
+            {teamDraft ? <DraftSummary draft={teamDraft} playerInfoById={playerInfoById} /> : null}
           </div>
 
-          <p className="mt-1 text-xs text-neutral-500">
-            Esta es una sugerencia: en el próximo PR vas a poder mover jugadores y confirmar el
-            match.
-          </p>
-
-          {teamPreview.warnings.length > 0 ? (
-            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              <p className="font-medium">Avisos del generador</p>
-              <ul className="mt-1 list-disc pl-5 text-xs">
-                {teamPreview.warnings.map((w, i) => (
-                  <li key={i}>{w}</li>
-                ))}
-              </ul>
+          {canGenerateTeams ? (
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <GenerateDraftForm convocatoriaId={convocatoria.id} hasDraft={!!teamDraft} />
+              {teamDraft ? <ClearDraftForm convocatoriaId={convocatoria.id} /> : null}
             </div>
           ) : null}
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <TeamColumn
-              label="Team A"
-              composition={teamPreview.teamA}
-              positionDist={teamPreview.positionDist.A}
-            />
-            <TeamColumn
-              label="Team B"
-              composition={teamPreview.teamB}
-              positionDist={teamPreview.positionDist.B}
-            />
-          </div>
+          {teamDraft ? (
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <DraftTeamColumn
+                label="A"
+                side={teamDraft.A}
+                playerInfoById={playerInfoById}
+                convocatoriaId={convocatoria.id}
+                editable={isAdmin && isOpen}
+              />
+              <DraftTeamColumn
+                label="B"
+                side={teamDraft.B}
+                playerInfoById={playerInfoById}
+                convocatoriaId={convocatoria.id}
+                editable={isAdmin && isOpen}
+              />
+            </div>
+          ) : isAdmin && isOpen ? (
+            <p className="mt-3 text-sm text-neutral-500">
+              Hacé click en &ldquo;Generar teams&rdquo; para armar el draft. Después vas a poder
+              mover jugadores entre A y B.
+            </p>
+          ) : null}
         </section>
       ) : null}
 
       {isAdmin && isOpen && !canGenerateTeams ? (
         <section className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-5 text-sm text-neutral-600">
-          Para generar el preview de teams hacen falta al menos {MIN_CONVOCADOS_PARA_GENERAR}{" "}
+          Para generar el draft de teams hacen falta al menos {MIN_CONVOCADOS_PARA_GENERAR}{" "}
           convocados. Llevás {convocados.length}.
         </section>
       ) : null}
@@ -422,50 +422,130 @@ export default async function ConvocatoriaDetallePage({
   );
 }
 
-type TeamComposition = NonNullable<ReturnType<typeof generateTeams>>["teamA"];
+type PlayerInfoMap = Map<
+  string,
+  {
+    id: string;
+    nombre: string;
+    role_field: RoleField;
+    position_pref: PositionPref;
+    internal_score: number;
+  }
+>;
 
-function TeamColumn({
-  label,
-  composition,
-  positionDist,
+function sumScores(playerIds: string[], gk: string | null, infoById: PlayerInfoMap): number {
+  let total = 0;
+  if (gk) total += infoById.get(gk)?.internal_score ?? 0;
+  for (const id of playerIds) total += infoById.get(id)?.internal_score ?? 0;
+  return total;
+}
+
+function DraftSummary({
+  draft,
+  playerInfoById,
 }: {
-  label: string;
-  composition: TeamComposition;
-  positionDist: Record<PositionPref, number>;
+  draft: TeamDraft;
+  playerInfoById: PlayerInfoMap;
 }) {
-  const total = composition.players.length + (composition.goalkeeper ? 1 : 0);
+  const scoreA = sumScores(draft.A.playerIds, draft.A.goalkeeperPlayerId, playerInfoById);
+  const scoreB = sumScores(draft.B.playerIds, draft.B.goalkeeperPlayerId, playerInfoById);
+  const diff = Math.abs(scoreA - scoreB);
+
+  return (
+    <p className="text-xs text-neutral-500">
+      Diferencia de score{" "}
+      <span className={diff > 2 ? "font-semibold text-amber-700" : "text-neutral-700"}>
+        {diff.toFixed(2)}
+      </span>
+    </p>
+  );
+}
+
+function DraftTeamColumn({
+  label,
+  side,
+  playerInfoById,
+  convocatoriaId,
+  editable,
+}: {
+  label: TeamLabel;
+  side: TeamDraft["A"];
+  playerInfoById: PlayerInfoMap;
+  convocatoriaId: string;
+  editable: boolean;
+}) {
+  const otherLabel: TeamLabel = label === "A" ? "B" : "A";
+  const teamCount = side.playerIds.length + (side.goalkeeperPlayerId ? 1 : 0);
+  const totalScore = sumScores(side.playerIds, side.goalkeeperPlayerId, playerInfoById);
+
+  const positionDist: Record<PositionPref, number> = {
+    defensor: 0,
+    mediocampista: 0,
+    delantero: 0,
+  };
+  for (const id of side.playerIds) {
+    const p = playerInfoById.get(id);
+    if (p) positionDist[p.position_pref]++;
+  }
+
+  const gkInfo = side.goalkeeperPlayerId ? playerInfoById.get(side.goalkeeperPlayerId) : null;
 
   return (
     <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="text-sm font-semibold text-neutral-900">{label}</h3>
+        <h3 className="text-sm font-semibold text-neutral-900">Team {label}</h3>
         <p className="text-xs text-neutral-500">
-          {total} jug. · score {composition.totalScore.toFixed(2)}
+          {teamCount} jug. · score {totalScore.toFixed(2)}
         </p>
       </div>
 
       <ul className="mt-3 space-y-1.5 text-sm">
-        {composition.goalkeeper ? (
+        {gkInfo ? (
           <li className="flex items-center justify-between gap-2">
-            <span className="truncate text-neutral-900">
-              <span className="mr-1.5 inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-800">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-800">
                 GK
               </span>
-              {composition.goalkeeper.nombre}
+              <span className="truncate text-neutral-900">{gkInfo.nombre}</span>
+              <span className="shrink-0 text-xs text-neutral-500">
+                {gkInfo.internal_score.toFixed(2)}
+              </span>
             </span>
-            <span className="shrink-0 text-xs text-neutral-500">
-              {composition.goalkeeper.internal_score.toFixed(2)}
-            </span>
+            {editable ? (
+              <SwapPlayerForm
+                convocatoriaId={convocatoriaId}
+                playerId={gkInfo.id}
+                targetLabel={`Team ${otherLabel}`}
+              />
+            ) : null}
           </li>
         ) : (
           <li className="text-xs italic text-amber-700">Sin arquero asignado</li>
         )}
-        {composition.players.map((p) => (
-          <li key={p.id} className="flex items-center justify-between gap-2">
-            <span className="truncate text-neutral-900">{p.nombre}</span>
-            <span className="shrink-0 text-xs text-neutral-500">{p.internal_score.toFixed(2)}</span>
-          </li>
-        ))}
+        {side.playerIds.map((id) => {
+          const p = playerInfoById.get(id);
+          if (!p) return null;
+          return (
+            <li key={id} className="flex items-center justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="truncate text-neutral-900">{p.nombre}</span>
+                <span className="shrink-0 text-xs text-neutral-500">
+                  {p.internal_score.toFixed(2)}
+                </span>
+              </span>
+              {editable ? (
+                <span className="flex shrink-0 items-center gap-1">
+                  <PromoteToGKForm convocatoriaId={convocatoriaId} playerId={id} />
+                  <SwapPlayerForm
+                    convocatoriaId={convocatoriaId}
+                    playerId={id}
+                    targetLabel={`Team ${otherLabel}`}
+                  />
+                </span>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
 
       <p className="mt-3 border-t border-neutral-200 pt-2 text-xs text-neutral-600">
