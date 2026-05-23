@@ -202,6 +202,7 @@ export default async function AuditoriaPage({
               key={r.id}
               canDecide={r.status === "pending" || r.status === "flagged"}
               isOwn={r.requested_by === ctx.userId}
+              detailHref={`/auditoria/${r.id}`}
               request={{
                 id: r.id,
                 action_type: r.action_type,

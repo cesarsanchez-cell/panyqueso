@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 
 import type { Database, Json } from "@/lib/supabase/database.types";
@@ -93,10 +94,12 @@ export function RequestCard({
   request,
   canDecide,
   isOwn,
+  detailHref,
 }: {
   request: RequestView;
   canDecide: boolean;
   isOwn: boolean;
+  detailHref?: string;
 }) {
   const [state, formAction, pending] = useActionState<DecisionState, FormData>(decideRequest, null);
 
@@ -125,6 +128,17 @@ export function RequestCard({
           {request.statusLabel}
         </span>
       </header>
+
+      {detailHref ? (
+        <div className="mt-3">
+          <Link
+            href={detailHref}
+            className="text-xs font-medium text-neutral-500 underline transition hover:text-neutral-700"
+          >
+            Ver detalle →
+          </Link>
+        </div>
+      ) : null}
 
       <div className="mt-4 space-y-3">
         <div>
