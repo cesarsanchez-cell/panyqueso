@@ -9,10 +9,9 @@ const ROLE_LABEL: Record<NonNullable<AuthContext["profile"]["role"]>, string> = 
   veedor: "Veedor",
 };
 
-const NAV_ITEMS_BY_ROLE: Record<
-  NonNullable<AuthContext["profile"]["role"]>,
-  { label: string; href: string }[]
-> = {
+type NavItem = { label: string; href: string; key?: string };
+
+const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, NavItem[]> = {
   admin: [
     { label: "Inicio", href: "/" },
     { label: "Jugadores", href: "/jugadores" },
@@ -20,11 +19,17 @@ const NAV_ITEMS_BY_ROLE: Record<
   veedor: [
     { label: "Inicio", href: "/" },
     { label: "Jugadores", href: "/jugadores" },
-    { label: "Auditoría", href: "/auditoria" },
+    { label: "Auditoría", href: "/auditoria", key: "auditoria" },
   ],
 };
 
-export function AppHeader({ ctx }: { ctx: AuthContext }) {
+export function AppHeader({
+  ctx,
+  pendingAuditCount,
+}: {
+  ctx: AuthContext;
+  pendingAuditCount: number;
+}) {
   const displayName = ctx.profile.nombre?.trim() || ctx.email;
   const roleLabel = ctx.profile.role ? ROLE_LABEL[ctx.profile.role] : null;
 
@@ -45,15 +50,26 @@ export function AppHeader({ ctx }: { ctx: AuthContext }) {
         </form>
       </div>
       <nav className="mx-auto flex max-w-5xl gap-1 overflow-x-auto border-t border-neutral-100 px-2 sm:px-4">
-        {(ctx.profile.role ? NAV_ITEMS_BY_ROLE[ctx.profile.role] : []).map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="shrink-0 px-3 py-2 text-sm font-medium text-neutral-600 transition hover:text-neutral-900"
-          >
-            {item.label}
-          </Link>
-        ))}
+        {(ctx.profile.role ? NAV_ITEMS_BY_ROLE[ctx.profile.role] : []).map((item) => {
+          const showBadge = item.key === "auditoria" && pendingAuditCount > 0;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium text-neutral-600 transition hover:text-neutral-900"
+            >
+              {item.label}
+              {showBadge ? (
+                <span
+                  aria-label={`${pendingAuditCount} solicitudes pendientes`}
+                  className="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200"
+                >
+                  {pendingAuditCount}
+                </span>
+              ) : null}
+            </Link>
+          );
+        })}
       </nav>
     </header>
   );

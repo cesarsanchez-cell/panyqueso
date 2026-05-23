@@ -60,7 +60,13 @@ export async function decideRequest(
     return { error: friendly ?? `No se pudo procesar: ${error.message}` };
   }
 
+  // Revalidar:
+  //  - /auditoria (la lista cambia).
+  //  - / (layout calcula el badge de pendientes; ver Fase 4 PR 1).
+  //  - /auditoria/[id] (ruta de detalle: PR 4 la crea, ahora ya queda revalidada).
   revalidatePath("/auditoria");
+  revalidatePath("/");
+  revalidatePath(`/auditoria/${requestId}`);
 
   const successMsg =
     decision === "approve"
