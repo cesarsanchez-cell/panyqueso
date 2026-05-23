@@ -14,6 +14,29 @@ type PlayerStatus = Database["public"]["Enums"]["player_status"];
 type PlayerRoleField = Database["public"]["Enums"]["player_role_field"];
 type PositionPref = Database["public"]["Enums"]["position_pref"];
 type RatingConfidence = Database["public"]["Enums"]["rating_confidence"];
+type RequestAction = Database["public"]["Enums"]["change_request_action"];
+type RequestStatus = Database["public"]["Enums"]["change_request_status"];
+
+const REQUEST_ACTION_LABEL: Record<RequestAction, string> = {
+  create_player: "Nuevo jugador",
+  update_sensitive_fields: "Cambio sensible",
+  deactivate_player: "Desactivación",
+  reactivate_player: "Reactivación",
+};
+
+const REQUEST_STATUS_LABEL: Record<RequestStatus, string> = {
+  pending: "Pendiente",
+  flagged: "Marcada",
+  approved: "Aprobada",
+  rejected: "Rechazada",
+};
+
+const REQUEST_STATUS_BADGE: Record<RequestStatus, string> = {
+  pending: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
+  flagged: "bg-orange-50 text-orange-700 ring-1 ring-orange-200",
+  approved: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+  rejected: "bg-red-50 text-red-700 ring-1 ring-red-200",
+};
 
 const STATUS_LABEL: Record<PlayerStatus, string> = {
   pending: "Pendiente",
@@ -53,6 +76,15 @@ function formatDate(iso: string): string {
   });
 }
 
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default async function JugadorDetallePage({
   params,
   searchParams,
@@ -83,6 +115,23 @@ export default async function JugadorDetallePage({
   if (!player) {
     notFound();
   }
+
+  const { data: requestsRaw, error: requestsError } = await supabase
+    .from("player_change_requests")
+    .select(
+      `id, action_type, status, reason, created_at, reviewed_at, review_comment,
+       requester:profiles!requested_by(nombre),
+       reviewer:profiles!reviewed_by(nombre)`,
+    )
+    .eq("player_id", id)
+    .order("created_at", { ascending: false });
+
+  if (requestsError) {
+    throw new Error(`No se pudieron cargar las solicitudes: ${requestsError.message}`);
+  }
+
+  const requests = requestsRaw ?? [];
+  const pendingRequests = requests.filter((r) => r.status === "pending" || r.status === "flagged");
 
   return (
     <div className="space-y-6">
@@ -127,6 +176,24 @@ export default async function JugadorDetallePage({
         </div>
       ) : null}
 
+      {pendingRequests.length > 0 ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <p className="font-medium">
+            {pendingRequests.length === 1
+              ? "Hay 1 solicitud en revisión sobre este jugador."
+              : `Hay ${pendingRequests.length} solicitudes en revisión sobre este jugador.`}
+          </p>
+          <ul className="mt-1 list-disc pl-5 text-xs">
+            {pendingRequests.map((r) => (
+              <li key={r.id}>
+                {REQUEST_ACTION_LABEL[r.action_type]} · {REQUEST_STATUS_LABEL[r.status]} ·{" "}
+                {formatDateTime(r.created_at)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {isAdmin && player.status === "approved" ? (
         <div>
           <Link
@@ -168,6 +235,57 @@ export default async function JugadorDetallePage({
           <p className="whitespace-pre-line text-sm text-neutral-700">{player.private_notes}</p>
         </Section>
       ) : null}
+
+      <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+          Solicitudes
+        </h2>
+        {requests.length === 0 ? (
+          <p className="mt-3 text-sm text-neutral-500">
+            Sin solicitudes registradas para este jugador.
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y divide-neutral-100">
+            {requests.map((r) => (
+              <li key={r.id} className="py-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-neutral-900">
+                        {REQUEST_ACTION_LABEL[r.action_type]}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${REQUEST_STATUS_BADGE[r.status]}`}
+                      >
+                        {REQUEST_STATUS_LABEL[r.status]}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      Solicitada por {r.requester?.nombre ?? "—"} · {formatDateTime(r.created_at)}
+                      {r.reviewed_at ? (
+                        <>
+                          {" · "}revisada por {r.reviewer?.nombre ?? "—"} ·{" "}
+                          {formatDateTime(r.reviewed_at)}
+                        </>
+                      ) : null}
+                    </p>
+                    {r.reason ? (
+                      <p className="mt-1 whitespace-pre-line text-xs text-neutral-700">
+                        Motivo: {r.reason}
+                      </p>
+                    ) : null}
+                    {r.review_comment ? (
+                      <p className="mt-1 whitespace-pre-line text-xs text-neutral-700">
+                        Comentario: {r.review_comment}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <Section title="Auditoría">
         <Field label="Creado" value={formatDate(player.created_at)} />
