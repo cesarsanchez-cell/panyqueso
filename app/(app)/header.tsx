@@ -15,6 +15,7 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
   admin: [
     { label: "Inicio", href: "/" },
     { label: "Jugadores", href: "/jugadores" },
+    { label: "Lugares", href: "/lugares" },
   ],
   veedor: [
     { label: "Inicio", href: "/" },
