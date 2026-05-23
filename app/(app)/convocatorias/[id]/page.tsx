@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth/require-role";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { generateTeams, type GeneratorInput } from "@/lib/teams/generate";
 
 import { AddPlayerForm } from "./add-player-form";
 import { CancelForm } from "./cancel-form";
@@ -111,7 +112,7 @@ export default async function ConvocatoriaDetallePage({
     .from("convocatoria_players")
     .select(
       `id, added_at, attendance_status,
-       player:players!player_id(id, nombre, role_field, position_pref, status)`,
+       player:players!player_id(id, nombre, role_field, position_pref, status, internal_score)`,
     )
     .eq("convocatoria_id", id)
     .order("added_at", { ascending: true });
@@ -129,6 +130,29 @@ export default async function ConvocatoriaDetallePage({
   // Selector: solo se muestra si admin + abierta. Carga players approved
   // filtrados por searchParams, excluyendo los ya convocados.
   const showSelector = isAdmin && isOpen;
+
+  // Preview de teams: admin + abierta + al menos 10 convocados (mínimo
+  // jugable: 5 vs 5 segun el plan v4).
+  const MIN_CONVOCADOS_PARA_GENERAR = 10;
+  const canGenerateTeams = isAdmin && isOpen && convocados.length >= MIN_CONVOCADOS_PARA_GENERAR;
+
+  const generatorInput: GeneratorInput[] = canGenerateTeams
+    ? convocados
+        .map((cp) => cp.player)
+        .filter(
+          (p): p is NonNullable<typeof p> & { internal_score: number } =>
+            p !== null && p.internal_score !== null,
+        )
+        .map((p) => ({
+          id: p.id,
+          nombre: p.nombre,
+          role_field: p.role_field,
+          position_pref: p.position_pref,
+          internal_score: Number(p.internal_score),
+        }))
+    : [];
+
+  const teamPreview = canGenerateTeams ? generateTeams(generatorInput) : null;
 
   const q = (sp.q ?? "").trim();
   const rol = parseRol(sp.rol);
@@ -324,6 +348,62 @@ export default async function ConvocatoriaDetallePage({
         </section>
       ) : null}
 
+      {teamPreview ? (
+        <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+              Teams sugeridos (preview)
+            </h2>
+            <p className="text-xs text-neutral-500">
+              Algoritmo determinístico · diferencia de score{" "}
+              <span
+                className={
+                  teamPreview.totalDiff > 2 ? "font-semibold text-amber-700" : "text-neutral-700"
+                }
+              >
+                {teamPreview.totalDiff.toFixed(2)}
+              </span>
+            </p>
+          </div>
+
+          <p className="mt-1 text-xs text-neutral-500">
+            Esta es una sugerencia: en el próximo PR vas a poder mover jugadores y confirmar el
+            match.
+          </p>
+
+          {teamPreview.warnings.length > 0 ? (
+            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <p className="font-medium">Avisos del generador</p>
+              <ul className="mt-1 list-disc pl-5 text-xs">
+                {teamPreview.warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <TeamColumn
+              label="Team A"
+              composition={teamPreview.teamA}
+              positionDist={teamPreview.positionDist.A}
+            />
+            <TeamColumn
+              label="Team B"
+              composition={teamPreview.teamB}
+              positionDist={teamPreview.positionDist.B}
+            />
+          </div>
+        </section>
+      ) : null}
+
+      {isAdmin && isOpen && !canGenerateTeams ? (
+        <section className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-5 text-sm text-neutral-600">
+          Para generar el preview de teams hacen falta al menos {MIN_CONVOCADOS_PARA_GENERAR}{" "}
+          convocados. Llevás {convocados.length}.
+        </section>
+      ) : null}
+
       {isAdmin && isOpen ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
@@ -338,6 +418,60 @@ export default async function ConvocatoriaDetallePage({
           </div>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+type TeamComposition = NonNullable<ReturnType<typeof generateTeams>>["teamA"];
+
+function TeamColumn({
+  label,
+  composition,
+  positionDist,
+}: {
+  label: string;
+  composition: TeamComposition;
+  positionDist: Record<PositionPref, number>;
+}) {
+  const total = composition.players.length + (composition.goalkeeper ? 1 : 0);
+
+  return (
+    <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="text-sm font-semibold text-neutral-900">{label}</h3>
+        <p className="text-xs text-neutral-500">
+          {total} jug. · score {composition.totalScore.toFixed(2)}
+        </p>
+      </div>
+
+      <ul className="mt-3 space-y-1.5 text-sm">
+        {composition.goalkeeper ? (
+          <li className="flex items-center justify-between gap-2">
+            <span className="truncate text-neutral-900">
+              <span className="mr-1.5 inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-800">
+                GK
+              </span>
+              {composition.goalkeeper.nombre}
+            </span>
+            <span className="shrink-0 text-xs text-neutral-500">
+              {composition.goalkeeper.internal_score.toFixed(2)}
+            </span>
+          </li>
+        ) : (
+          <li className="text-xs italic text-amber-700">Sin arquero asignado</li>
+        )}
+        {composition.players.map((p) => (
+          <li key={p.id} className="flex items-center justify-between gap-2">
+            <span className="truncate text-neutral-900">{p.nombre}</span>
+            <span className="shrink-0 text-xs text-neutral-500">{p.internal_score.toFixed(2)}</span>
+          </li>
+        ))}
+      </ul>
+
+      <p className="mt-3 border-t border-neutral-200 pt-2 text-xs text-neutral-600">
+        DEF {positionDist.defensor} · MED {positionDist.mediocampista} · DEL{" "}
+        {positionDist.delantero}
+      </p>
     </div>
   );
 }
