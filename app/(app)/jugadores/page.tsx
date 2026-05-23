@@ -40,12 +40,14 @@ function parseStatus(raw: string | undefined): PlayerStatus | null {
 export default async function JugadoresPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; created?: string }>;
 }) {
-  await requireRole(["admin", "veedor"]);
+  const ctx = await requireRole(["admin", "veedor"]);
 
   const params = await searchParams;
   const statusFilter = parseStatus(params.status);
+  const isAdmin = ctx.profile.role === "admin";
+  const showCreatedFlash = params.created === "1";
 
   const supabase = await createClient();
   let query = supabase
@@ -67,7 +69,21 @@ export default async function JugadoresPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Jugadores</h1>
+        {isAdmin ? (
+          <Link
+            href="/jugadores/nuevo"
+            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-neutral-800"
+          >
+            Nuevo jugador
+          </Link>
+        ) : null}
       </div>
+
+      {showCreatedFlash ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          Solicitud creada. Queda pendiente de aprobación por un veedor.
+        </div>
+      ) : null}
 
       <nav className="-mb-px flex gap-2 overflow-x-auto border-b border-neutral-200">
         {FILTERS.map((opt) => {
