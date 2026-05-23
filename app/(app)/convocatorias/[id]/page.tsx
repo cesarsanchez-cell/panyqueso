@@ -11,6 +11,7 @@ import { CancelForm } from "./cancel-form";
 import { ConfirmMatchForm } from "./confirm-match-form";
 import { ClearDraftForm, GenerateDraftForm, PromoteToGKForm, SwapPlayerForm } from "./draft-forms";
 import { RemovePlayerForm } from "./remove-player-form";
+import { ResultForm } from "./result-form";
 
 type Status = Database["public"]["Enums"]["convocatoria_status"];
 type RoleField = Database["public"]["Enums"]["player_role_field"];
@@ -80,6 +81,31 @@ function formatHora(raw: string): string {
   return raw.slice(0, 5);
 }
 
+type SupabaseLike = Awaited<ReturnType<typeof createClient>>;
+
+async function loadMatch(supabase: SupabaseLike, convocatoriaId: string) {
+  const { data, error } = await supabase
+    .from("matches")
+    .select(
+      `id, score_team_a, score_team_b, winner, notas, confirmed_at, confirmed_with_warning,
+       reviewer:profiles!confirmed_by(nombre),
+       teams:match_teams!match_id(
+         id, team_label, total_score,
+         players:match_team_players!match_team_id(
+           id, is_goalkeeper, assigned_position,
+           player:players!player_id(id, nombre, role_field, position_pref, internal_score)
+         )
+       )`,
+    )
+    .eq("convocatoria_id", convocatoriaId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`No se pudo cargar el partido: ${error.message}`);
+  }
+  return data;
+}
+
 export default async function ConvocatoriaDetallePage({
   params,
   searchParams,
@@ -127,7 +153,14 @@ export default async function ConvocatoriaDetallePage({
   const convocadoIds = new Set(convocados.map((cp) => cp.player?.id).filter(Boolean) as string[]);
 
   const isOpen = convocatoria.status === "abierta";
+  const isClosed = convocatoria.status === "cerrada";
+  const isPlayed = convocatoria.status === "jugada";
   const overCupo = convocados.length > convocatoria.cupo_maximo;
+
+  // Match data: si la convocatoria ya fue confirmada (cerrada o jugada),
+  // cargamos matches + match_teams + match_team_players para renderizar la
+  // vista oficial del partido (no del draft).
+  const match = isClosed || isPlayed ? await loadMatch(supabase, id) : null;
 
   // Selector: solo se muestra si admin + abierta. Carga players approved
   // filtrados por searchParams, excluyendo los ya convocados.
@@ -362,7 +395,16 @@ export default async function ConvocatoriaDetallePage({
         </section>
       ) : null}
 
-      {canGenerateTeams || teamDraft ? (
+      {match ? (
+        <MatchSection
+          match={match}
+          convocatoriaId={convocatoria.id}
+          isAdmin={isAdmin}
+          isPlayed={isPlayed}
+        />
+      ) : null}
+
+      {!match && (canGenerateTeams || teamDraft) ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
@@ -438,6 +480,136 @@ export default async function ConvocatoriaDetallePage({
           </div>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+type MatchData = NonNullable<Awaited<ReturnType<typeof loadMatch>>>;
+
+const WINNER_LABEL: Record<NonNullable<MatchData["winner"]>, string> = {
+  a: "Ganó Team A",
+  b: "Ganó Team B",
+  empate: "Empate",
+};
+
+function MatchSection({
+  match,
+  convocatoriaId,
+  isAdmin,
+  isPlayed,
+}: {
+  match: MatchData;
+  convocatoriaId: string;
+  isAdmin: boolean;
+  isPlayed: boolean;
+}) {
+  const hasResult = match.score_team_a !== null && match.score_team_b !== null;
+  const teams = [...(match.teams ?? [])].sort((a, b) => a.team_label.localeCompare(b.team_label));
+
+  return (
+    <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Partido</h2>
+        {hasResult && match.winner ? (
+          <p className="text-sm font-semibold text-emerald-700">
+            {WINNER_LABEL[match.winner]} · {match.score_team_a} a {match.score_team_b}
+          </p>
+        ) : (
+          <p className="text-xs text-neutral-500">Sin resultado cargado todavía</p>
+        )}
+      </div>
+
+      {match.confirmed_with_warning ? (
+        <p className="mt-2 text-xs text-amber-700">
+          Confirmado con avisos (ver balance_snapshot del partido).
+        </p>
+      ) : null}
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        {teams.map((t) => (
+          <MatchTeamColumn key={t.id} team={t} />
+        ))}
+      </div>
+
+      {match.notas ? (
+        <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Notas</p>
+          <p className="mt-1 whitespace-pre-line text-sm text-neutral-700">{match.notas}</p>
+        </div>
+      ) : null}
+
+      {isAdmin ? (
+        <div className="mt-5 border-t border-neutral-200 pt-5">
+          <h3 className="text-sm font-semibold text-neutral-900">
+            {hasResult ? "Editar resultado" : "Cargar resultado"}
+          </h3>
+          {!hasResult ? (
+            <p className="mt-1 text-xs text-neutral-500">
+              Al guardar la primera vez, la convocatoria pasa a <code>jugada</code>.
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-neutral-500">
+              Podés editar el resultado mientras la convocatoria esté en <code>jugada</code>.
+            </p>
+          )}
+          <div className="mt-3">
+            <ResultForm
+              convocatoriaId={convocatoriaId}
+              initialScoreA={match.score_team_a}
+              initialScoreB={match.score_team_b}
+              initialNotas={match.notas}
+              hasResult={hasResult}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {/* isPlayed referenciado solo para futuras secciones (PR 2 de Fase 7
+          va a usar este flag para habilitar inputs de goles por jugador). */}
+      <span hidden>{isPlayed ? "1" : "0"}</span>
+    </section>
+  );
+}
+
+function MatchTeamColumn({ team }: { team: MatchData["teams"][number] }) {
+  const players = team.players ?? [];
+  const sorted = [...players].sort((a, b) => {
+    if (a.is_goalkeeper !== b.is_goalkeeper) return a.is_goalkeeper ? -1 : 1;
+    const sa = a.player?.internal_score ?? 0;
+    const sb = b.player?.internal_score ?? 0;
+    return sb - sa;
+  });
+
+  return (
+    <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="text-sm font-semibold text-neutral-900">Team {team.team_label}</h3>
+        <p className="text-xs text-neutral-500">
+          {players.length} jug. · score{" "}
+          {team.total_score !== null ? Number(team.total_score).toFixed(2) : "—"}
+        </p>
+      </div>
+      <ul className="mt-3 space-y-1.5 text-sm">
+        {sorted.map((mtp) => {
+          const p = mtp.player;
+          if (!p) return null;
+          return (
+            <li key={mtp.id} className="flex items-center justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-1.5">
+                {mtp.is_goalkeeper ? (
+                  <span className="inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-800">
+                    GK
+                  </span>
+                ) : null}
+                <span className="truncate text-neutral-900">{p.nombre}</span>
+              </span>
+              <span className="shrink-0 text-xs text-neutral-500">
+                {Number(p.internal_score ?? 0).toFixed(2)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
