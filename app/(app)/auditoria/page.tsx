@@ -82,7 +82,7 @@ export default async function AuditoriaPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  await requireRole("veedor");
+  const ctx = await requireRole("veedor");
 
   const sp = await searchParams;
   const tab = parseTab(sp.tab);
@@ -201,6 +201,7 @@ export default async function AuditoriaPage({
             <RequestCard
               key={r.id}
               canDecide={r.status === "pending" || r.status === "flagged"}
+              isOwn={r.requested_by === ctx.userId}
               request={{
                 id: r.id,
                 action_type: r.action_type,

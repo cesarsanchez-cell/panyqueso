@@ -89,7 +89,15 @@ function renderProposed(action: ActionType, proposed: Json, old: Json): React.Re
   );
 }
 
-export function RequestCard({ request, canDecide }: { request: RequestView; canDecide: boolean }) {
+export function RequestCard({
+  request,
+  canDecide,
+  isOwn,
+}: {
+  request: RequestView;
+  canDecide: boolean;
+  isOwn: boolean;
+}) {
   const [state, formAction, pending] = useActionState<DecisionState, FormData>(decideRequest, null);
 
   const targetLabel =
@@ -131,7 +139,16 @@ export function RequestCard({ request, canDecide }: { request: RequestView; canD
         </div>
       </div>
 
-      {canDecide ? (
+      {canDecide && isOwn ? (
+        <div
+          role="status"
+          className="mt-5 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700"
+        >
+          Vos creaste esta solicitud — esperá la decisión de otro veedor.
+        </div>
+      ) : null}
+
+      {canDecide && !isOwn ? (
         <form action={formAction} className="mt-5 space-y-3">
           <input type="hidden" name="request_id" value={request.id} />
           <div>
