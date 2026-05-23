@@ -5,7 +5,9 @@ import { requireRole } from "@/lib/auth/require-role";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
-type SearchParams = { proposed?: string };
+import { StatusChangeForm } from "./status-change-form";
+
+type SearchParams = { proposed?: string; deactivate?: string; reactivate?: string };
 
 type PlayerStatus = Database["public"]["Enums"]["player_status"];
 type PlayerRoleField = Database["public"]["Enums"]["player_role_field"];
@@ -63,6 +65,8 @@ export default async function JugadorDetallePage({
   const sp = await searchParams;
   const isAdmin = ctx.profile.role === "admin";
   const showProposedFlash = sp.proposed === "1";
+  const showDeactivateFlash = sp.deactivate === "1";
+  const showReactivateFlash = sp.reactivate === "1";
 
   const supabase = await createClient();
   const { data: player, error } = await supabase
@@ -111,6 +115,16 @@ export default async function JugadorDetallePage({
           Solicitud de cambio creada. Queda pendiente de aprobación por un veedor.
         </div>
       ) : null}
+      {showDeactivateFlash ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          Solicitud de desactivación creada. Queda pendiente del veedor.
+        </div>
+      ) : null}
+      {showReactivateFlash ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          Solicitud de reactivación creada. Queda pendiente del veedor.
+        </div>
+      ) : null}
 
       {isAdmin && player.status === "approved" ? (
         <div>
@@ -156,6 +170,13 @@ export default async function JugadorDetallePage({
         <Field label="Creado" value={formatDate(player.created_at)} />
         <Field label="Actualizado" value={formatDate(player.updated_at)} />
       </Section>
+
+      {isAdmin && player.status === "approved" ? (
+        <StatusChangeForm playerId={player.id} action="deactivate_player" />
+      ) : null}
+      {isAdmin && player.status === "inactive" ? (
+        <StatusChangeForm playerId={player.id} action="reactivate_player" />
+      ) : null}
     </div>
   );
 }
