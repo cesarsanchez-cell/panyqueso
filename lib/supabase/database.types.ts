@@ -776,7 +776,22 @@ export type Database = {
       };
     };
     Views: {
-      [_ in never]: never;
+      players_public: {
+        Row: {
+          apodo: string | null;
+          avatar_url: string | null;
+          fecha_nacimiento: string | null;
+          id: string | null;
+          nombre: string | null;
+          pierna_habil: Database["public"]["Enums"]["pierna_habil_enum"] | null;
+          position_pref: Database["public"]["Enums"]["position_pref"] | null;
+          positions_possible: Database["public"]["Enums"]["position_pref"][] | null;
+          role_field: Database["public"]["Enums"]["player_role_field"] | null;
+          status: Database["public"]["Enums"]["player_status"] | null;
+          ubicacion_maps_url: string | null;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       approve_player_change_request: {
@@ -796,9 +811,17 @@ export type Database = {
         Args: { p_match_id: string };
         Returns: undefined;
       };
+      current_player_id: {
+        Args: never;
+        Returns: string;
+      };
       current_user_role: {
         Args: never;
         Returns: Database["public"]["Enums"]["user_role"];
+      };
+      is_active_member_of_grupo: {
+        Args: { p_grupo_id: string };
+        Returns: boolean;
       };
       get_invite_by_token: {
         Args: { p_token: string };
