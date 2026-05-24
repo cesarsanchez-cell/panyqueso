@@ -17,7 +17,7 @@ type PlayerCore = {
   id: string;
   nombre: string;
   role_field: "arquero" | "jugador_campo" | "mixto";
-  position_pref: "defensor" | "mediocampista" | "delantero";
+  position_pref: "arquero" | "defensor" | "mediocampista" | "delantero";
   internal_score: number;
 };
 
@@ -41,7 +41,7 @@ function sumScores(
 }
 
 function positionDist(ids: string[], byId: Map<string, PlayerCore>) {
-  const dist = { defensor: 0, mediocampista: 0, delantero: 0 };
+  const dist = { arquero: 0, defensor: 0, mediocampista: 0, delantero: 0 };
   for (const id of ids) {
     const p = byId.get(id);
     if (p) dist[p.position_pref]++;

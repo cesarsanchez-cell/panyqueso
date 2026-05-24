@@ -15,7 +15,7 @@ type RatingConfidence = Database["public"]["Enums"]["rating_confidence"];
 export type ProposeChangeState = null | { error: string } | { fieldErrors: Record<string, string> };
 
 const ROLES: readonly PlayerRoleField[] = ["arquero", "jugador_campo", "mixto"];
-const POSITIONS: readonly PositionPref[] = ["defensor", "mediocampista", "delantero"];
+const POSITIONS: readonly PositionPref[] = ["arquero", "defensor", "mediocampista", "delantero"];
 const CONFIDENCES: readonly RatingConfidence[] = ["baja", "media", "alta"];
 
 function asString(v: FormDataEntryValue | null): string {

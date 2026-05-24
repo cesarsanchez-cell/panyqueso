@@ -53,7 +53,7 @@ function emptyComposition(): TeamComposition {
 }
 
 function emptyPositionDist(): Record<PositionPref, number> {
-  return { defensor: 0, mediocampista: 0, delantero: 0 };
+  return { arquero: 0, defensor: 0, mediocampista: 0, delantero: 0 };
 }
 
 function teamCount(t: TeamComposition): number {

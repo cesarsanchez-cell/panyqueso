@@ -11,6 +11,7 @@ const ROLE_OPTIONS = [
 ] as const;
 
 const POSITION_OPTIONS = [
+  { value: "arquero", label: "Arquero" },
   { value: "defensor", label: "Defensor" },
   { value: "mediocampista", label: "Mediocampista" },
   { value: "delantero", label: "Delantero" },
