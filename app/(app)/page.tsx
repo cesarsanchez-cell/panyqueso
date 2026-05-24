@@ -29,6 +29,13 @@ const CARDS: CardLink[] = [
     roles: ["veedor"],
   },
   {
+    href: "/grupos",
+    title: "Grupos",
+    description:
+      "Grupos recurrentes (lugar/día/hora) con titulares y cola FIFO de suplentes persistente.",
+    roles: ["admin"],
+  },
+  {
     href: "/lugares",
     title: "Lugares",
     description: "Canchas / sedes donde se juegan los partidos.",
