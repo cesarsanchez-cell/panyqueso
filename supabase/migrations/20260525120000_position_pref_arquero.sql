@@ -1,0 +1,22 @@
+-- ============================================================================
+-- Post-MVP: agregar 'arquero' al enum position_pref
+-- ============================================================================
+--
+-- Bug detectado en QA: el form de alta de jugador tenia dos campos:
+--   1. Rol en cancha (role_field): Arquero / Jugador de campo / Mixto
+--   2. Posicion preferida (position_pref): Defensor / Mediocampista / Delantero
+--
+-- Inconsistencia: si role_field='arquero', la position_pref no tenia opcion
+-- 'arquero' aunque era obligatoria. Forzaba al usuario a poner una posicion
+-- de campo sin sentido.
+--
+-- Fix forward-only: extender el enum position_pref con 'arquero'. El algoritmo
+-- de team-generator usa position_pref solo para reporting (distribucion de
+-- posiciones en balance_meta), no para decidir teams, asi que agregar un
+-- nuevo bucket no rompe la logica.
+--
+-- ALTER TYPE ADD VALUE no se puede correr en transaccion en algunas versiones
+-- de Postgres, pero Postgres 12+ lo permite. Supabase corre PG 15+, asi que ok.
+-- ============================================================================
+
+alter type public.position_pref add value if not exists 'arquero';

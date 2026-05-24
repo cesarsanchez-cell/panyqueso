@@ -41,13 +41,14 @@ const ROLE_LABEL: Record<RoleField, string> = {
 };
 
 const POSITION_LABEL: Record<PositionPref, string> = {
+  arquero: "Arquero",
   defensor: "Defensor",
   mediocampista: "Mediocampista",
   delantero: "Delantero",
 };
 
 const ROLES: readonly RoleField[] = ["arquero", "jugador_campo", "mixto"];
-const POSITIONS: readonly PositionPref[] = ["defensor", "mediocampista", "delantero"];
+const POSITIONS: readonly PositionPref[] = ["arquero", "defensor", "mediocampista", "delantero"];
 
 function parseRol(raw: string | undefined): RoleField | null {
   return (ROLES as readonly string[]).includes(raw ?? "") ? (raw as RoleField) : null;
@@ -768,6 +769,7 @@ function DraftTeamColumn({
   const totalScore = sumScores(side.playerIds, side.goalkeeperPlayerId, playerInfoById);
 
   const positionDist: Record<PositionPref, number> = {
+    arquero: 0,
     defensor: 0,
     mediocampista: 0,
     delantero: 0,
@@ -838,8 +840,8 @@ function DraftTeamColumn({
       </ul>
 
       <p className="mt-3 border-t border-neutral-200 pt-2 text-xs text-neutral-600">
-        DEF {positionDist.defensor} · MED {positionDist.mediocampista} · DEL{" "}
-        {positionDist.delantero}
+        ARQ {positionDist.arquero} · DEF {positionDist.defensor} · MED {positionDist.mediocampista}{" "}
+        · DEL {positionDist.delantero}
       </p>
     </div>
   );

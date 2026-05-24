@@ -593,7 +593,7 @@ export type Database = {
       match_winner: "a" | "b" | "empate";
       player_role_field: "arquero" | "jugador_campo" | "mixto";
       player_status: "pending" | "approved" | "inactive";
-      position_pref: "defensor" | "mediocampista" | "delantero";
+      position_pref: "defensor" | "mediocampista" | "delantero" | "arquero";
       rating_confidence: "baja" | "media" | "alta";
       user_role: "admin" | "veedor";
     };
@@ -737,7 +737,7 @@ export const Constants = {
       match_winner: ["a", "b", "empate"],
       player_role_field: ["arquero", "jugador_campo", "mixto"],
       player_status: ["pending", "approved", "inactive"],
-      position_pref: ["defensor", "mediocampista", "delantero"],
+      position_pref: ["defensor", "mediocampista", "delantero", "arquero"],
       rating_confidence: ["baja", "media", "alta"],
       user_role: ["admin", "veedor"],
     },

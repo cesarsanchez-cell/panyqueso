@@ -31,6 +31,7 @@ const ROLE_FIELD_LABEL: Record<PlayerRoleField, string> = {
 };
 
 const POSITION_PREF_LABEL: Record<PositionPref, string> = {
+  arquero: "Arquero",
   defensor: "Defensor",
   mediocampista: "Mediocampista",
   delantero: "Delantero",
