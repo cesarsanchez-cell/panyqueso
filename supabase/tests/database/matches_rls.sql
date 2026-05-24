@@ -66,7 +66,7 @@ values (
 insert into public.matches (
   id, convocatoria_id, fecha, algorithm_version, confirmed_by, confirmed_at
 ) values (
-  '00000000-0000-0000-0000-0000000000m1',
+  '00000000-0000-0000-0000-0000000000f1',
   '00000000-0000-0000-0000-0000000000c1',
   current_date + 1, 'v1.0',
   '00000000-0000-0000-0000-0000000000a1', now()
@@ -92,19 +92,19 @@ select plan(10);
 -- ---------------------------------------------------------------------------
 select _as('00000000-0000-0000-0000-0000000000a1');
 select isnt_empty(
-  $$select 1 from public.matches where id = '00000000-0000-0000-0000-0000000000m1'$$,
+  $$select 1 from public.matches where id = '00000000-0000-0000-0000-0000000000f1'$$,
   'admin: SELECT matches devuelve fila'
 );
 
 select _as('00000000-0000-0000-0000-0000000000a2');
 select isnt_empty(
-  $$select 1 from public.matches where id = '00000000-0000-0000-0000-0000000000m1'$$,
+  $$select 1 from public.matches where id = '00000000-0000-0000-0000-0000000000f1'$$,
   'veedor: SELECT matches devuelve fila'
 );
 
 select _as('00000000-0000-0000-0000-0000000000a3');
 select is_empty(
-  $$select 1 from public.matches where id = '00000000-0000-0000-0000-0000000000m1'$$,
+  $$select 1 from public.matches where id = '00000000-0000-0000-0000-0000000000f1'$$,
   'sin rol: SELECT matches filtrado por RLS'
 );
 
@@ -114,14 +114,14 @@ select is_empty(
 select _as('00000000-0000-0000-0000-0000000000a1');
 select lives_ok(
   $$update public.matches set score_team_a = 3, score_team_b = 2, winner = 'a'
-     where id = '00000000-0000-0000-0000-0000000000m1'$$,
+     where id = '00000000-0000-0000-0000-0000000000f1'$$,
   'admin: UPDATE matches lives_ok'
 );
 
 select _as('00000000-0000-0000-0000-0000000000a2');
 select is_empty(
   $$update public.matches set score_team_a = 9
-     where id = '00000000-0000-0000-0000-0000000000m1' returning 1$$,
+     where id = '00000000-0000-0000-0000-0000000000f1' returning 1$$,
   'veedor: UPDATE matches filtrado por RLS (is_empty)'
 );
 
@@ -132,7 +132,7 @@ select _as('00000000-0000-0000-0000-0000000000a1');
 select lives_ok(
   $$insert into public.match_player_stats (match_id, player_id, goals)
     values (
-      '00000000-0000-0000-0000-0000000000m1',
+      '00000000-0000-0000-0000-0000000000f1',
       '00000000-0000-0000-0000-0000000000b1',
       2
     )$$,
@@ -143,7 +143,7 @@ select _as('00000000-0000-0000-0000-0000000000a2');
 select throws_ok(
   $$insert into public.match_player_stats (match_id, player_id, goals)
     values (
-      '00000000-0000-0000-0000-0000000000m1',
+      '00000000-0000-0000-0000-0000000000f1',
       '00000000-0000-0000-0000-0000000000b1',
       99
     )$$,
@@ -158,7 +158,7 @@ select throws_ok(
 select _as('00000000-0000-0000-0000-0000000000a1');
 select lives_ok(
   $$update public.match_player_stats set goals = 3
-     where match_id = '00000000-0000-0000-0000-0000000000m1'
+     where match_id = '00000000-0000-0000-0000-0000000000f1'
        and player_id = '00000000-0000-0000-0000-0000000000b1'$$,
   'admin: UPDATE match_player_stats lives_ok'
 );
@@ -166,7 +166,7 @@ select lives_ok(
 select _as('00000000-0000-0000-0000-0000000000a2');
 select is_empty(
   $$update public.match_player_stats set goals = 9
-     where match_id = '00000000-0000-0000-0000-0000000000m1'
+     where match_id = '00000000-0000-0000-0000-0000000000f1'
      returning 1$$,
   'veedor: UPDATE match_player_stats filtrado por RLS (is_empty)'
 );
@@ -177,7 +177,7 @@ select is_empty(
 select _as('00000000-0000-0000-0000-0000000000a2');
 select isnt_empty(
   $$select 1 from public.match_player_stats
-     where match_id = '00000000-0000-0000-0000-0000000000m1'$$,
+     where match_id = '00000000-0000-0000-0000-0000000000f1'$$,
   'veedor: SELECT match_player_stats devuelve fila'
 );
 
