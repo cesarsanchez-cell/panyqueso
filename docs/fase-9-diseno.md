@@ -4,6 +4,8 @@ Documento de diseño previo a la implementación. Captura las decisiones tomadas
 
 **Estado**: borrador para revisión. PR 0 — no contiene código, solo este documento.
 
+> **Actualización 2026-05-24**: descartamos Twilio + WhatsApp Business para el MVP de la fase. El onboarding pasa a ser **manual via WhatsApp común** (admin pega links) y el auth es **celular + password** (sin OTP). Detalle operativo en [`docs/onboarding-jugador.md`](onboarding-jugador.md). Los cambios aplicados a este doc están marcados en §5, §8 y §11.
+
 ---
 
 ## 1. Contexto y objetivo
@@ -37,9 +39,11 @@ Jugador recibe link y entra a /invite/<token> (pública, sin login):
 
   "No voy" → token se quema, marca declinado, fin.
 
-  "Voy" → flujo de signup:
-    - Confirma teléfono → OTP por WhatsApp (Twilio Sender) → valida.
+  "Voy" → flujo de signup (sin OTP):
+    - Celular pre-cargado read-only desde el token.
     - Form datos básicos: nombre, fecha_nacimiento, rol_field, position_pref, positions_possible.
+    - Jugador define un password en este mismo form (primer login).
+    - Sistema crea user en auth.users con email sintético (<phone>@phone.fdlm.local) + password.
     - Sistema crea row en players: phone=X, auth_user_id=Y, status='pending', sin ratings.
     - Sistema agrega al grupo según vacante:
         * Si hay cupo libre de titular → titular.
@@ -276,13 +280,11 @@ Se suma al enum `user_role` (antes solo admin/veedor).
 
 ### Login
 
-- Vía OTP por WhatsApp.
-- Implementación: Supabase Auth con phone provider + Twilio WhatsApp Sender.
-- Setup operativo previo (documentado aparte en `docs/twilio-whatsapp-setup.md`):
-  1. Crear cuenta Twilio.
-  2. Aprobar un WhatsApp Sender en Meta Business (lleva días, depende de Meta).
-  3. Crear template de OTP aprobado por Meta.
-  4. Configurar credenciales en Supabase Auth dashboard.
+- Vía **celular + password**. Sin OTP, sin SMS, sin WhatsApp Business.
+- Implementación: Supabase Auth con email/password. Internamente se usa un **email sintético** derivado del celular: `<phone>@phone.fdlm.local`. El jugador nunca lo ve ni lo tipea.
+- Onboarding manual: el admin reparte los links de invitación copiándolos al WhatsApp común. El detalle operativo (mensajes sugeridos, recovery de password, checklist) está en [`docs/onboarding-jugador.md`](onboarding-jugador.md).
+- Recovery de password en Fase 9: manual desde Supabase Dashboard (admin setea pass temporal). Plan B futuro: magic link al email opcional del jugador si configuramos SMTP.
+- Si en el futuro el grupo escala o se necesitan notificaciones automáticas, retomamos Twilio + WhatsApp Business. El modelo de datos ya está preparado (phone + auth_user_id) para hacer ese cambio sin migración.
 
 ### Identidad
 
@@ -382,12 +384,12 @@ Aproximación: ~13 PRs. Granularidad mixta según criterio: schema/RLS/SECURITY 
 | 0 | **Este documento de diseño** | Doc | No es código, es la fuente de verdad |
 | 1 | Schema base: grupos, grupo_membresias, player_invitations, columnas en players/lugares/convocatorias, role 'player', action_type 'assign_initial_ratings', default attendance, migración edad → fecha_nacimiento | Migration + RLS base | Riesgo alto de DB, va solo |
 | 2 | View `players_public` + RLS column-level + ajuste de `compute_internal_score` para leer fecha_nacimiento | RLS + RPC | Toca privacidad crítica, va solo |
-| 3 | Setup Twilio WhatsApp + Supabase Auth phone provider (+ doc operativo) | Config + docs | Bloqueante operacional, depende de Meta |
+| 3 | ~~Setup Twilio WhatsApp~~ → doc operativo de onboarding manual (`docs/onboarding-jugador.md`) | Docs | Mergeado como PR #60. Plan A descartado: vamos con onboarding manual + auth por celular+password |
 | 4 | UI admin: crear/listar/editar grupos + membresías + cola FIFO | UI admin | Bundle de UI |
 | 5 | UI admin: import bulk desde WA (`/grupos/[id]/importar`) | UI admin | Bundle de UI |
 | 6 | Server action `createInvitation` desde convocatoria (form individual) + cola de invites pendientes | Backend admin | Backend nuevo, va separado |
 | 7 | `/invite/<token>` página pública con info del partido y botones Voy/No voy | UI pública | Primera ruta pública, va separado |
-| 8 | Signup OTP WA + creación de player + alta automática a grupo (titular o cola) | Auth + backend | Crítico, va separado |
+| 8 | Signup desde /invite/<token>: form con password + creación de auth user (email sintético) + alta a players + membresía de grupo + login automático. Incluye `/login` aceptando celular+password. | Auth + backend | Crítico, va separado |
 | 9 | `/mi-perfil` (datos básicos editables — incluye apodo/pierna_habil/email/ubicación + upload de foto a Supabase Storage + próxima convocatoria con "No voy" + historial + posición en cola del grupo) | UI player + Storage | Bundle de UI player. Crea bucket `avatars` con RLS de Storage acá. |
 | 10 | "Clonar última convocatoria" + UI admin para movimientos manuales dentro de las 8h | UI admin | Bundle de UI |
 | 11 | Promoción automática del suplente cuando titular declina (server action + trigger según convenga) | Backend lógica | Algoritmo nuevo, va separado |
@@ -432,8 +434,8 @@ Esos quedan para fases posteriores si se necesitan.
 
 1. **Vos**: leer este doc tranquilo, marcar lo que no convenza o falte.
 2. **Vos**: si todo OK, decir "arrancamos" → se empieza por PR 1.
-3. **En paralelo** (porque depende de Meta y tarda): vos arrancás el trámite de Twilio + WhatsApp Sender mientras yo avanzo con PR 1–2 que no dependen de eso.
-4. PR 3 (config Twilio) se mergea cuando vos tengas las credenciales aprobadas. PRs 4–6 pueden avanzar sin Twilio porque son UI y backend sin auth player. PR 7 (signup) bloquea hasta tener Twilio operativo.
+3. Con el pivot a onboarding manual ya **no hay trámite externo bloqueante**. Todos los PRs siguientes (5 → 13) pueden encadenarse sin esperar a terceros.
+4. PR 8 (signup + login celular+password) ya no depende de Twilio; requiere `SUPABASE_SERVICE_ROLE_KEY` disponible en server actions para crear users desde el token de invite.
 
 ---
 
