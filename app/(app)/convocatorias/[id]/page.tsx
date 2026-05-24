@@ -592,24 +592,79 @@ function MatchSection({
         </div>
       ) : null}
 
-      {isAdmin ? (
-        <div className="mt-5 border-t border-neutral-200 pt-5">
-          <h3 className="text-sm font-semibold text-neutral-900">Goles por jugador</h3>
-          <p className="mt-1 text-xs text-neutral-500">
-            {isPlayed
-              ? "La suma de goles por team debería coincidir con el resultado."
-              : "Podés precargar goles ahora; el resultado se carga más arriba."}
-          </p>
-          <div className="mt-3">
-            <GoalsForm
-              convocatoriaId={convocatoriaId}
-              teams={goalsFormTeams}
-              initialGoalsByPlayerId={goalsByPlayerId}
-            />
-          </div>
-        </div>
-      ) : null}
+      <div className="mt-5 border-t border-neutral-200 pt-5">
+        <h3 className="text-sm font-semibold text-neutral-900">Goles por jugador</h3>
+        {isAdmin ? (
+          <>
+            <p className="mt-1 text-xs text-neutral-500">
+              {isPlayed
+                ? "La suma de goles por team debería coincidir con el resultado."
+                : "Podés precargar goles ahora; el resultado se carga más arriba."}
+            </p>
+            <div className="mt-3">
+              <GoalsForm
+                convocatoriaId={convocatoriaId}
+                teams={goalsFormTeams}
+                initialGoalsByPlayerId={goalsByPlayerId}
+              />
+            </div>
+          </>
+        ) : (
+          <GoalsReadOnly teams={goalsFormTeams} goalsByPlayerId={goalsByPlayerId} />
+        )}
+      </div>
     </section>
+  );
+}
+
+function GoalsReadOnly({
+  teams,
+  goalsByPlayerId,
+}: {
+  teams: GoalsFormTeam[];
+  goalsByPlayerId: Record<string, number>;
+}) {
+  return (
+    <div className="mt-3 grid gap-4 sm:grid-cols-2">
+      {teams.map((team) => {
+        const sum = team.players.reduce((acc, p) => acc + (goalsByPlayerId[p.playerId] ?? 0), 0);
+        const mismatch = team.score !== null && sum !== team.score;
+        return (
+          <div key={team.label} className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
+            <div className="flex items-baseline justify-between gap-2">
+              <h4 className="text-sm font-semibold text-neutral-900">Team {team.label}</h4>
+              <p className={`text-xs ${mismatch ? "text-amber-700" : "text-neutral-500"}`}>
+                Goles: {sum}
+                {team.score !== null ? ` / ${team.score}` : ""}
+              </p>
+            </div>
+            {mismatch ? (
+              <p className="mt-2 text-xs text-amber-700">
+                La suma de goles no coincide con el resultado ({team.score}).
+              </p>
+            ) : null}
+            <ul className="mt-3 space-y-1.5 text-sm">
+              {team.players.map((p) => {
+                const g = goalsByPlayerId[p.playerId] ?? 0;
+                return (
+                  <li key={p.playerId} className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      {p.isGoalkeeper ? (
+                        <span className="inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-800">
+                          GK
+                        </span>
+                      ) : null}
+                      <span className="truncate text-neutral-900">{p.nombre}</span>
+                    </span>
+                    <span className="shrink-0 text-xs font-medium text-neutral-700">{g}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
