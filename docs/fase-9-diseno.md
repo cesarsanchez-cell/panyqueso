@@ -59,7 +59,9 @@ Próxima semana:
   Admin click "Clonar última convocatoria".
   Sistema toma los titulares activos del grupo + los que jugaron como reemplazo la semana anterior (attendance='confirmado').
   Todos quedan en attendance='confirmado' por default.
-  Los suplentes esperan en la cola, no entran a la convocatoria todavía.
+  La cola de suplentes del grupo PERSISTE entre convocatorias: vive en grupo_membresias, no se resetea. M sigue siendo #1, N sigue siendo #2, etc.
+  Los suplentes no entran a convocatoria_players por default, pero quedan listos para ser promovidos automáticamente si algún titular se baja en esta nueva convocatoria.
+  Si un suplente jugó como reemplazo la semana pasada, sigue siendo suplente del grupo con la misma posición FIFO.
 
 Durante la semana, antes de 8h del partido:
   Cualquier titular se baja desde /mi-perfil → attendance='declinado'.
@@ -129,7 +131,8 @@ Constraints:
 | `used_at` | timestamptz null | cuándo aceptó |
 | `used_by_player_id` | uuid FK null | row de players creado al aceptar |
 | `declined_at` | timestamptz null | cuándo dijo "No voy" |
-| `expires_at` | timestamptz | computado al crear: min(partido - 8h, cuando se llene el cupo) |
+| `expires_at` | timestamptz | c
+omputado al crear: min(partido - 8h, cuando se llene el cupo) |
 
 Estado derivado en queries:
 - `pending`: used_at=null AND declined_at=null AND expires_at > now()
@@ -143,8 +146,17 @@ Estado derivado en queries:
 - `+ phone text null` (nullable para legacy)
 - `+ auth_user_id uuid null FK auth.users(id)` (nullable para legacy + invitados sin aceptar)
 - `+ fecha_nacimiento date null` (nullable solo durante la migración; después NOT NULL para los nuevos)
+- `+ apodo text null` — sobrenombre opcional, visible entre miembros del grupo.
+- `+ pierna_habil pierna_habil_enum null` — enum nuevo: `'derecha'`, `'izquierda'`, `'ambas'`. Opcional.
+- `+ email text null` — backup de contacto / futura recuperación de password. `unique where email is not null`.
+- `+ avatar_url text null` — referencia a Supabase Storage (bucket `avatars`). Opcional, lo sube el propio jugador.
+- `+ ubicacion_maps_url text null` — link de Google Maps a su ubicación, lo pega el jugador. Útil para ver desde dónde viene cada uno.
 - `- edad int` (eliminada después de migrar los datos)
-- Constraint nuevo: `unique (phone) where phone is not null`
+- Constraints nuevos:
+  - `unique (phone) where phone is not null`
+  - `unique (email) where email is not null`
+
+Enum nuevo: `pierna_habil_enum` con valores `'derecha'`, `'izquierda'`, `'ambas'`.
 
 #### `lugares`
 - `+ google_maps_url text null` — link de Google Maps que el admin pega manualmente.
@@ -199,6 +211,7 @@ Si todos los suplentes activos declinaron, la convocatoria queda con un hueco. E
 ### Lista de espera FIFO
 
 - Orden inicial: por `joined_at` (orden de entrada al grupo como suplente).
+- **La cola es del grupo, no de la convocatoria.** Persiste semana a semana en `grupo_membresias`. Cada nueva convocatoria hereda la misma cola; no se resetea ni se recrea.
 - Suplente que jugó como reemplazo: mantiene su posición.
 - Cuando un titular se baja del grupo permanentemente: primer suplente activo asciende a titular fijo, los demás suplentes se reordenan (cada uno sube un puesto).
 - Cuando un jugador nuevo acepta un invite: si hay vacante de titular activa, entra directo como titular; sino, al final de la cola de suplentes (`orden = max + 1`).
@@ -261,10 +274,12 @@ Se suma al enum `user_role` (antes solo admin/veedor).
 
 | Recurso | Admin | Veedor | Player (registrado) |
 |---|---|---|---|
-| Sus propios datos básicos | sí | sí | sí (puede editar nombre/pass/posición) |
+| Sus propios datos básicos (nombre, fecha_nac, posición, apodo, pierna, ubicación, foto) | sí | sí | sí (edita libre nombre/pass/posición/apodo/pierna/email/foto/ubicación) |
+| Su propio email | sí | sí | sí (lo edita) |
 | `internal_score`, technical/physical/mental de sí mismo | sí | sí | **NO** |
 | `private_notes` de sí mismo | sí | sí | **NO** |
-| Datos básicos de otros jugadores del grupo (nombre, fecha_nacimiento, edad, posición) | sí | sí | sí (solo de jugadores de sus grupos) |
+| Datos básicos de otros jugadores del grupo (nombre, fecha_nac, edad, posición, apodo, pierna, foto, ubicación) | sí | sí | sí (solo de jugadores de sus grupos) |
+| Email de otros jugadores | sí | sí | **NO** (es contacto privado, no se expone entre miembros) |
 | Ratings de otros jugadores | sí | sí | **NO** |
 | Lista de cola FIFO con nombres | sí | sí | sí (de sus grupos) |
 | Convocatorias y resultados | sí | sí | sí (de sus grupos) |
@@ -280,7 +295,8 @@ Player ve datos de **otros jugadores del mismo grupo**, pero solo columnas safe 
 PostgreSQL no soporta RLS column-level directamente. Dos opciones:
 
 **Opción A: View `players_public`**
-- View con SELECT de columnas safe (id, nombre, fecha_nacimiento, role_field, position_pref, positions_possible, status).
+- View con SELECT de columnas safe: `id, nombre, fecha_nacimiento, role_field, position_pref, positions_possible, status, apodo, pierna_habil, avatar_url, ubicacion_maps_url`.
+- **NO incluye**: `email, phone, technical, physical, mental, internal_score, private_notes, rating_confidence`.
 - RLS sobre la view que permite SELECT al player si comparte grupo activo con la row.
 - Los queries del frontend para player apuntan a esta view, no a `players`.
 
@@ -340,7 +356,7 @@ Aproximación: ~13 PRs. Granularidad mixta según criterio: schema/RLS/SECURITY 
 | 6 | Server action `createInvitation` desde convocatoria (form individual) + cola de invites pendientes | Backend admin | Backend nuevo, va separado |
 | 7 | `/invite/<token>` página pública con info del partido y botones Voy/No voy | UI pública | Primera ruta pública, va separado |
 | 8 | Signup OTP WA + creación de player + alta automática a grupo (titular o cola) | Auth + backend | Crítico, va separado |
-| 9 | `/mi-perfil` (datos básicos editables + próxima convocatoria con "No voy" + historial + posición en cola del grupo) | UI player | Bundle de UI player |
+| 9 | `/mi-perfil` (datos básicos editables — incluye apodo/pierna_habil/email/ubicación + upload de foto a Supabase Storage + próxima convocatoria con "No voy" + historial + posición en cola del grupo) | UI player + Storage | Bundle de UI player. Crea bucket `avatars` con RLS de Storage acá. |
 | 10 | "Clonar última convocatoria" + UI admin para movimientos manuales dentro de las 8h | UI admin | Bundle de UI |
 | 11 | Promoción automática del suplente cuando titular declina (server action + trigger según convenga) | Backend lógica | Algoritmo nuevo, va separado |
 | 12 | RPC `assign_initial_ratings` SECURITY DEFINER + integración con cola del veedor | Backend + audit | SECURITY DEFINER va separado |
