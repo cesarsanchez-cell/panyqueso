@@ -37,6 +37,7 @@ const ALL_ACTIONS: readonly ActionType[] = [
   "update_sensitive_fields",
   "deactivate_player",
   "reactivate_player",
+  "assign_initial_ratings",
 ];
 
 const ACTION_LABEL: Record<ActionType, string> = {
@@ -44,6 +45,7 @@ const ACTION_LABEL: Record<ActionType, string> = {
   update_sensitive_fields: "Cambio sensible",
   deactivate_player: "Desactivar",
   reactivate_player: "Reactivar",
+  assign_initial_ratings: "Calificación inicial",
 };
 
 const PAGE_SIZE = 20;
