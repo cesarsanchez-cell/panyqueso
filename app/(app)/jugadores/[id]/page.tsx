@@ -22,6 +22,7 @@ const REQUEST_ACTION_LABEL: Record<RequestAction, string> = {
   update_sensitive_fields: "Cambio sensible",
   deactivate_player: "Desactivación",
   reactivate_player: "Reactivación",
+  assign_initial_ratings: "Calificación inicial",
 };
 
 const REQUEST_STATUS_LABEL: Record<RequestStatus, string> = {

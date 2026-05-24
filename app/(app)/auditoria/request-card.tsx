@@ -15,6 +15,7 @@ const ACTION_LABEL: Record<ActionType, string> = {
   update_sensitive_fields: "Cambio sensible",
   deactivate_player: "Desactivar",
   reactivate_player: "Reactivar",
+  assign_initial_ratings: "Calificación inicial",
 };
 
 const STATUS_BADGE: Record<Status, string> = {

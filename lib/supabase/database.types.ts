@@ -119,6 +119,7 @@ export type Database = {
           created_by: string;
           cupo_maximo: number;
           fecha: string;
+          grupo_id: string | null;
           hora: string;
           id: string;
           lugar_id: string | null;
@@ -132,6 +133,7 @@ export type Database = {
           created_by: string;
           cupo_maximo?: number;
           fecha: string;
+          grupo_id?: string | null;
           hora?: string;
           id?: string;
           lugar_id?: string | null;
@@ -145,6 +147,7 @@ export type Database = {
           created_by?: string;
           cupo_maximo?: number;
           fecha?: string;
+          grupo_id?: string | null;
           hora?: string;
           id?: string;
           lugar_id?: string | null;
@@ -162,6 +165,13 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "convocatorias_grupo_id_fkey";
+            columns: ["grupo_id"];
+            isOneToOne: false;
+            referencedRelation: "grupos";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "convocatorias_lugar_id_fkey";
             columns: ["lugar_id"];
             isOneToOne: false;
@@ -170,22 +180,143 @@ export type Database = {
           },
         ];
       };
+      grupo_membresias: {
+        Row: {
+          created_at: string;
+          grupo_id: string;
+          id: string;
+          inactivated_at: string | null;
+          inactivated_by: string | null;
+          joined_at: string;
+          orden: number | null;
+          player_id: string;
+          status: Database["public"]["Enums"]["membresia_status"];
+          tipo: Database["public"]["Enums"]["membresia_tipo"];
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          grupo_id: string;
+          id?: string;
+          inactivated_at?: string | null;
+          inactivated_by?: string | null;
+          joined_at?: string;
+          orden?: number | null;
+          player_id: string;
+          status?: Database["public"]["Enums"]["membresia_status"];
+          tipo: Database["public"]["Enums"]["membresia_tipo"];
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          grupo_id?: string;
+          id?: string;
+          inactivated_at?: string | null;
+          inactivated_by?: string | null;
+          joined_at?: string;
+          orden?: number | null;
+          player_id?: string;
+          status?: Database["public"]["Enums"]["membresia_status"];
+          tipo?: Database["public"]["Enums"]["membresia_tipo"];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "grupo_membresias_grupo_id_fkey";
+            columns: ["grupo_id"];
+            isOneToOne: false;
+            referencedRelation: "grupos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "grupo_membresias_inactivated_by_fkey";
+            columns: ["inactivated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "grupo_membresias_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      grupos: {
+        Row: {
+          created_at: string;
+          cupo_titulares: number;
+          dia_semana: number;
+          hora: string;
+          id: string;
+          lugar_id: string;
+          nombre: string;
+          owner_id: string;
+          status: Database["public"]["Enums"]["grupo_status"];
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          cupo_titulares?: number;
+          dia_semana: number;
+          hora?: string;
+          id?: string;
+          lugar_id: string;
+          nombre: string;
+          owner_id: string;
+          status?: Database["public"]["Enums"]["grupo_status"];
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          cupo_titulares?: number;
+          dia_semana?: number;
+          hora?: string;
+          id?: string;
+          lugar_id?: string;
+          nombre?: string;
+          owner_id?: string;
+          status?: Database["public"]["Enums"]["grupo_status"];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "grupos_lugar_id_fkey";
+            columns: ["lugar_id"];
+            isOneToOne: false;
+            referencedRelation: "lugares";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "grupos_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       lugares: {
         Row: {
           created_at: string;
           created_by: string;
+          google_maps_url: string | null;
           id: string;
           nombre: string;
         };
         Insert: {
           created_at?: string;
           created_by: string;
+          google_maps_url?: string | null;
           id?: string;
           nombre: string;
         };
         Update: {
           created_at?: string;
           created_by?: string;
+          google_maps_url?: string | null;
           id?: string;
           nombre?: string;
         };
@@ -467,16 +598,97 @@ export type Database = {
           },
         ];
       };
+      player_invitations: {
+        Row: {
+          convocatoria_id: string | null;
+          created_at: string;
+          created_by: string;
+          declined_at: string | null;
+          expires_at: string;
+          grupo_id: string;
+          id: string;
+          nombre_tentativo: string | null;
+          phone: string;
+          token: string;
+          used_at: string | null;
+          used_by_player_id: string | null;
+        };
+        Insert: {
+          convocatoria_id?: string | null;
+          created_at?: string;
+          created_by: string;
+          declined_at?: string | null;
+          expires_at: string;
+          grupo_id: string;
+          id?: string;
+          nombre_tentativo?: string | null;
+          phone: string;
+          token: string;
+          used_at?: string | null;
+          used_by_player_id?: string | null;
+        };
+        Update: {
+          convocatoria_id?: string | null;
+          created_at?: string;
+          created_by?: string;
+          declined_at?: string | null;
+          expires_at?: string;
+          grupo_id?: string;
+          id?: string;
+          nombre_tentativo?: string | null;
+          phone?: string;
+          token?: string;
+          used_at?: string | null;
+          used_by_player_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "player_invitations_convocatoria_id_fkey";
+            columns: ["convocatoria_id"];
+            isOneToOne: false;
+            referencedRelation: "convocatorias";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "player_invitations_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "player_invitations_grupo_id_fkey";
+            columns: ["grupo_id"];
+            isOneToOne: false;
+            referencedRelation: "grupos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "player_invitations_used_by_player_id_fkey";
+            columns: ["used_by_player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       players: {
         Row: {
+          apodo: string | null;
+          auth_user_id: string | null;
+          avatar_url: string | null;
           created_at: string;
           created_by: string | null;
           edad: number;
+          email: string | null;
+          fecha_nacimiento: string | null;
           id: string;
           internal_score: number;
           mental: number;
           nombre: string;
+          phone: string | null;
           physical: number;
+          pierna_habil: Database["public"]["Enums"]["pierna_habil_enum"] | null;
           position_pref: Database["public"]["Enums"]["position_pref"];
           positions_possible: Database["public"]["Enums"]["position_pref"][];
           private_notes: string | null;
@@ -484,17 +696,25 @@ export type Database = {
           role_field: Database["public"]["Enums"]["player_role_field"];
           status: Database["public"]["Enums"]["player_status"];
           technical: number;
+          ubicacion_maps_url: string | null;
           updated_at: string;
         };
         Insert: {
+          apodo?: string | null;
+          auth_user_id?: string | null;
+          avatar_url?: string | null;
           created_at?: string;
           created_by?: string | null;
           edad: number;
+          email?: string | null;
+          fecha_nacimiento?: string | null;
           id?: string;
           internal_score?: number;
           mental: number;
           nombre: string;
+          phone?: string | null;
           physical: number;
+          pierna_habil?: Database["public"]["Enums"]["pierna_habil_enum"] | null;
           position_pref: Database["public"]["Enums"]["position_pref"];
           positions_possible?: Database["public"]["Enums"]["position_pref"][];
           private_notes?: string | null;
@@ -502,17 +722,25 @@ export type Database = {
           role_field: Database["public"]["Enums"]["player_role_field"];
           status?: Database["public"]["Enums"]["player_status"];
           technical: number;
+          ubicacion_maps_url?: string | null;
           updated_at?: string;
         };
         Update: {
+          apodo?: string | null;
+          auth_user_id?: string | null;
+          avatar_url?: string | null;
           created_at?: string;
           created_by?: string | null;
           edad?: number;
+          email?: string | null;
+          fecha_nacimiento?: string | null;
           id?: string;
           internal_score?: number;
           mental?: number;
           nombre?: string;
+          phone?: string | null;
           physical?: number;
+          pierna_habil?: Database["public"]["Enums"]["pierna_habil_enum"] | null;
           position_pref?: Database["public"]["Enums"]["position_pref"];
           positions_possible?: Database["public"]["Enums"]["position_pref"][];
           private_notes?: string | null;
@@ -520,6 +748,7 @@ export type Database = {
           role_field?: Database["public"]["Enums"]["player_role_field"];
           status?: Database["public"]["Enums"]["player_status"];
           technical?: number;
+          ubicacion_maps_url?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -571,6 +800,27 @@ export type Database = {
         Args: never;
         Returns: Database["public"]["Enums"]["user_role"];
       };
+      get_invite_by_token: {
+        Args: { p_token: string };
+        Returns: {
+          invite_id: string;
+          invite_phone: string;
+          invite_nombre_tentativo: string | null;
+          invite_used_at: string | null;
+          invite_declined_at: string | null;
+          invite_expires_at: string;
+          grupo_id: string;
+          grupo_nombre: string;
+          grupo_dia_semana: number;
+          grupo_hora: string;
+          grupo_cupo_titulares: number;
+          lugar_nombre: string;
+          lugar_google_maps_url: string | null;
+          convocatoria_id: string | null;
+          convocatoria_fecha: string | null;
+          convocatoria_hora: string | null;
+        }[];
+      };
       flag_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
@@ -586,16 +836,21 @@ export type Database = {
         | "create_player"
         | "update_sensitive_fields"
         | "deactivate_player"
-        | "reactivate_player";
+        | "reactivate_player"
+        | "assign_initial_ratings";
       change_request_status: "pending" | "approved" | "rejected" | "flagged";
       convocatoria_status: "abierta" | "cerrada" | "jugada" | "cancelada";
+      grupo_status: "activo" | "archivado";
       match_team_label: "A" | "B";
       match_winner: "a" | "b" | "empate";
+      membresia_status: "activo" | "inactivo";
+      membresia_tipo: "titular" | "suplente";
+      pierna_habil_enum: "derecha" | "izquierda" | "ambas";
       player_role_field: "arquero" | "jugador_campo" | "mixto";
       player_status: "pending" | "approved" | "inactive";
       position_pref: "defensor" | "mediocampista" | "delantero" | "arquero";
       rating_confidence: "baja" | "media" | "alta";
-      user_role: "admin" | "veedor";
+      user_role: "admin" | "veedor" | "player";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -730,16 +985,21 @@ export const Constants = {
         "update_sensitive_fields",
         "deactivate_player",
         "reactivate_player",
+        "assign_initial_ratings",
       ],
       change_request_status: ["pending", "approved", "rejected", "flagged"],
       convocatoria_status: ["abierta", "cerrada", "jugada", "cancelada"],
+      grupo_status: ["activo", "archivado"],
       match_team_label: ["A", "B"],
       match_winner: ["a", "b", "empate"],
+      membresia_status: ["activo", "inactivo"],
+      membresia_tipo: ["titular", "suplente"],
+      pierna_habil_enum: ["derecha", "izquierda", "ambas"],
       player_role_field: ["arquero", "jugador_campo", "mixto"],
       player_status: ["pending", "approved", "inactive"],
       position_pref: ["defensor", "mediocampista", "delantero", "arquero"],
       rating_confidence: ["baja", "media", "alta"],
-      user_role: ["admin", "veedor"],
+      user_role: ["admin", "veedor", "player"],
     },
   },
 } as const;
