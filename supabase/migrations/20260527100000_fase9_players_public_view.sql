@@ -100,34 +100,51 @@ comment on view public.players_public is
 
 grant select on public.players_public to authenticated;
 
--- 3. RLS para grupos: player ve los grupos donde tiene membresia activa -----
+-- 3. Helper: is_active_member_of_grupo() ------------------------------------
+-- Usado en las policies de grupos y grupo_membresias para evitar recursion.
+-- Si la policy de grupo_membresias hiciera un SELECT directo sobre la misma
+-- tabla, dispararia la policy de nuevo (loop). SECURITY DEFINER bypassa RLS
+-- y rompe el ciclo.
+create or replace function public.is_active_member_of_grupo(p_grupo_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select exists (
+    select 1
+      from public.grupo_membresias gm
+     where gm.grupo_id = p_grupo_id
+       and gm.player_id = public.current_player_id()
+       and gm.status = 'activo'
+  )
+$$;
+
+comment on function public.is_active_member_of_grupo(uuid) is
+  'Fase 9: helper SECURITY DEFINER para policies. Evita recursion al consultar grupo_membresias desde una policy sobre la misma tabla.';
+
+revoke all on function public.is_active_member_of_grupo(uuid) from public;
+grant execute on function public.is_active_member_of_grupo(uuid) to authenticated;
+
+-- 4. RLS para grupos: player ve los grupos donde tiene membresia activa -----
 create policy grupos_select_player
   on public.grupos
   for select
   to authenticated
   using (
     public.current_user_role() = 'player'
-    and exists (
-      select 1 from public.grupo_membresias gm
-       where gm.grupo_id = public.grupos.id
-         and gm.player_id = public.current_player_id()
-         and gm.status = 'activo'
-    )
+    and public.is_active_member_of_grupo(public.grupos.id)
   );
 
--- 4. RLS para grupo_membresias: player ve la cola completa de sus grupos ---
+-- 5. RLS para grupo_membresias: player ve la cola completa de sus grupos ---
 create policy grupo_membresias_select_player
   on public.grupo_membresias
   for select
   to authenticated
   using (
     public.current_user_role() = 'player'
-    and exists (
-      select 1 from public.grupo_membresias gm_self
-       where gm_self.grupo_id = public.grupo_membresias.grupo_id
-         and gm_self.player_id = public.current_player_id()
-         and gm_self.status = 'activo'
-    )
+    and public.is_active_member_of_grupo(public.grupo_membresias.grupo_id)
   );
 
 comment on policy grupo_membresias_select_player on public.grupo_membresias is

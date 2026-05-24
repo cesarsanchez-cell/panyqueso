@@ -819,6 +819,10 @@ export type Database = {
         Args: never;
         Returns: Database["public"]["Enums"]["user_role"];
       };
+      is_active_member_of_grupo: {
+        Args: { p_grupo_id: string };
+        Returns: boolean;
+      };
       get_invite_by_token: {
         Args: { p_token: string };
         Returns: {
