@@ -1,39 +1,82 @@
+import Link from "next/link";
+
 import { requireUser } from "@/lib/auth/require-role";
 
+type CardLink = {
+  href: string;
+  title: string;
+  description: string;
+  roles: Array<"admin" | "veedor">;
+};
+
+const CARDS: CardLink[] = [
+  {
+    href: "/jugadores",
+    title: "Jugadores",
+    description: "Listado, alta y propuestas de cambio. Admin crea solicitudes; veedor aprueba.",
+    roles: ["admin", "veedor"],
+  },
+  {
+    href: "/convocatorias",
+    title: "Convocatorias",
+    description: "Armado de partidos: convocados, draft de teams, confirmación y resultado.",
+    roles: ["admin", "veedor"],
+  },
+  {
+    href: "/auditoria",
+    title: "Auditoría",
+    description: "Cola de solicitudes pendientes de revisión. Aprobar, rechazar o flag.",
+    roles: ["veedor"],
+  },
+  {
+    href: "/lugares",
+    title: "Lugares",
+    description: "Canchas / sedes donde se juegan los partidos.",
+    roles: ["admin"],
+  },
+  {
+    href: "/perfil",
+    title: "Perfil",
+    description: "Cambio de password.",
+    roles: ["admin", "veedor"],
+  },
+];
+
 export default async function HomePage() {
-  // El layout ya garantiza sesion + rol. Llamamos de nuevo solo para leer el
-  // contexto (cacheado: no es una segunda query).
   const { profile } = await requireUser();
+  const role = profile.role;
+
+  const cards = CARDS.filter((c) => role && c.roles.includes(role));
 
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-neutral-900">Hola, bienvenido.</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-neutral-900">
+          Hola{profile.nombre ? `, ${profile.nombre}` : ""}.
+        </h1>
         <p className="text-base text-neutral-600">
-          Estás dentro del MVP de <span className="font-medium">Futbol de los martes</span>.
+          Estás logueado como <span className="font-medium">{role ?? "—"}</span>.
         </p>
       </div>
 
-      <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+      <section>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-          Tu sesión
+          Accesos rápidos
         </h2>
-        <dl className="mt-3 space-y-2 text-sm">
-          <div className="flex justify-between gap-3">
-            <dt className="text-neutral-500">Nombre</dt>
-            <dd className="text-neutral-900">{profile.nombre ?? "—"}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-neutral-500">Rol</dt>
-            <dd className="text-neutral-900">{profile.role ?? "—"}</dd>
-          </div>
-        </dl>
+        <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+          {cards.map((c) => (
+            <li key={c.href}>
+              <Link
+                href={c.href}
+                className="block rounded-lg border border-neutral-200 bg-white p-4 shadow-sm transition hover:border-neutral-300 hover:shadow-md"
+              >
+                <p className="text-sm font-semibold text-neutral-900">{c.title}</p>
+                <p className="mt-1 text-xs text-neutral-600">{c.description}</p>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </section>
-
-      <p className="text-sm text-neutral-500">
-        Las pantallas de jugadores, convocatorias, partidos y auditoría se construyen en las
-        próximas fases.
-      </p>
     </div>
   );
 }
