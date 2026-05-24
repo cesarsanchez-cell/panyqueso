@@ -65,8 +65,13 @@ Próxima semana:
 
 Durante la semana, antes de 8h del partido:
   Cualquier titular se baja desde /mi-perfil → attendance='declinado'.
-  Sistema promueve automáticamente al primer suplente disponible.
-  Si el suplente no puede esa semana, declina y el sistema sigue con el siguiente.
+  Sistema ejecuta el SWAP de titularidad:
+    - Primer suplente activo de la cola ASCIENDE a titular permanente del grupo.
+    - Se agrega a convocatoria_players con attendance='confirmado'.
+    - El titular que se bajó queda con membresía INACTIVA (sale del grupo activo: ni titular ni suplente).
+    - La cola corre un puesto: N pasa a #1, O a #2, etc.
+  Si el nuevo titular (ex-suplente) también declina antes del partido, el ciclo se repite con el próximo suplente activo.
+  Admin puede revertir el swap manualmente si la baja del titular fue justificada (ej. emergencia). Restaura al titular original y baja al ex-suplente.
 
 Dentro de las 8h previas al partido:
   Self-service bloqueado (UI + RLS).
@@ -74,9 +79,12 @@ Dentro de las 8h previas al partido:
   Si un jugador no puede ir, avisa al admin por canal externo (WA grupal).
 
 Después del partido:
-  Membresías del grupo no cambian. Titulares siguen titulares, suplentes mantienen su orden FIFO.
-  Si un titular se baja del grupo (no solo de una semana), el primer suplente activo asciende a titular fijo.
+  Las membresías del grupo reflejan los movimientos de la semana:
+    - Suplentes que ascendieron quedan como titulares permanentes desde el próximo partido.
+    - Titulares que se bajaron quedan inactivos: perdieron su lugar.
+  Un titular que perdió su lugar puede volver al grupo desde /mi-perfil ("Anotarme en la cola"). Entra como suplente al final del FIFO (orden = max + 1).
 ```
+
 
 ---
 
@@ -193,46 +201,70 @@ El sistema bloquea las acciones self-service de los jugadores dentro de las 8 ho
 - Solo admin puede modificar: bajar gente, promover suplentes en cualquier orden, etc.
 - Token de invitación expira (`expires_at = partido - 8h`).
 
-### Promoción automática del suplente
+### Swap de titularidad (regla clave)
 
-Cuando un titular cambia su attendance a 'declinado' (antes de 8h):
+Cuando un titular cambia su attendance a 'declinado' (antes de 8h del partido), **pierde su titularidad permanentemente**. El suplente que lo reemplaza asciende a titular del grupo desde ese partido. No es un reemplazo temporal, es un swap.
 
-1. Sistema busca primer suplente activo del grupo (menor `orden` con `tipo='suplente'` y `status='activo'`).
+Pasos del swap automático:
+
+1. Sistema busca primer suplente activo del grupo (`tipo='suplente'`, `status='activo'`, menor `orden`).
 2. Verifica que no esté ya en la convocatoria (puede haber subido por otro decline anterior).
-3. Lo agrega a `convocatoria_players` con attendance='confirmado'.
-4. El suplente lo ve en `/mi-perfil` la próxima vez que entre.
+3. **Promueve la membresía del suplente**: `tipo='titular'` (mantiene `status='activo'`).
+4. **Inactiva la membresía del titular original**: `status='inactivo'`, `inactivated_at=now()`, `inactivated_by=auth.uid()` (el propio jugador que se bajó).
+5. **Reordena la cola**: los suplentes con `orden > orden_del_promovido` corren un puesto (`orden -= 1`).
+6. Agrega al nuevo titular a `convocatoria_players` con `attendance='confirmado'`.
+7. El nuevo titular lo ve en `/mi-perfil` la próxima vez que entre.
 
-**El suplente promovido mantiene su orden FIFO en el grupo.** Jugar como reemplazo no le cuesta posición.
+Si el nuevo titular también declina antes del partido, repite el ciclo con el siguiente suplente activo. Cada decline genera un swap nuevo.
 
-Si el suplente promovido declina, el ciclo se repite con el siguiente.
+Si todos los suplentes activos declinaron, la convocatoria queda con un hueco. El admin lo resuelve manualmente.
 
-Si todos los suplentes activos declinaron, la convocatoria queda con un hueco. El admin lo resuelve manualmente (invitar a alguien nuevo, dejar el equipo corto, etc.).
+**Override del admin**: hasta el cierre del cupo o el cutoff de 8h, el admin puede revertir un swap si considera la baja del titular justificada (ej. emergencia médica). La reversión consiste en:
+
+- Re-activar la membresía del titular original (`status='activo'`, `tipo='titular'`).
+- Bajar al ex-suplente (volver a `tipo='suplente'`, ubicarlo en su posición original de la cola o donde el admin elija).
+- Restaurar `convocatoria_players` para que el titular original quede confirmado.
+
+El admin tiene poder god mode sobre las membresías; el sistema no le impide nada dentro de su grupo.
 
 ### Lista de espera FIFO
 
 - Orden inicial: por `joined_at` (orden de entrada al grupo como suplente).
 - **La cola es del grupo, no de la convocatoria.** Persiste semana a semana en `grupo_membresias`. Cada nueva convocatoria hereda la misma cola; no se resetea ni se recrea.
-- Suplente que jugó como reemplazo: mantiene su posición.
-- Cuando un titular se baja del grupo permanentemente: primer suplente activo asciende a titular fijo, los demás suplentes se reordenan (cada uno sube un puesto).
+- Cuando un suplente asciende a titular (por swap o por baja permanente de otro), la cola se compacta: los que estaban detrás corren un puesto.
 - Cuando un jugador nuevo acepta un invite: si hay vacante de titular activa, entra directo como titular; sino, al final de la cola de suplentes (`orden = max + 1`).
+- **Anotarse en la cola** (auto-servicio): un jugador con membresía inactiva (típicamente, un ex-titular que perdió su lugar) puede re-entrar al grupo desde `/mi-perfil` → "Anotarme en la cola". Su membresía pasa a `status='activo'`, `tipo='suplente'`, `orden = max + 1`.
 
 ### Clonar última convocatoria
 
 Botón "Clonar última" en la pantalla de creación de convocatoria del grupo.
 
 - Pre-llena: lugar, fecha (próximo día_semana del grupo), hora.
-- Convocados pre-cargados: todos los que tuvieron `attendance_status='confirmado'` en la última convocatoria del grupo.
-  - Esto incluye titulares que jugaron + suplentes que jugaron como reemplazo.
-  - Excluye declinados y ausentes_sin_aviso.
-- Admin revisa y crea.
+- Convocados pre-cargados: los titulares activos del grupo (`grupo_membresias` con `tipo='titular'`, `status='activo'`).
+  - Como los swaps de la semana pasada ya promovieron a los ex-suplentes a titulares, esto naturalmente incluye a quienes jugaron por reemplazo.
+  - Los ex-titulares que perdieron su lugar quedaron inactivos y no son convocados (deben anotarse en la cola para volver).
+- Admin revisa la lista y puede sacar/agregar antes de confirmar.
+- Default attendance = 'confirmado' para todos.
 
 ### Salida permanente del grupo
 
-Dos vías:
-- **Jugador**: en `/mi-perfil`, botón "Salir del grupo X". Confirma. Su membresía pasa a `status='inactivo'`.
-- **Admin**: en `/grupos/[id]`, puede remover a un miembro. Misma consecuencia.
+Tres vías por las que una membresía puede pasar a `status='inactivo'`:
 
-Cuando un titular sale del grupo, el primer suplente activo asciende a titular automáticamente. Los demás suplentes corren un puesto.
+- **Jugador (voluntaria, explícita)**: en `/mi-perfil`, botón "Salir del grupo X". Confirma. Membresía → inactiva.
+- **Jugador (involuntaria, por swap)**: titular se baja de una convocatoria → pierde su lugar automáticamente (regla del swap). Membresía → inactiva.
+- **Admin**: en `/grupos/[id]`, puede remover a un miembro manualmente. Misma consecuencia.
+
+En cualquiera de los tres casos, si la membresía inactivada era de un titular, el primer suplente activo asciende a titular y la cola corre un puesto. Si era de un suplente, simplemente desaparece de la cola y los que estaban detrás corren un puesto.
+
+### Volver al grupo después de quedar inactivo
+
+Un jugador con membresía inactiva puede re-entrar al grupo:
+
+- Vía auto-servicio desde `/mi-perfil` → botón "Anotarme en la cola del grupo X".
+- Entra como suplente al final del FIFO (`orden = max + 1`).
+- Si quiere volver a ser titular, tiene que esperar a que alguno se baje y le toque ascender.
+
+Esto le da una "segunda chance" al jugador sin que el admin tenga que intervenir.
 
 ---
 
