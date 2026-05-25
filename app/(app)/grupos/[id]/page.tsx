@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -7,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ArchiveGrupoForm } from "./archive-form";
 import { EditGrupoForm } from "./edit-grupo-form";
 import { AddMemberForm, DemoteForm, PromoteForm, RemoveMemberForm } from "./membership-forms";
+import { PendingInvitesList, type PendingInvite } from "./pending-invites";
 
 const DIA_LABEL = [
   "Domingo",
@@ -37,22 +39,39 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
   }
   if (!grupo) notFound();
 
-  const [{ data: membresias, error: memErr }, { data: lugares }, { data: players }] =
-    await Promise.all([
-      supabase
-        .from("grupo_membresias")
-        .select("id, tipo, orden, status, joined_at, player:players!player_id(id, nombre, apodo)")
-        .eq("grupo_id", id)
-        .eq("status", "activo")
-        .order("tipo", { ascending: true })
-        .order("orden", { ascending: true, nullsFirst: true }),
-      supabase.from("lugares").select("id, nombre").order("nombre", { ascending: true }),
-      supabase
-        .from("players")
-        .select("id, nombre, apodo, status")
-        .eq("status", "approved")
-        .order("nombre", { ascending: true }),
-    ]);
+  const nowIso = new Date().toISOString();
+  const [
+    { data: membresias, error: memErr },
+    { data: lugares },
+    { data: players },
+    { data: pendingInvitesRaw, error: invitesErr },
+  ] = await Promise.all([
+    supabase
+      .from("grupo_membresias")
+      .select("id, tipo, orden, status, joined_at, player:players!player_id(id, nombre, apodo)")
+      .eq("grupo_id", id)
+      .eq("status", "activo")
+      .order("tipo", { ascending: true })
+      .order("orden", { ascending: true, nullsFirst: true }),
+    supabase.from("lugares").select("id, nombre").order("nombre", { ascending: true }),
+    supabase
+      .from("players")
+      .select("id, nombre, apodo, status")
+      .eq("status", "approved")
+      .order("nombre", { ascending: true }),
+    supabase
+      .from("player_invitations")
+      .select("id, phone, nombre_tentativo, token, expires_at")
+      .eq("grupo_id", id)
+      .is("used_at", null)
+      .is("declined_at", null)
+      .gt("expires_at", nowIso)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  if (invitesErr) {
+    throw new Error(`No se pudieron cargar las invitaciones: ${invitesErr.message}`);
+  }
 
   if (memErr) {
     throw new Error(`No se pudieron cargar las membresías: ${memErr.message}`);
@@ -69,6 +88,19 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
 
   const hayCupoTitular = titulares.length < grupo.cupo_titulares;
   const isActive = grupo.status === "activo";
+
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const origin = host ? `${proto}://${host}` : "";
+
+  const pendingInvites: PendingInvite[] = (pendingInvitesRaw ?? []).map((row) => ({
+    id: row.id,
+    phone: row.phone,
+    nombre: row.nombre_tentativo ?? row.phone,
+    link: origin ? `${origin}/invite/${row.token}` : `/invite/${row.token}`,
+    expiresAt: row.expires_at,
+  }));
 
   return (
     <div className="space-y-6">
@@ -144,6 +176,30 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
             />
           )}
         </div>
+      </section>
+
+      <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+            Invitaciones pendientes
+          </h2>
+          <p className="text-sm text-neutral-700">{pendingInvites.length}</p>
+        </div>
+        {pendingInvites.length === 0 ? (
+          <p className="mt-3 text-sm text-neutral-500">
+            Sin invitaciones pendientes. Generá nuevas desde{" "}
+            {isActive ? (
+              <Link href={`/grupos/${grupo.id}/importar`} className="underline">
+                Importar desde WA
+              </Link>
+            ) : (
+              "Importar desde WA (grupo archivado)"
+            )}
+            .
+          </p>
+        ) : (
+          <PendingInvitesList invites={pendingInvites} />
+        )}
       </section>
 
       <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
