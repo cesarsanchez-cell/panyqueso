@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -11,6 +12,7 @@ import { CancelForm } from "./cancel-form";
 import { ConfirmMatchForm } from "./confirm-match-form";
 import { ClearDraftForm, GenerateDraftForm, PromoteToGKForm, SwapPlayerForm } from "./draft-forms";
 import { GoalsForm, type GoalsFormTeam } from "./goals-form";
+import { InviteSection, type PendingConvocatoriaInvite } from "./invite-section";
 import { RemovePlayerForm } from "./remove-player-form";
 import { ResultForm } from "./result-form";
 
@@ -124,7 +126,7 @@ export default async function ConvocatoriaDetallePage({
   const { data: convocatoria, error } = await supabase
     .from("convocatorias")
     .select(
-      `id, fecha, hora, status, cupo_maximo, notas, created_at, team_draft,
+      `id, fecha, hora, status, cupo_maximo, notas, created_at, team_draft, grupo_id,
        lugar:lugares!lugar_id(id, nombre),
        creator:profiles!created_by(nombre)`,
     )
@@ -181,6 +183,40 @@ export default async function ConvocatoriaDetallePage({
   // Selector: solo se muestra si admin + abierta. Carga players approved
   // filtrados por searchParams, excluyendo los ya convocados.
   const showSelector = isAdmin && isOpen;
+
+  // Invites: solo si la convocatoria pertenece a un grupo (Fase 9).
+  const canInvite = isAdmin && isOpen && convocatoria.grupo_id !== null;
+
+  let pendingInvites: PendingConvocatoriaInvite[] = [];
+  let origin = "";
+  if (canInvite) {
+    const nowIso = new Date().toISOString();
+    const { data: invitesRaw, error: invitesErr } = await supabase
+      .from("player_invitations")
+      .select("id, phone, nombre_tentativo, token, expires_at")
+      .eq("convocatoria_id", id)
+      .is("used_at", null)
+      .is("declined_at", null)
+      .gt("expires_at", nowIso)
+      .order("created_at", { ascending: false });
+
+    if (invitesErr) {
+      throw new Error(`No se pudieron cargar las invitaciones: ${invitesErr.message}`);
+    }
+
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+    const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+    origin = host ? `${proto}://${host}` : "";
+
+    pendingInvites = (invitesRaw ?? []).map((row) => ({
+      id: row.id,
+      phone: row.phone,
+      nombre: row.nombre_tentativo ?? row.phone,
+      link: origin ? `${origin}/invite/${row.token}` : `/invite/${row.token}`,
+      expiresAt: row.expires_at,
+    }));
+  }
 
   // Teams: admin + abierta + al menos 10 convocados (5v5 minimo segun
   // plan v4). El draft persistido vive en convocatorias.team_draft (PR 2).
@@ -409,6 +445,10 @@ export default async function ConvocatoriaDetallePage({
             </ul>
           )}
         </section>
+      ) : null}
+
+      {canInvite ? (
+        <InviteSection convocatoriaId={convocatoria.id} invites={pendingInvites} origin={origin} />
       ) : null}
 
       {match ? (
