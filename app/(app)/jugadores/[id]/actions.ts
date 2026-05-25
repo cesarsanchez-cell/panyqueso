@@ -312,9 +312,23 @@ export async function resetPlayerPassword(
 
   const tempPassword = generateTempPassword();
   const admin = createAdminClient();
-  const { error: updateErr } = await admin.auth.admin.updateUserById(player.auth_user_id, {
-    password: tempPassword,
-  });
+
+  // Aprovechamos para sincronizar auth.email con players.phone si hay drift.
+  // Caso real: jugador con players.phone corregido pero auth.email todavia
+  // con el numero viejo no podia loguear ni con el password nuevo.
+  const updatePayload: { password: string; email?: string } = { password: tempPassword };
+  if (player.phone) {
+    const expectedAuthEmail = `${player.phone.toLowerCase()}@phone.fdlm.local`;
+    const { data: authUser } = await admin.auth.admin.getUserById(player.auth_user_id);
+    if (authUser?.user && authUser.user.email !== expectedAuthEmail) {
+      updatePayload.email = expectedAuthEmail;
+    }
+  }
+
+  const { error: updateErr } = await admin.auth.admin.updateUserById(
+    player.auth_user_id,
+    updatePayload,
+  );
 
   if (updateErr) {
     return { error: `No se pudo resetear el password: ${updateErr.message}` };
