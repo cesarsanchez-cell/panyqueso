@@ -144,6 +144,18 @@ export async function updatePlayerData(
   if (Object.keys(errors).length > 0) return { fieldErrors: errors };
 
   const supabase = await createClient();
+
+  // Leemos el estado actual ANTES del UPDATE: necesitamos auth_user_id para
+  // poder sincronizar el auth.email sintetico cuando cambia el celular.
+  const { data: existing, error: readErr } = await supabase
+    .from("players")
+    .select("phone, auth_user_id")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  if (readErr) return { error: `No se pudo leer el jugador: ${readErr.message}` };
+  if (!existing) return { error: "El jugador no existe." };
+
   const { error } = await supabase
     .from("players")
     .update({
@@ -170,6 +182,54 @@ export async function updatePlayerData(
       return { error: "Conflicto de unicidad. Revisá teléfono y email." };
     }
     return { error: `No se pudo guardar: ${error.message}` };
+  }
+
+  // Sincronizar auth.email del jugador con su celular actual.
+  //
+  // El email sintetico de auth (`<phone>@phone.fdlm.local`) tiene que coincidir
+  // exacto con players.phone porque el login traduce celular -> email para
+  // pegarle a Supabase Auth. Si quedan desync, el jugador no puede loguear.
+  //
+  // Detectamos drift comparando lo que tiene auth con el sintetico esperado
+  // del nuevo phone, no comparando con el phone viejo. Asi cubrimos tambien
+  // el caso retroactivo donde players.phone y auth.email ya estaban desync
+  // por bugs previos: el proximo save los re-alinea.
+  if (existing.auth_user_id && phone) {
+    const expectedAuthEmail = `${phone.toLowerCase()}@phone.fdlm.local`;
+    const admin = createAdminClient();
+    const { data: authUser, error: getErr } = await admin.auth.admin.getUserById(
+      existing.auth_user_id,
+    );
+
+    if (getErr) {
+      return {
+        error: `Datos guardados, pero no pude leer la cuenta de auth: ${getErr.message}. El jugador podria no poder loguear con el nuevo celular.`,
+      };
+    }
+
+    const currentAuthEmail = authUser?.user?.email ?? null;
+    if (currentAuthEmail !== expectedAuthEmail) {
+      const { error: authErr } = await admin.auth.admin.updateUserById(existing.auth_user_id, {
+        email: expectedAuthEmail,
+      });
+
+      if (authErr) {
+        // Rollback best-effort del phone en players para no quedar desync.
+        if (existing.phone !== phone) {
+          await supabase.from("players").update({ phone: existing.phone }).eq("id", playerId);
+        }
+        const detail = authErr.message.toLowerCase();
+        if (detail.includes("already")) {
+          return {
+            error:
+              "Ese teléfono ya está usado por otra cuenta de Supabase Auth. Revisá si hay un jugador duplicado.",
+          };
+        }
+        return {
+          error: `Se guardó pero no se pudo sincronizar la cuenta de auth: ${authErr.message}.`,
+        };
+      }
+    }
   }
 
   revalidatePath(`/jugadores/${playerId}`);
