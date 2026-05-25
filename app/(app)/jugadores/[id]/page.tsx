@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
+import { ContactFieldsForm } from "./contact-fields-form";
 import { PrivateNotesForm } from "./private-notes-form";
 import { StatusChangeForm } from "./status-change-form";
 
@@ -234,6 +235,19 @@ export default async function JugadorDetallePage({
         />
         <Field label="Confianza" value={CONFIDENCE_LABEL[player.rating_confidence]} />
       </Section>
+
+      {isAdmin ? (
+        <ContactFieldsForm
+          playerId={player.id}
+          initial={{
+            phone: player.phone,
+            email: player.email,
+            apodo: player.apodo,
+            pierna_habil: player.pierna_habil,
+            fecha_nacimiento: player.fecha_nacimiento,
+          }}
+        />
+      ) : null}
 
       {isAdmin ? (
         <PrivateNotesForm playerId={player.id} initial={player.private_notes ?? ""} />

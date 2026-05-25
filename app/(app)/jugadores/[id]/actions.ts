@@ -8,12 +8,29 @@ import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
 type ChangeRequestInsert = Database["public"]["Tables"]["player_change_requests"]["Insert"];
+type PiernaHabil = Database["public"]["Enums"]["pierna_habil_enum"];
 
 export type StatusChangeAction = "deactivate_player" | "reactivate_player";
 
 export type StatusChangeState = null | { error: string };
 
 export type PrivateNotesState = null | { error: string } | { success: string };
+
+export type ContactFieldsState = null | { error: string } | { success: string };
+
+const E164_REGEX = /^\+[1-9]\d{6,14}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const PIERNA_VALUES: readonly PiernaHabil[] = ["derecha", "izquierda", "ambas"] as const;
+
+function normalizePhoneInput(raw: string): string {
+  return raw.replace(/[\s\-().]/g, "");
+}
+
+function parsePierna(raw: string): PiernaHabil | null | undefined {
+  if (!raw) return null;
+  return PIERNA_VALUES.includes(raw as PiernaHabil) ? (raw as PiernaHabil) : undefined;
+}
 
 function parseAction(raw: FormDataEntryValue | null): StatusChangeAction | null {
   if (raw === "deactivate_player" || raw === "reactivate_player") return raw;
@@ -78,6 +95,85 @@ export async function requestStatusChange(
 
   const flashKey = action === "deactivate_player" ? "deactivate=1" : "reactivate=1";
   redirect(`/jugadores/${playerId}?${flashKey}`);
+}
+
+export async function updateContactFields(
+  _prev: ContactFieldsState,
+  formData: FormData,
+): Promise<ContactFieldsState> {
+  await requireRole("admin");
+
+  const playerId = String(formData.get("player_id") ?? "").trim();
+  if (!playerId) return { error: "Falta el id del jugador." };
+
+  const phoneRaw = String(formData.get("phone") ?? "").trim();
+  const emailRaw = String(formData.get("email") ?? "").trim();
+  const apodoRaw = String(formData.get("apodo") ?? "").trim();
+  const piernaRaw = String(formData.get("pierna_habil") ?? "").trim();
+  const fechaRaw = String(formData.get("fecha_nacimiento") ?? "").trim();
+
+  let phone: string | null = null;
+  if (phoneRaw) {
+    const normalized = normalizePhoneInput(phoneRaw);
+    if (!E164_REGEX.test(normalized)) {
+      return {
+        error: "Teléfono inválido. Debe estar en formato E.164 (ej: +5491155551234).",
+      };
+    }
+    phone = normalized;
+  }
+
+  let email: string | null = null;
+  if (emailRaw) {
+    if (!EMAIL_REGEX.test(emailRaw) || emailRaw.length > 254) {
+      return { error: "Email inválido." };
+    }
+    email = emailRaw.toLowerCase();
+  }
+
+  let apodo: string | null = null;
+  if (apodoRaw) {
+    if (apodoRaw.length > 40) return { error: "Apodo demasiado largo (máx 40 caracteres)." };
+    apodo = apodoRaw;
+  }
+
+  const pierna = parsePierna(piernaRaw);
+  if (pierna === undefined) return { error: "Pierna hábil inválida." };
+
+  let fecha_nacimiento: string | null = null;
+  if (fechaRaw) {
+    if (!FECHA_REGEX.test(fechaRaw)) {
+      return { error: "Fecha de nacimiento inválida (formato YYYY-MM-DD)." };
+    }
+    const parsed = new Date(`${fechaRaw}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) {
+      return { error: "Fecha de nacimiento inválida." };
+    }
+    fecha_nacimiento = fechaRaw;
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("players")
+    .update({ phone, email, apodo, pierna_habil: pierna, fecha_nacimiento })
+    .eq("id", playerId);
+
+  if (error) {
+    if (error.code === "23505") {
+      const detail = error.message.toLowerCase();
+      if (detail.includes("phone")) {
+        return { error: "Ese teléfono ya está asignado a otro jugador." };
+      }
+      if (detail.includes("email")) {
+        return { error: "Ese email ya está asignado a otro jugador." };
+      }
+      return { error: "Conflicto de unicidad. Revisá teléfono y email." };
+    }
+    return { error: `No se pudo guardar: ${error.message}` };
+  }
+
+  revalidatePath(`/jugadores/${playerId}`);
+  return { success: "Datos guardados." };
 }
 
 export async function updatePrivateNotes(
