@@ -1,8 +1,11 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
+
 import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth/require-role";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -200,4 +203,62 @@ export async function updatePrivateNotes(
 
   revalidatePath(`/jugadores/${playerId}`);
   return { success: "Notas guardadas." };
+}
+
+// ============================================================================
+// resetPlayerPassword: admin genera un password temporal para el jugador y se
+// lo pasa por WhatsApp. Cubre el caso "me olvide la contraseña" para players
+// que entran con celular (auth.email sintetico no recibe mails de Supabase).
+//
+// Devuelve el password en claro UNA SOLA VEZ en el state para que el admin lo
+// copie. No queda persistido en ningun lado.
+// ============================================================================
+
+export type ResetPlayerPasswordState =
+  | null
+  | { error: string }
+  | { tempPassword: string; phone: string | null };
+
+function generateTempPassword(): string {
+  // 12 chars base64url-ish (URL safe). 9 bytes -> 12 chars base64. Mas que
+  // suficiente para un pass temporal de un solo uso.
+  return randomBytes(9).toString("base64").replace(/\+/g, "A").replace(/\//g, "Z");
+}
+
+export async function resetPlayerPassword(
+  _prev: ResetPlayerPasswordState,
+  formData: FormData,
+): Promise<ResetPlayerPasswordState> {
+  await requireRole("admin");
+
+  const playerId = String(formData.get("player_id") ?? "").trim();
+  if (!playerId) return { error: "Falta el id del jugador." };
+
+  const supabase = await createClient();
+  const { data: player, error: playerErr } = await supabase
+    .from("players")
+    .select("auth_user_id, phone")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  if (playerErr) return { error: `No se pudo leer el jugador: ${playerErr.message}` };
+  if (!player) return { error: "El jugador no existe." };
+  if (!player.auth_user_id) {
+    return {
+      error:
+        "Este jugador todavía no completó su alta (no tiene cuenta). No hay password que resetear.",
+    };
+  }
+
+  const tempPassword = generateTempPassword();
+  const admin = createAdminClient();
+  const { error: updateErr } = await admin.auth.admin.updateUserById(player.auth_user_id, {
+    password: tempPassword,
+  });
+
+  if (updateErr) {
+    return { error: `No se pudo resetear el password: ${updateErr.message}` };
+  }
+
+  return { tempPassword, phone: player.phone };
 }

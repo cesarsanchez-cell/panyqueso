@@ -6,6 +6,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
 import { AdminPlayerForm } from "./admin-player-form";
+import { AdminResetPassword } from "./admin-reset-password";
 import { PrivateNotesForm } from "./private-notes-form";
 
 type SearchParams = { proposed?: string };
@@ -247,6 +248,8 @@ export default async function JugadorDetallePage({
           <p className="whitespace-pre-line text-sm text-neutral-700">{player.private_notes}</p>
         </Section>
       ) : null}
+
+      {isAdmin ? <AdminResetPassword playerId={player.id} playerNombre={player.nombre} /> : null}
 
       <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
