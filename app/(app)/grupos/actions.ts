@@ -176,8 +176,9 @@ export async function unarchiveGrupo(formData: FormData): Promise<void> {
 }
 
 // ============================================================================
-// addMember: agregar player al grupo. Si tipo=suplente, se ubica al final
-// de la cola FIFO (orden = max + 1).
+// addMember: agregar player al grupo. El tipo se decide automaticamente:
+// si hay cupo de titulares libre -> titular; si no -> suplente al final de la
+// cola FIFO. No pedimos al admin que elija.
 // ============================================================================
 export async function addMember(
   _prev: MembershipState,
@@ -191,15 +192,31 @@ export async function addMember(
   const player_id = String(formData.get("player_id") ?? "").trim();
   if (!player_id) return { error: "Falta seleccionar un jugador." };
 
-  const tipoRaw = String(formData.get("tipo") ?? "");
-  if (tipoRaw !== "titular" && tipoRaw !== "suplente") {
-    return { error: "Tipo inválido." };
-  }
-  const tipo: MembresiaTipo = tipoRaw;
-
   const supabase = await createClient();
 
-  // Si es suplente, calculamos orden = max + 1 dentro del grupo.
+  // Decidir tipo segun cupo de titulares libre.
+  const [{ data: grupo, error: grupoErr }, { count: titularesCount, error: countErr }] =
+    await Promise.all([
+      supabase.from("grupos").select("cupo_titulares").eq("id", grupo_id).maybeSingle(),
+      supabase
+        .from("grupo_membresias")
+        .select("id", { count: "exact", head: true })
+        .eq("grupo_id", grupo_id)
+        .eq("tipo", "titular")
+        .eq("status", "activo"),
+    ]);
+
+  if (grupoErr || !grupo) {
+    return { error: `No se pudo leer el grupo: ${grupoErr?.message ?? "no existe"}` };
+  }
+  if (countErr) {
+    return { error: `No se pudo contar titulares: ${countErr.message}` };
+  }
+
+  const hayCupoTitular = (titularesCount ?? 0) < grupo.cupo_titulares;
+  const tipo: MembresiaTipo = hayCupoTitular ? "titular" : "suplente";
+
+  // Si va a suplente, calcular orden = max + 1.
   let orden: number | null = null;
   if (tipo === "suplente") {
     const { data: maxRow, error: maxErr } = await supabase
@@ -233,12 +250,19 @@ export async function addMember(
   }
 
   revalidatePath(`/grupos/${grupo_id}`);
-  return { success: "Jugador agregado." };
+  return {
+    success:
+      tipo === "titular"
+        ? "Jugador agregado como titular."
+        : `Jugador agregado como suplente #${orden}.`,
+  };
 }
 
 // ============================================================================
-// removeMember: marca la membresía como inactiva. Si era suplente, los
-// suplentes con orden mayor corren un puesto.
+// removeMember: marca la membresía como inactiva.
+// - Si era suplente: los suplentes con orden mayor corren un puesto.
+// - Si era titular: el primer suplente activo (orden=1) sube a titular y la
+//   cola se compacta desde orden=1.
 // ============================================================================
 export async function removeMember(formData: FormData): Promise<void> {
   await requireRole("admin");
@@ -265,16 +289,38 @@ export async function removeMember(formData: FormData): Promise<void> {
 
   if (upErr) return;
 
-  // Si era suplente, compactar la cola: orden -= 1 para los que estaban detrás.
   if (m.tipo === "suplente" && m.orden !== null) {
+    // Era suplente: compactar la cola desde el orden que vacio.
     await compactSuplenteQueue(supabase, m.grupo_id, m.orden);
+  } else if (m.tipo === "titular") {
+    // Era titular: promover al primer suplente activo y compactar.
+    const { data: first } = await supabase
+      .from("grupo_membresias")
+      .select("id")
+      .eq("grupo_id", m.grupo_id)
+      .eq("tipo", "suplente")
+      .eq("status", "activo")
+      .order("orden", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (first) {
+      await supabase
+        .from("grupo_membresias")
+        .update({ tipo: "titular", orden: null })
+        .eq("id", first.id);
+      // Despues del ascenso, los suplentes con orden > 1 corren un puesto.
+      await compactSuplenteQueue(supabase, m.grupo_id, 1);
+    }
   }
 
   revalidatePath(`/grupos/${m.grupo_id}`);
 }
 
 // ============================================================================
-// promoteToTitular: suplente -> titular. Compacta la cola.
+// promoteToTitular: suplente -> titular. Compacta la cola. Respeta el cupo
+// (no promueve si el cupo de titulares ya esta lleno; admin debe sacar a
+// otro titular primero).
 // ============================================================================
 export async function promoteToTitular(formData: FormData): Promise<void> {
   await requireRole("admin");
@@ -291,6 +337,23 @@ export async function promoteToTitular(formData: FormData): Promise<void> {
     .maybeSingle();
 
   if (!m || m.status !== "activo" || m.tipo !== "suplente") return;
+
+  // Enforce cupo antes de promover.
+  const [{ data: grupo }, { count: titularesCount }] = await Promise.all([
+    supabase.from("grupos").select("cupo_titulares").eq("id", m.grupo_id).maybeSingle(),
+    supabase
+      .from("grupo_membresias")
+      .select("id", { count: "exact", head: true })
+      .eq("grupo_id", m.grupo_id)
+      .eq("tipo", "titular")
+      .eq("status", "activo"),
+  ]);
+  if (!grupo) return;
+  if ((titularesCount ?? 0) >= grupo.cupo_titulares) {
+    // No quedan cupos; no hacemos nada. La UI deberia evitar este caso pero
+    // este guard previene el problema si llega al action.
+    return;
+  }
 
   const oldOrden = m.orden;
   await supabase
