@@ -16,7 +16,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const E164_RE = /^\+[1-9]\d{6,14}$/;
 const PHONE_NORMALIZE_RE = /[\s\-().]/g;
 
-export type LoginState = { error: string } | null;
+export type LoginState = { error: string; identifier: string } | null;
 
 function safeRedirectTarget(value: string | null): string {
   if (typeof value !== "string" || value.length === 0) return "/";
@@ -55,13 +55,16 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
 
   const parsed = LoginSchema.safeParse({ identifier, password });
   if (!parsed.success) {
-    if (!identifier) return { error: "Ingresá tu email o celular" };
-    return { error: "Ingresá tu contraseña" };
+    if (!identifier) return { error: "Ingresá tu email o celular", identifier };
+    return { error: "Ingresá tu contraseña", identifier };
   }
 
   const email = resolveLoginEmail(parsed.data.identifier);
   if (!email) {
-    return { error: "Email o celular inválido (celular en formato +5491155551234)" };
+    return {
+      error: "Email o celular inválido (celular en formato +5491155551234)",
+      identifier,
+    };
   }
 
   const supabase = await createClient();
@@ -71,7 +74,7 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   });
 
   if (error) {
-    return { error: "Email/celular o contraseña incorrectos" };
+    return { error: "Email/celular o contraseña incorrectos", identifier };
   }
 
   const redirectTo = formData.get("redirectTo");
