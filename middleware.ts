@@ -4,7 +4,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
 // Rutas accesibles sin sesion. Toda otra ruta exige login.
-const PUBLIC_PATHS = ["/login"];
+// /invite/<token> es publico: el token es la capability (Fase 9 PR 7).
+const PUBLIC_PATHS = ["/login", "/invite"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
