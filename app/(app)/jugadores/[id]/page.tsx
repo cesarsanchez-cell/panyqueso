@@ -5,11 +5,10 @@ import { requireRole } from "@/lib/auth/require-role";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
-import { ContactFieldsForm } from "./contact-fields-form";
+import { AdminPlayerForm } from "./admin-player-form";
 import { PrivateNotesForm } from "./private-notes-form";
-import { StatusChangeForm } from "./status-change-form";
 
-type SearchParams = { proposed?: string; deactivate?: string; reactivate?: string };
+type SearchParams = { proposed?: string };
 
 type PlayerStatus = Database["public"]["Enums"]["player_status"];
 type PlayerRoleField = Database["public"]["Enums"]["player_role_field"];
@@ -101,8 +100,6 @@ export default async function JugadorDetallePage({
   const sp = await searchParams;
   const isAdmin = ctx.profile.role === "admin";
   const showProposedFlash = sp.proposed === "1";
-  const showDeactivateFlash = sp.deactivate === "1";
-  const showReactivateFlash = sp.reactivate === "1";
 
   const supabase = await createClient();
   const { data: player, error } = await supabase
@@ -138,8 +135,6 @@ export default async function JugadorDetallePage({
   const hasPendingSensitive = pendingRequests.some(
     (r) => r.action_type === "update_sensitive_fields",
   );
-  const hasPendingDeactivate = pendingRequests.some((r) => r.action_type === "deactivate_player");
-  const hasPendingReactivate = pendingRequests.some((r) => r.action_type === "reactivate_player");
 
   return (
     <div className="space-y-6">
@@ -170,17 +165,7 @@ export default async function JugadorDetallePage({
 
       {showProposedFlash ? (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          Solicitud de cambio creada. Queda pendiente de aprobación por un veedor.
-        </div>
-      ) : null}
-      {showDeactivateFlash ? (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          Solicitud de desactivación creada. Queda pendiente del veedor.
-        </div>
-      ) : null}
-      {showReactivateFlash ? (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          Solicitud de reactivación creada. Queda pendiente del veedor.
+          Solicitud de ratings creada. Queda pendiente de aprobación por un veedor.
         </div>
       ) : null}
 
@@ -202,28 +187,37 @@ export default async function JugadorDetallePage({
         </div>
       ) : null}
 
-      {isAdmin && player.status === "approved" && !hasPendingSensitive ? (
-        <div>
-          <Link
-            href={`/jugadores/${player.id}/proponer-cambio`}
-            className="inline-flex items-center rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-sm transition hover:bg-neutral-50"
-          >
-            Proponer cambio
-          </Link>
-        </div>
-      ) : null}
-
-      <Section title="Posición">
-        <Field label="Preferida" value={POSITION_LABEL[player.position_pref]} />
-        <Field
-          label="Posibles"
-          value={
-            player.positions_possible.length > 0
-              ? player.positions_possible.map((p) => POSITION_LABEL[p]).join(" · ")
-              : "—"
-          }
+      {isAdmin ? (
+        <AdminPlayerForm
+          playerId={player.id}
+          initial={{
+            nombre: player.nombre,
+            fecha_nacimiento: player.fecha_nacimiento,
+            role_field: player.role_field,
+            position_pref: player.position_pref,
+            positions_possible: player.positions_possible,
+            phone: player.phone,
+            email: player.email,
+            apodo: player.apodo,
+            pierna_habil: player.pierna_habil,
+            status: player.status,
+          }}
         />
-      </Section>
+      ) : (
+        <>
+          <Section title="Posición">
+            <Field label="Preferida" value={POSITION_LABEL[player.position_pref]} />
+            <Field
+              label="Posibles"
+              value={
+                player.positions_possible.length > 0
+                  ? player.positions_possible.map((p) => POSITION_LABEL[p]).join(" · ")
+                  : "—"
+              }
+            />
+          </Section>
+        </>
+      )}
 
       <Section title="Ratings">
         <Field label="Técnica" value={`${player.technical} / 10`} />
@@ -234,20 +228,17 @@ export default async function JugadorDetallePage({
           value={player.internal_score === null ? "—" : Number(player.internal_score).toFixed(2)}
         />
         <Field label="Confianza" value={CONFIDENCE_LABEL[player.rating_confidence]} />
+        {isAdmin && !hasPendingSensitive ? (
+          <div className="pt-2">
+            <Link
+              href={`/jugadores/${player.id}/proponer-cambio`}
+              className="inline-flex items-center rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-sm transition hover:bg-neutral-50"
+            >
+              Proponer ratings (requiere veedor)
+            </Link>
+          </div>
+        ) : null}
       </Section>
-
-      {isAdmin ? (
-        <ContactFieldsForm
-          playerId={player.id}
-          initial={{
-            phone: player.phone,
-            email: player.email,
-            apodo: player.apodo,
-            pierna_habil: player.pierna_habil,
-            fecha_nacimiento: player.fecha_nacimiento,
-          }}
-        />
-      ) : null}
 
       {isAdmin ? (
         <PrivateNotesForm playerId={player.id} initial={player.private_notes ?? ""} />
@@ -312,13 +303,6 @@ export default async function JugadorDetallePage({
         <Field label="Creado" value={formatDate(player.created_at)} />
         <Field label="Actualizado" value={formatDate(player.updated_at)} />
       </Section>
-
-      {isAdmin && player.status === "approved" && !hasPendingDeactivate ? (
-        <StatusChangeForm playerId={player.id} action="deactivate_player" />
-      ) : null}
-      {isAdmin && player.status === "inactive" && !hasPendingReactivate ? (
-        <StatusChangeForm playerId={player.id} action="reactivate_player" />
-      ) : null}
     </div>
   );
 }

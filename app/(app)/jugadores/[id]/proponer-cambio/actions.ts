@@ -8,14 +8,10 @@ import type { Database, Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
 type ChangeRequestInsert = Database["public"]["Tables"]["player_change_requests"]["Insert"];
-type PlayerRoleField = Database["public"]["Enums"]["player_role_field"];
-type PositionPref = Database["public"]["Enums"]["position_pref"];
 type RatingConfidence = Database["public"]["Enums"]["rating_confidence"];
 
 export type ProposeChangeState = null | { error: string } | { fieldErrors: Record<string, string> };
 
-const ROLES: readonly PlayerRoleField[] = ["arquero", "jugador_campo", "mixto"];
-const POSITIONS: readonly PositionPref[] = ["arquero", "defensor", "mediocampista", "delantero"];
 const CONFIDENCES: readonly RatingConfidence[] = ["baja", "media", "alta"];
 
 function asString(v: FormDataEntryValue | null): string {
@@ -29,13 +25,6 @@ function parseRating(v: FormDataEntryValue | null): number | null {
   return n;
 }
 
-function parseEdad(v: FormDataEntryValue | null): number | null {
-  if (typeof v !== "string") return null;
-  const n = Number(v);
-  if (!Number.isInteger(n) || n < 14 || n > 99) return null;
-  return n;
-}
-
 export async function proposeChange(
   playerId: string,
   _prev: ProposeChangeState,
@@ -46,21 +35,6 @@ export async function proposeChange(
   if (!playerId) return { error: "Falta el id del jugador." };
 
   const errors: Record<string, string> = {};
-
-  const edad = parseEdad(formData.get("edad"));
-  if (edad === null) errors.edad = "Edad entre 14 y 99";
-
-  const role_field_raw = asString(formData.get("role_field"));
-  const role_field = ROLES.includes(role_field_raw as PlayerRoleField)
-    ? (role_field_raw as PlayerRoleField)
-    : null;
-  if (!role_field) errors.role_field = "Elegí un rol";
-
-  const position_pref_raw = asString(formData.get("position_pref"));
-  const position_pref = POSITIONS.includes(position_pref_raw as PositionPref)
-    ? (position_pref_raw as PositionPref)
-    : null;
-  if (!position_pref) errors.position_pref = "Elegí una posición";
 
   const technical = parseRating(formData.get("technical"));
   if (technical === null) errors.technical = "Entre 1 y 10";
@@ -86,7 +60,7 @@ export async function proposeChange(
   const supabase = await createClient();
   const { data: player, error: playerErr } = await supabase
     .from("players")
-    .select("id, edad, role_field, position_pref, technical, physical, mental, rating_confidence")
+    .select("id, technical, physical, mental, rating_confidence")
     .eq("id", playerId)
     .maybeSingle();
 
@@ -133,9 +107,6 @@ export async function proposeChange(
     }
   };
 
-  compare("edad", player.edad, edad);
-  compare("role_field", player.role_field, role_field);
-  compare("position_pref", player.position_pref, position_pref);
   compare("technical", player.technical, technical);
   compare("physical", player.physical, physical);
   compare("mental", player.mental, mental);
