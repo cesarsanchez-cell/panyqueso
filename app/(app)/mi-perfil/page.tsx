@@ -115,11 +115,11 @@ export default async function MiPerfilPage({
 
   const supabase = await createClient();
 
-  const { data: player } = await supabase
-    .from("players")
-    .select("id, nombre, status, apodo")
-    .eq("auth_user_id", ctx.userId)
-    .maybeSingle();
+  // RPC SECURITY DEFINER porque el rol player no tiene SELECT directo en
+  // public.players (los datos publicos van por players_public, que omite
+  // status e id). Esta RPC devuelve solo los campos safe del propio jugador.
+  const { data: playerRows } = await supabase.rpc("get_my_player_summary");
+  const player = playerRows && playerRows.length > 0 ? playerRows[0] : null;
 
   let gruposActivos: Awaited<ReturnType<typeof loadMembresiasActivas>> = [];
   let gruposInactivos: Awaited<ReturnType<typeof loadGruposInactivos>> = [];
