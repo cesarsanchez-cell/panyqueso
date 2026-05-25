@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 
 import { ArchiveGrupoForm } from "./archive-form";
 import { EditGrupoForm } from "./edit-grupo-form";
-import { AddMemberForm, DemoteForm, PromoteForm, RemoveMemberForm } from "./membership-forms";
+import { MembersSections } from "./members-sections";
+import { AddMemberForm } from "./membership-forms";
 import { PendingInvitesList, type PendingInvite } from "./pending-invites";
 
 const DIA_LABEL = [
@@ -169,11 +170,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
               .
             </p>
           ) : (
-            <AddMemberForm
-              grupoId={grupo.id}
-              availablePlayers={availablePlayers}
-              hayCupoTitular={hayCupoTitular}
-            />
+            <AddMemberForm grupoId={grupo.id} availablePlayers={availablePlayers} />
           )}
         </div>
       </section>
@@ -202,74 +199,11 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
         )}
       </section>
 
-      <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-            Titulares
-          </h2>
-          <p className="text-sm text-neutral-700">
-            {titulares.length} de {grupo.cupo_titulares}
-          </p>
-        </div>
-        {titulares.length === 0 ? (
-          <p className="mt-3 text-sm text-neutral-500">Sin titulares todavía.</p>
-        ) : (
-          <ul className="mt-3 divide-y divide-neutral-100">
-            {titulares.map((m) => (
-              <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <span className="text-sm font-medium text-neutral-900">
-                  {m.player?.nombre ?? "—"}
-                  {m.player?.apodo ? (
-                    <span className="ml-2 text-xs font-normal text-neutral-500">
-                      ({m.player.apodo})
-                    </span>
-                  ) : null}
-                </span>
-                <div className="flex items-center gap-2">
-                  <DemoteForm membresiaId={m.id} />
-                  <RemoveMemberForm membresiaId={m.id} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-            Cola de suplentes (FIFO)
-          </h2>
-          <p className="text-sm text-neutral-700">{suplentes.length}</p>
-        </div>
-        {suplentes.length === 0 ? (
-          <p className="mt-3 text-sm text-neutral-500">Sin suplentes en cola.</p>
-        ) : (
-          <ol className="mt-3 divide-y divide-neutral-100">
-            {suplentes.map((m) => (
-              <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <span className="flex items-center gap-3">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-700">
-                    {m.orden ?? "?"}
-                  </span>
-                  <span className="text-sm font-medium text-neutral-900">
-                    {m.player?.nombre ?? "—"}
-                    {m.player?.apodo ? (
-                      <span className="ml-2 text-xs font-normal text-neutral-500">
-                        ({m.player.apodo})
-                      </span>
-                    ) : null}
-                  </span>
-                </span>
-                <div className="flex items-center gap-2">
-                  <PromoteForm membresiaId={m.id} />
-                  <RemoveMemberForm membresiaId={m.id} />
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+      <MembersSections
+        titulares={titulares}
+        suplentes={suplentes}
+        cupoTitulares={grupo.cupo_titulares}
+      />
     </div>
   );
 }

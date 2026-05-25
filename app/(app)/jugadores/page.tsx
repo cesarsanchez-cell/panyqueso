@@ -4,6 +4,8 @@ import { requireRole } from "@/lib/auth/require-role";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
+import { PlayersListFilterable } from "./players-list-filterable";
+
 type PlayerStatus = Database["public"]["Enums"]["player_status"];
 type PlayerRoleField = Database["public"]["Enums"]["player_role_field"];
 type ChangeRequestStatus = Database["public"]["Enums"]["change_request_status"];
@@ -18,12 +20,6 @@ const ROLE_FIELD_LABEL: Record<PlayerRoleField, string> = {
   arquero: "Arquero",
   jugador_campo: "Campo",
   mixto: "Mixto",
-};
-
-const PLAYER_STATUS_BADGE: Record<PlayerStatus, string> = {
-  pending: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
-  approved: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
-  inactive: "bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200",
 };
 
 const REQUEST_STATUS_LABEL: Partial<Record<ChangeRequestStatus, string>> = {
@@ -85,7 +81,7 @@ export default async function JugadoresPage({
   const supabase = await createClient();
   let playersQuery = supabase
     .from("players")
-    .select("id, nombre, edad, status, role_field")
+    .select("id, nombre, apodo, edad, status, role_field")
     .order("nombre", { ascending: true });
 
   if (statusFilter) {
@@ -169,55 +165,42 @@ export default async function JugadoresPage({
             : "Aún no hay jugadores cargados."}
         </div>
       ) : (
-        <ul className="divide-y divide-neutral-200 overflow-hidden rounded-lg border border-neutral-200 bg-white">
-          {createRequests.map((r) => {
-            const nombre = readString(r.proposed_values, "nombre") ?? "(sin nombre)";
-            const edad = readNumber(r.proposed_values, "edad");
-            const roleField = readRoleField(r.proposed_values);
-            return (
-              <li
-                key={r.id}
-                className="flex items-center justify-between gap-4 bg-sky-50/30 px-4 py-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-neutral-900">
-                    {nombre}
-                    <span className="ml-2 text-xs font-normal text-neutral-500">· solicitud</span>
-                  </p>
-                  <p className="text-xs text-neutral-500">
-                    {edad !== null ? `${edad} años` : "edad —"}
-                    {roleField ? ` · ${ROLE_FIELD_LABEL[roleField]}` : ""}
-                  </p>
-                </div>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${REQUEST_STATUS_BADGE[r.status] ?? ""}`}
-                >
-                  {REQUEST_STATUS_LABEL[r.status] ?? r.status}
-                </span>
-              </li>
-            );
-          })}
-          {players.map((p) => (
-            <li key={p.id}>
-              <Link
-                href={`/jugadores/${p.id}`}
-                className="flex items-center justify-between gap-4 px-4 py-3 transition hover:bg-neutral-50"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-neutral-900">{p.nombre}</p>
-                  <p className="text-xs text-neutral-500">
-                    {p.edad} años · {ROLE_FIELD_LABEL[p.role_field]}
-                  </p>
-                </div>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${PLAYER_STATUS_BADGE[p.status]}`}
-                >
-                  {STATUS_LABEL[p.status]}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          {createRequests.length > 0 ? (
+            <ul className="divide-y divide-neutral-200 overflow-hidden rounded-lg border border-neutral-200 bg-white">
+              {createRequests.map((r) => {
+                const nombre = readString(r.proposed_values, "nombre") ?? "(sin nombre)";
+                const edad = readNumber(r.proposed_values, "edad");
+                const roleField = readRoleField(r.proposed_values);
+                return (
+                  <li
+                    key={r.id}
+                    className="flex items-center justify-between gap-4 bg-sky-50/30 px-4 py-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-neutral-900">
+                        {nombre}
+                        <span className="ml-2 text-xs font-normal text-neutral-500">
+                          · solicitud
+                        </span>
+                      </p>
+                      <p className="text-xs text-neutral-500">
+                        {edad !== null ? `${edad} años` : "edad —"}
+                        {roleField ? ` · ${ROLE_FIELD_LABEL[roleField]}` : ""}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${REQUEST_STATUS_BADGE[r.status] ?? ""}`}
+                    >
+                      {REQUEST_STATUS_LABEL[r.status] ?? r.status}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+          <PlayersListFilterable players={players} />
+        </>
       )}
     </div>
   );
