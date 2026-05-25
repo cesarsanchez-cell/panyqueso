@@ -8,12 +8,15 @@ import { createClient } from "@/lib/supabase/server";
 
 type PlayerRoleField = Database["public"]["Enums"]["player_role_field"];
 type PositionPref = Database["public"]["Enums"]["position_pref"];
+type PiernaHabil = Database["public"]["Enums"]["pierna_habil_enum"];
 
 export type AcceptInviteState = null | { error: string } | { fieldErrors: Record<string, string> };
 
 const ROLES: readonly PlayerRoleField[] = ["arquero", "jugador_campo", "mixto"];
 const POSITIONS: readonly PositionPref[] = ["arquero", "defensor", "mediocampista", "delantero"];
+const PIERNA_VALUES: readonly PiernaHabil[] = ["derecha", "izquierda", "ambas"];
 const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function syntheticEmailFromPhone(phone: string): string {
   return `${phone.toLowerCase()}@phone.fdlm.local`;
@@ -60,6 +63,23 @@ export async function acceptInvite(
     ? (position_pref_raw as PositionPref)
     : null;
   if (!position_pref) errors.position_pref = "Elegí una posición.";
+
+  const emailRaw = String(formData.get("email") ?? "").trim();
+  let emailOptional: string | null = null;
+  if (emailRaw) {
+    if (!EMAIL_REGEX.test(emailRaw) || emailRaw.length > 254) errors.email = "Email inválido.";
+    else emailOptional = emailRaw.toLowerCase();
+  }
+
+  const piernaRaw = String(formData.get("pierna_habil") ?? "").trim();
+  let pierna_habil: PiernaHabil | null = null;
+  if (piernaRaw) {
+    if (!PIERNA_VALUES.includes(piernaRaw as PiernaHabil)) {
+      errors.pierna_habil = "Valor inválido.";
+    } else {
+      pierna_habil = piernaRaw as PiernaHabil;
+    }
+  }
 
   const password = String(formData.get("password") ?? "");
   const passwordConfirm = String(formData.get("password_confirm") ?? "");
@@ -117,7 +137,7 @@ export async function acceptInvite(
   const authUserId = created.user.id;
 
   // 4. claim_invite atomico. Si falla, borramos el auth.user para no dejar orfanos.
-  const { error: claimErr } = await admin.rpc("claim_invite", {
+  const { data: newPlayerId, error: claimErr } = await admin.rpc("claim_invite", {
     p_token: token,
     p_auth_user_id: authUserId,
     p_nombre: nombre,
@@ -141,7 +161,19 @@ export async function acceptInvite(
     return { error: `No se pudo completar el registro: ${claimErr.message}` };
   }
 
-  // 5. Auto-login con las credenciales recien creadas.
+  // 5. Datos opcionales (email, pierna_habil). Best-effort: si falla, el alta
+  // sigue siendo valida y el admin puede editar despues desde el detalle.
+  if (newPlayerId && (emailOptional || pierna_habil)) {
+    await admin
+      .from("players")
+      .update({
+        ...(emailOptional ? { email: emailOptional } : {}),
+        ...(pierna_habil ? { pierna_habil } : {}),
+      })
+      .eq("id", newPlayerId);
+  }
+
+  // 6. Auto-login con las credenciales recien creadas.
   const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
   if (signInErr) {
     return {

@@ -27,6 +27,13 @@ const POSITION_OPTIONS = [
   { value: "delantero", label: "Delantero" },
 ];
 
+const PIERNA_OPTIONS = [
+  { value: "", label: "Prefiero no decir" },
+  { value: "derecha", label: "Derecha" },
+  { value: "izquierda", label: "Izquierda" },
+  { value: "ambas", label: "Ambas" },
+];
+
 function fieldError(state: AcceptInviteState, field: string): string | null {
   if (state && "fieldErrors" in state) return state.fieldErrors[field] ?? null;
   return null;
@@ -129,6 +136,42 @@ export function SignupForm({ token, nombreTentativo, phone }: Props) {
             ))}
           </select>
           <ErrorLine msg={fieldError(state, "position_pref")} />
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor="email" className={labelClass}>
+            Email <span className="text-neutral-500">(opcional)</span>
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            maxLength={254}
+            autoComplete="email"
+            placeholder="vos@ejemplo.com"
+            className={inputClass}
+          />
+          <ErrorLine msg={fieldError(state, "email")} />
+        </div>
+        <div>
+          <label htmlFor="pierna_habil" className={labelClass}>
+            Pierna hábil <span className="text-neutral-500">(opcional)</span>
+          </label>
+          <select
+            id="pierna_habil"
+            name="pierna_habil"
+            defaultValue=""
+            className={inputClass}
+          >
+            {PIERNA_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <ErrorLine msg={fieldError(state, "pierna_habil")} />
         </div>
       </div>
 
