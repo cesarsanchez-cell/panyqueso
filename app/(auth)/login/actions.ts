@@ -6,23 +6,18 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 
 // Schema minimo: tipos. La normalizacion (trim/lowercase) y validacion de
-// formato la hacemos manualmente abajo. Razon: en Zod 4 los mensajes custom
-// pasados como string posicional a metodos chain como .email("...") devuelven
-// "Invalid input" en lugar del mensaje en algunos paths, lo que rompe el UX.
+// formato la hacemos manualmente abajo.
 const LoginSchema = z.object({
-  email: z.string().min(1),
+  identifier: z.string().min(1),
   password: z.string().min(1),
 });
 
-// Regex pragmatico de email. No es RFC 5322 estricto - rechaza obviamente
-// invalidos y deja pasar el resto. La validacion real la hace Supabase Auth.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const E164_RE = /^\+[1-9]\d{6,14}$/;
+const PHONE_NORMALIZE_RE = /[\s\-().]/g;
 
 export type LoginState = { error: string } | null;
 
-/**
- * Anti open-redirect: solo aceptar paths internos.
- */
 function safeRedirectTarget(value: string | null): string {
   if (typeof value !== "string" || value.length === 0) return "/";
   if (!value.startsWith("/")) return "/";
@@ -30,33 +25,53 @@ function safeRedirectTarget(value: string | null): string {
   return value;
 }
 
+function syntheticEmailFromPhone(phone: string): string {
+  return `${phone.toLowerCase()}@phone.fdlm.local`;
+}
+
+// Detecta si el identifier es un celular (E.164 una vez normalizado) o email.
+// Retorna el email real a usar contra Supabase Auth: si era phone, devuelve
+// el email sintetico.
+function resolveLoginEmail(identifier: string): string | null {
+  const normalizedPhone = identifier.replace(PHONE_NORMALIZE_RE, "");
+  if (E164_RE.test(normalizedPhone)) {
+    return syntheticEmailFromPhone(normalizedPhone);
+  }
+  const lower = identifier.toLowerCase();
+  if (EMAIL_RE.test(lower)) {
+    return lower;
+  }
+  return null;
+}
+
 export async function login(_prev: LoginState, formData: FormData): Promise<LoginState> {
-  const rawEmail = formData.get("email");
+  // Backwards compat: el form viejo usaba "email"; el nuevo manda
+  // "identifier" o "email" indistintamente.
+  const rawIdentifier = formData.get("identifier") ?? formData.get("email");
   const rawPassword = formData.get("password");
 
-  const normalizedEmail = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
+  const identifier = typeof rawIdentifier === "string" ? rawIdentifier.trim() : "";
   const password = typeof rawPassword === "string" ? rawPassword : "";
 
-  const parsed = LoginSchema.safeParse({ email: normalizedEmail, password });
-
+  const parsed = LoginSchema.safeParse({ identifier, password });
   if (!parsed.success) {
-    if (!normalizedEmail) return { error: "Ingresá tu email" };
-    return { error: "Ingresá tu password" };
+    if (!identifier) return { error: "Ingresá tu email o celular" };
+    return { error: "Ingresá tu contraseña" };
   }
 
-  if (!EMAIL_RE.test(parsed.data.email)) {
-    return { error: "Email inválido" };
+  const email = resolveLoginEmail(parsed.data.identifier);
+  if (!email) {
+    return { error: "Email o celular inválido (celular en formato +5491155551234)" };
   }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({
-    email: parsed.data.email,
+    email,
     password: parsed.data.password,
   });
 
   if (error) {
-    // Mensaje generico para no permitir enumeracion de cuentas.
-    return { error: "Email o password incorrectos" };
+    return { error: "Email/celular o contraseña incorrectos" };
   }
 
   const redirectTo = formData.get("redirectTo");

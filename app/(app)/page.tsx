@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth/require-role";
 
@@ -52,6 +53,12 @@ const CARDS: CardLink[] = [
 export default async function HomePage() {
   const { profile } = await requireUser();
   const role = profile.role;
+
+  // Player no tiene cards admin/veedor. Lo mandamos a /mi-perfil que es su
+  // home natural (Fase 9 PR 8).
+  if (role === "player") {
+    redirect("/mi-perfil");
+  }
 
   const cards = CARDS.filter((c) => role && c.roles.includes(role));
 

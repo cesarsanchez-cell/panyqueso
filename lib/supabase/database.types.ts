@@ -873,6 +873,18 @@ export type Database = {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
       };
+      claim_invite: {
+        Args: {
+          p_auth_user_id: string;
+          p_edad: number;
+          p_fecha_nacimiento: string;
+          p_nombre: string;
+          p_position_pref: Database["public"]["Enums"]["position_pref"];
+          p_role_field: Database["public"]["Enums"]["player_role_field"];
+          p_token: string;
+        };
+        Returns: string;
+      };
       compute_internal_score: {
         Args: {
           p_edad: number;
