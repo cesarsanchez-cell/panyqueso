@@ -891,6 +891,7 @@ export type Database = {
         Args: never;
         Returns: Database["public"]["Enums"]["user_role"];
       };
+      decline_invite_by_token: { Args: { p_token: string }; Returns: boolean };
       flag_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
