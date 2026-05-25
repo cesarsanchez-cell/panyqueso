@@ -14,18 +14,22 @@ export function LoginForm({ redirectTo }: Props) {
   return (
     <form action={formAction} className="space-y-4">
       <div className="space-y-1">
-        <label htmlFor="email" className="block text-sm font-medium text-neutral-800">
-          Email
+        <label htmlFor="identifier" className="block text-sm font-medium text-neutral-800">
+          Email o celular
         </label>
         <input
-          id="email"
-          name="email"
-          type="email"
+          id="identifier"
+          name="identifier"
+          type="text"
           required
-          autoComplete="email"
-          inputMode="email"
+          autoComplete="username"
+          inputMode="text"
+          placeholder="tu@email.com o +5491155551234"
           className="block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-base shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
         />
+        <p className="text-xs text-neutral-500">
+          Admin/veedor: email. Jugadores: celular en formato <code>+54...</code>.
+        </p>
       </div>
 
       <div className="space-y-1">

@@ -28,7 +28,10 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
     { label: "Convocatorias", href: "/convocatorias" },
     { label: "Auditoría", href: "/auditoria", key: "auditoria" },
   ],
-  player: [{ label: "Inicio", href: "/" }],
+  player: [
+    { label: "Mi perfil", href: "/mi-perfil" },
+    { label: "Cambiar password", href: "/perfil" },
+  ],
 };
 
 export function AppHeader({
