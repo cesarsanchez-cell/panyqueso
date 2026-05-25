@@ -8,7 +8,18 @@ import { createClient } from "@/lib/supabase/server";
 
 type MembresiaTipo = Database["public"]["Enums"]["membresia_tipo"];
 
-export type CreateGrupoState = null | { error: string } | { success: string };
+type GrupoFormValues = {
+  nombre: string;
+  lugar_id: string;
+  dia_semana: string;
+  hora: string;
+  cupo_titulares: string;
+};
+
+export type CreateGrupoState =
+  | null
+  | { error: string; values: GrupoFormValues }
+  | { success: string };
 export type UpdateGrupoState = null | { error: string } | { success: string };
 export type MembershipState = null | { error: string } | { success: string };
 
@@ -40,24 +51,35 @@ export async function createGrupo(
 ): Promise<CreateGrupoState> {
   const ctx = await requireRole("admin");
 
-  const nombre = String(formData.get("nombre") ?? "").trim();
-  if (!nombre) return { error: "El nombre es obligatorio." };
+  // Capturamos lo que tipeo el admin para echarlo de vuelta en caso de error.
+  // React 19 resetea inputs uncontrolled cuando una form action retorna; sin
+  // esto el admin pierde lo cargado cada vez que algo falla.
+  const values: GrupoFormValues = {
+    nombre: String(formData.get("nombre") ?? "").trim(),
+    lugar_id: String(formData.get("lugar_id") ?? "").trim(),
+    dia_semana: String(formData.get("dia_semana") ?? ""),
+    hora: String(formData.get("hora") ?? ""),
+    cupo_titulares: String(formData.get("cupo_titulares") ?? ""),
+  };
+
+  const nombre = values.nombre;
+  if (!nombre) return { error: "El nombre es obligatorio.", values };
   if (nombre.length > MAX_NOMBRE) {
-    return { error: `Nombre demasiado largo (máximo ${MAX_NOMBRE} caracteres).` };
+    return { error: `Nombre demasiado largo (máximo ${MAX_NOMBRE} caracteres).`, values };
   }
 
-  const lugar_id = String(formData.get("lugar_id") ?? "").trim();
-  if (!lugar_id) return { error: "Falta seleccionar un lugar." };
+  const lugar_id = values.lugar_id;
+  if (!lugar_id) return { error: "Falta seleccionar un lugar.", values };
 
-  const dia_semana = parseDiaSemana(String(formData.get("dia_semana") ?? ""));
-  if (dia_semana === null) return { error: "Día de la semana inválido." };
+  const dia_semana = parseDiaSemana(values.dia_semana);
+  if (dia_semana === null) return { error: "Día de la semana inválido.", values };
 
-  const hora = parseHora(String(formData.get("hora") ?? ""));
-  if (!hora) return { error: "Hora inválida (formato HH:MM)." };
+  const hora = parseHora(values.hora);
+  if (!hora) return { error: "Hora inválida (formato HH:MM).", values };
 
-  const cupo_titulares = parseCupo(String(formData.get("cupo_titulares") ?? ""));
+  const cupo_titulares = parseCupo(values.cupo_titulares);
   if (cupo_titulares === null) {
-    return { error: "Cupo de titulares inválido (entre 6 y 24)." };
+    return { error: "Cupo de titulares inválido (entre 6 y 24).", values };
   }
 
   const supabase = await createClient();
@@ -75,7 +97,7 @@ export async function createGrupo(
     .single();
 
   if (error || !data) {
-    return { error: `No se pudo crear el grupo: ${error?.message ?? "sin detalle"}` };
+    return { error: `No se pudo crear el grupo: ${error?.message ?? "sin detalle"}`, values };
   }
 
   revalidatePath("/grupos");

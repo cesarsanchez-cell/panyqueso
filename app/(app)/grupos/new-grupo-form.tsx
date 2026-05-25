@@ -27,6 +27,10 @@ export function NewGrupoForm({ lugares }: { lugares: Lugar[] }) {
     null,
   );
 
+  // Si vino un error, repoblamos con los valores tipeados. En success,
+  // dejamos vacios para que el admin pueda crear otro grupo limpio.
+  const errorValues = state && "error" in state ? state.values : null;
+
   return (
     <form action={formAction} className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -41,6 +45,7 @@ export function NewGrupoForm({ lugares }: { lugares: Lugar[] }) {
             required
             maxLength={80}
             placeholder="Ej: Martes 20hs Cancha del Tano"
+            defaultValue={errorValues?.nombre ?? ""}
             className={inputClass}
           />
         </div>
@@ -48,7 +53,13 @@ export function NewGrupoForm({ lugares }: { lugares: Lugar[] }) {
           <label htmlFor="lugar_id" className={labelClass}>
             Lugar
           </label>
-          <select id="lugar_id" name="lugar_id" required defaultValue="" className={inputClass}>
+          <select
+            id="lugar_id"
+            name="lugar_id"
+            required
+            defaultValue={errorValues?.lugar_id ?? ""}
+            className={inputClass}
+          >
             <option value="" disabled>
               Elegí…
             </option>
@@ -70,7 +81,7 @@ export function NewGrupoForm({ lugares }: { lugares: Lugar[] }) {
             id="dia_semana"
             name="dia_semana"
             required
-            defaultValue="2"
+            defaultValue={errorValues?.dia_semana ?? "2"}
             className={inputClass}
           >
             {DIAS.map((d) => (
@@ -89,7 +100,7 @@ export function NewGrupoForm({ lugares }: { lugares: Lugar[] }) {
             name="hora"
             type="time"
             required
-            defaultValue="20:00"
+            defaultValue={errorValues?.hora || "20:00"}
             className={inputClass}
           />
         </div>
@@ -104,7 +115,7 @@ export function NewGrupoForm({ lugares }: { lugares: Lugar[] }) {
             min={6}
             max={24}
             required
-            defaultValue={12}
+            defaultValue={errorValues?.cupo_titulares || 12}
             className={inputClass}
           />
         </div>
