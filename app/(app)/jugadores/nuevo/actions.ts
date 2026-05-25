@@ -29,11 +29,28 @@ function parseRating(v: FormDataEntryValue | null): number | null {
   return n;
 }
 
-function parseEdad(v: FormDataEntryValue | null): number | null {
+const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseFechaNacimiento(v: FormDataEntryValue | null): {
+  fecha: string;
+  edad: number;
+} | null {
   if (typeof v !== "string") return null;
-  const n = Number(v);
-  if (!Number.isInteger(n) || n < 14 || n > 99) return null;
-  return n;
+  const trimmed = v.trim();
+  if (!FECHA_REGEX.test(trimmed)) return null;
+
+  const dob = new Date(`${trimmed}T00:00:00`);
+  if (Number.isNaN(dob.getTime())) return null;
+
+  const now = new Date();
+  let edad = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
+    edad--;
+  }
+  if (edad < 14 || edad > 99) return null;
+
+  return { fecha: trimmed, edad };
 }
 
 export async function createPlayerRequest(
@@ -47,8 +64,10 @@ export async function createPlayerRequest(
   const nombre = asString(formData.get("nombre"));
   if (!nombre) errors.nombre = "Ingresá un nombre";
 
-  const edad = parseEdad(formData.get("edad"));
-  if (edad === null) errors.edad = "Edad entre 14 y 99";
+  const dobParsed = parseFechaNacimiento(formData.get("fecha_nacimiento"));
+  if (dobParsed === null) {
+    errors.fecha_nacimiento = "Fecha de nacimiento inválida (edad debe estar entre 14 y 99)";
+  }
 
   const role_field_raw = asString(formData.get("role_field"));
   const role_field = ROLES.includes(role_field_raw as PlayerRoleField)
@@ -89,10 +108,17 @@ export async function createPlayerRequest(
     return { fieldErrors: errors };
   }
 
+  // dobParsed siempre esta poblado aca (se valido arriba). El non-null assert
+  // es seguro porque si era null ya retornamos con errors.
+  const { fecha: fecha_nacimiento, edad } = dobParsed!;
+
   // Build proposed_values jsonb con los campos finales (sin nulls).
+  // edad va derivada (compute_internal_score la sigue usando); fecha_nacimiento
+  // queda guardada para futuras pantallas.
   const proposed_values: { [key: string]: Json } = {
     nombre,
     edad,
+    fecha_nacimiento,
     role_field,
     position_pref,
     technical,

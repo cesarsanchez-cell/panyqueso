@@ -53,19 +53,17 @@ export function NewPlayerForm() {
             <ErrorLine msg={fieldError(state, "nombre")} />
           </div>
           <div>
-            <label htmlFor="edad" className={labelClass}>
-              Edad
+            <label htmlFor="fecha_nacimiento" className={labelClass}>
+              Fecha de nacimiento
             </label>
             <input
-              id="edad"
-              name="edad"
-              type="number"
-              min={14}
-              max={99}
+              id="fecha_nacimiento"
+              name="fecha_nacimiento"
+              type="date"
               required
               className={inputClass}
             />
-            <ErrorLine msg={fieldError(state, "edad")} />
+            <ErrorLine msg={fieldError(state, "fecha_nacimiento")} />
           </div>
         </div>
       </Section>
