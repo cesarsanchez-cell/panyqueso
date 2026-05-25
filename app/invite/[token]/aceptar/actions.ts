@@ -16,7 +16,6 @@ const ROLES: readonly PlayerRoleField[] = ["arquero", "jugador_campo", "mixto"];
 const POSITIONS: readonly PositionPref[] = ["arquero", "defensor", "mediocampista", "delantero"];
 const PIERNA_VALUES: readonly PiernaHabil[] = ["derecha", "izquierda", "ambas"];
 const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function syntheticEmailFromPhone(phone: string): string {
   return `${phone.toLowerCase()}@phone.fdlm.local`;
@@ -63,13 +62,6 @@ export async function acceptInvite(
     ? (position_pref_raw as PositionPref)
     : null;
   if (!position_pref) errors.position_pref = "Elegí una posición.";
-
-  const emailRaw = String(formData.get("email") ?? "").trim();
-  let emailOptional: string | null = null;
-  if (emailRaw) {
-    if (!EMAIL_REGEX.test(emailRaw) || emailRaw.length > 254) errors.email = "Email inválido.";
-    else emailOptional = emailRaw.toLowerCase();
-  }
 
   const piernaRaw = String(formData.get("pierna_habil") ?? "").trim();
   let pierna_habil: PiernaHabil | null = null;
@@ -161,16 +153,10 @@ export async function acceptInvite(
     return { error: `No se pudo completar el registro: ${claimErr.message}` };
   }
 
-  // 5. Datos opcionales (email, pierna_habil). Best-effort: si falla, el alta
-  // sigue siendo valida y el admin puede editar despues desde el detalle.
-  if (newPlayerId && (emailOptional || pierna_habil)) {
-    await admin
-      .from("players")
-      .update({
-        ...(emailOptional ? { email: emailOptional } : {}),
-        ...(pierna_habil ? { pierna_habil } : {}),
-      })
-      .eq("id", newPlayerId);
+  // 5. Pierna habil opcional. Best-effort: si falla, el alta sigue valida y
+  // el admin puede editar despues desde el detalle.
+  if (newPlayerId && pierna_habil) {
+    await admin.from("players").update({ pierna_habil }).eq("id", newPlayerId);
   }
 
   // 6. Auto-login con las credenciales recien creadas.
