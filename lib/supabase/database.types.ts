@@ -929,6 +929,15 @@ export type Database = {
           lugar_nombre: string;
         }[];
       };
+      get_my_player_summary: {
+        Args: never;
+        Returns: {
+          apodo: string;
+          id: string;
+          nombre: string;
+          status: Database["public"]["Enums"]["player_status"];
+        }[];
+      };
       is_active_member_of_grupo: {
         Args: { p_grupo_id: string };
         Returns: boolean;
