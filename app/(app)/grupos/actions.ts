@@ -323,6 +323,36 @@ export async function demoteToSuplente(formData: FormData): Promise<void> {
 }
 
 // ============================================================================
+// cancelInvitation: marca una invitacion pendiente como expirada (expires_at
+// = now()). No se borra: queda como historial. El link deja de funcionar
+// porque la pagina publica /invite/<token> chequea expires_at > now().
+// ============================================================================
+export async function cancelInvitation(formData: FormData): Promise<void> {
+  await requireRole("admin");
+
+  const invitation_id = String(formData.get("invitation_id") ?? "").trim();
+  if (!invitation_id) return;
+
+  const supabase = await createClient();
+
+  const { data: inv } = await supabase
+    .from("player_invitations")
+    .select("id, grupo_id, used_at, declined_at")
+    .eq("id", invitation_id)
+    .maybeSingle();
+
+  if (!inv) return;
+  if (inv.used_at !== null || inv.declined_at !== null) return;
+
+  await supabase
+    .from("player_invitations")
+    .update({ expires_at: new Date().toISOString() })
+    .eq("id", invitation_id);
+
+  revalidatePath(`/grupos/${inv.grupo_id}`);
+}
+
+// ============================================================================
 // Helper: compactar la cola FIFO tras una salida.
 // Decrementa orden en 1 para todos los suplentes activos con orden > fromOrden.
 // ============================================================================
