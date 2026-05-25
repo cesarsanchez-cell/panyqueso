@@ -25,6 +25,25 @@ const TIPO_LABEL = {
   suplente: "Suplente",
 } as const;
 
+type SupabaseLike = Awaited<ReturnType<typeof createClient>>;
+
+async function loadMembresias(supabase: SupabaseLike, playerId: string) {
+  const { data, error } = await supabase
+    .from("grupo_membresias")
+    .select(
+      "id, tipo, orden, status, grupo:grupos!grupo_id(id, nombre, dia_semana, hora, cupo_titulares, lugar:lugares!lugar_id(nombre))",
+    )
+    .eq("status", "activo")
+    .eq("player_id", playerId)
+    .order("tipo", { ascending: true })
+    .order("orden", { ascending: true, nullsFirst: true });
+
+  if (error) {
+    throw new Error(`No se pudieron cargar tus grupos: ${error.message}`);
+  }
+  return data ?? [];
+}
+
 export default async function MiPerfilPage({
   searchParams,
 }: {
@@ -46,20 +65,13 @@ export default async function MiPerfilPage({
     .eq("auth_user_id", ctx.userId)
     .maybeSingle();
 
-  const { data: membresias, error: memErr } = await supabase
-    .from("grupo_membresias")
-    .select(
-      "id, tipo, orden, status, grupo:grupos!grupo_id(id, nombre, dia_semana, hora, cupo_titulares, lugar:lugares!lugar_id(nombre))",
-    )
-    .eq("status", "activo")
-    .order("tipo", { ascending: true })
-    .order("orden", { ascending: true, nullsFirst: true });
-
-  if (memErr) {
-    throw new Error(`No se pudieron cargar tus grupos: ${memErr.message}`);
+  // RLS permite ver TODA la cola del grupo donde el player es miembro
+  // (decision de privacidad). Filtramos por player_id para mostrar solo
+  // las membresias propias del player en /mi-perfil.
+  let grupos: Awaited<ReturnType<typeof loadMembresias>> = [];
+  if (player) {
+    grupos = await loadMembresias(supabase, player.id);
   }
-
-  const grupos = membresias ?? [];
 
   return (
     <div className="space-y-6">
