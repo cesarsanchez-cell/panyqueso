@@ -933,6 +933,14 @@ export type Database = {
         Args: { p_grupo_id: string };
         Returns: boolean;
       };
+      player_decline_convocatoria: {
+        Args: { p_convocatoria_id: string };
+        Returns: undefined;
+      };
+      player_join_suplente_queue: {
+        Args: { p_grupo_id: string };
+        Returns: undefined;
+      };
       reject_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
