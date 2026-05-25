@@ -6,33 +6,15 @@ import type { Database } from "@/lib/supabase/database.types";
 
 import { proposeChange, type ProposeChangeState } from "./actions";
 
-type PlayerRoleField = Database["public"]["Enums"]["player_role_field"];
-type PositionPref = Database["public"]["Enums"]["position_pref"];
 type RatingConfidence = Database["public"]["Enums"]["rating_confidence"];
 
 type Initial = {
   id: string;
-  edad: number;
-  role_field: PlayerRoleField;
-  position_pref: PositionPref;
   technical: number;
   physical: number;
   mental: number;
   rating_confidence: RatingConfidence;
 };
-
-const ROLE_OPTIONS = [
-  { value: "arquero", label: "Arquero" },
-  { value: "jugador_campo", label: "Jugador de campo" },
-  { value: "mixto", label: "Mixto" },
-] as const;
-
-const POSITION_OPTIONS = [
-  { value: "arquero", label: "Arquero" },
-  { value: "defensor", label: "Defensor" },
-  { value: "mediocampista", label: "Mediocampista" },
-  { value: "delantero", label: "Delantero" },
-] as const;
 
 const CONFIDENCE_OPTIONS = [
   { value: "baja", label: "Baja" },
@@ -57,70 +39,12 @@ export function EditForm({ initial }: { initial: Initial }) {
 
   return (
     <form action={formAction} className="space-y-6">
-      <Section title="Posición">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="role_field" className={labelClass}>
-              Rol en cancha
-            </label>
-            <select
-              id="role_field"
-              name="role_field"
-              defaultValue={initial.role_field}
-              required
-              className={inputClass}
-            >
-              {ROLE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <ErrorLine msg={fieldError(state, "role_field")} />
-          </div>
-          <div>
-            <label htmlFor="position_pref" className={labelClass}>
-              Posición preferida
-            </label>
-            <select
-              id="position_pref"
-              name="position_pref"
-              defaultValue={initial.position_pref}
-              required
-              className={inputClass}
-            >
-              {POSITION_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <ErrorLine msg={fieldError(state, "position_pref")} />
-          </div>
-        </div>
-      </Section>
-
-      <Section title="Datos">
-        <div>
-          <label htmlFor="edad" className={labelClass}>
-            Edad
-          </label>
-          <input
-            id="edad"
-            name="edad"
-            type="number"
-            min={14}
-            max={99}
-            defaultValue={initial.edad}
-            required
-            className={inputClass}
-          />
-          <ErrorLine msg={fieldError(state, "edad")} />
-        </div>
-      </Section>
-
       <Section title="Ratings (1–10)">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <p className="text-xs text-neutral-500">
+          Este cambio pasa por el veedor antes de aplicarse. El resto de los datos del jugador
+          (nombre, posición, contacto, etc.) los editás directo desde la pantalla de detalle.
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
           {(
             [
               { name: "technical", label: "Técnica", value: initial.technical },
@@ -194,7 +118,7 @@ export function EditForm({ initial }: { initial: Initial }) {
           disabled={pending}
           className="rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {pending ? "Enviando…" : "Proponer cambio"}
+          {pending ? "Enviando…" : "Proponer ratings"}
         </button>
       </div>
     </form>

@@ -8,13 +8,14 @@ import { createClient } from "@/lib/supabase/server";
 import { EditForm } from "./edit-form";
 
 const FIELD_LABEL: Record<string, string> = {
-  edad: "Edad",
-  role_field: "Rol",
-  position_pref: "Posición preferida",
   technical: "Técnica",
   physical: "Físico",
   mental: "Mental",
   rating_confidence: "Confianza",
+  // Mantenido para mostrar requests viejas (pre-PR B) que aun esten pending.
+  edad: "Edad",
+  role_field: "Rol",
+  position_pref: "Posición preferida",
 };
 
 function isJsonObject(v: Json): v is { [k: string]: Json | undefined } {
@@ -36,9 +37,7 @@ export default async function ProponerCambioPage({ params }: { params: Promise<{
   const supabase = await createClient();
   const { data: player, error } = await supabase
     .from("players")
-    .select(
-      "id, nombre, edad, role_field, position_pref, technical, physical, mental, rating_confidence",
-    )
+    .select("id, nombre, technical, physical, mental, rating_confidence")
     .eq("id", id)
     .maybeSingle();
 
@@ -78,11 +77,11 @@ export default async function ProponerCambioPage({ params }: { params: Promise<{
 
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
-          Proponer cambio — {player.nombre}
+          Proponer ratings — {player.nombre}
         </h1>
         <p className="mt-1 text-sm text-neutral-600">
-          El cambio queda como solicitud pendiente hasta que un veedor la apruebe. Modificá solo los
-          campos que querés cambiar.
+          Los ratings (técnica/físico/mental/confianza) son lo único que el admin no puede cambiar
+          solo: pasan por el veedor antes de aplicarse. Modificá lo que quieras y agregá un motivo.
         </p>
       </div>
 
@@ -97,9 +96,6 @@ export default async function ProponerCambioPage({ params }: { params: Promise<{
         <EditForm
           initial={{
             id: player.id,
-            edad: player.edad,
-            role_field: player.role_field,
-            position_pref: player.position_pref,
             technical: player.technical,
             physical: player.physical,
             mental: player.mental,
