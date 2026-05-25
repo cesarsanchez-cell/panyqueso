@@ -111,6 +111,13 @@ export type Database = {
             referencedRelation: "players";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "convocatoria_players_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players_public";
+            referencedColumns: ["id"];
+          },
         ];
       };
       convocatorias: {
@@ -240,6 +247,13 @@ export type Database = {
             columns: ["player_id"];
             isOneToOne: false;
             referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "grupo_membresias_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players_public";
             referencedColumns: ["id"];
           },
         ];
@@ -373,6 +387,13 @@ export type Database = {
             referencedRelation: "players";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "match_player_stats_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players_public";
+            referencedColumns: ["id"];
+          },
         ];
       };
       match_team_players: {
@@ -413,6 +434,13 @@ export type Database = {
             columns: ["player_id"];
             isOneToOne: false;
             referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "match_team_players_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players_public";
             referencedColumns: ["id"];
           },
         ];
@@ -512,7 +540,7 @@ export type Database = {
           {
             foreignKeyName: "matches_convocatoria_id_fkey";
             columns: ["convocatoria_id"];
-            isOneToOne: false;
+            isOneToOne: true;
             referencedRelation: "convocatorias";
             referencedColumns: ["id"];
           },
@@ -576,10 +604,24 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "player_change_requests_created_player_id_fkey";
+            columns: ["created_player_id"];
+            isOneToOne: false;
+            referencedRelation: "players_public";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "player_change_requests_player_id_fkey";
             columns: ["player_id"];
             isOneToOne: false;
             referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "player_change_requests_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players_public";
             referencedColumns: ["id"];
           },
           {
@@ -668,6 +710,13 @@ export type Database = {
             columns: ["used_by_player_id"];
             isOneToOne: false;
             referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "player_invitations_used_by_player_id_fkey";
+            columns: ["used_by_player_id"];
+            isOneToOne: false;
+            referencedRelation: "players_public";
             referencedColumns: ["id"];
           },
         ];
@@ -790,6 +839,32 @@ export type Database = {
           status: Database["public"]["Enums"]["player_status"] | null;
           ubicacion_maps_url: string | null;
         };
+        Insert: {
+          apodo?: string | null;
+          avatar_url?: string | null;
+          fecha_nacimiento?: string | null;
+          id?: string | null;
+          nombre?: string | null;
+          pierna_habil?: Database["public"]["Enums"]["pierna_habil_enum"] | null;
+          position_pref?: Database["public"]["Enums"]["position_pref"] | null;
+          positions_possible?: Database["public"]["Enums"]["position_pref"][] | null;
+          role_field?: Database["public"]["Enums"]["player_role_field"] | null;
+          status?: Database["public"]["Enums"]["player_status"] | null;
+          ubicacion_maps_url?: string | null;
+        };
+        Update: {
+          apodo?: string | null;
+          avatar_url?: string | null;
+          fecha_nacimiento?: string | null;
+          id?: string | null;
+          nombre?: string | null;
+          pierna_habil?: Database["public"]["Enums"]["pierna_habil_enum"] | null;
+          position_pref?: Database["public"]["Enums"]["position_pref"] | null;
+          positions_possible?: Database["public"]["Enums"]["position_pref"][] | null;
+          role_field?: Database["public"]["Enums"]["player_role_field"] | null;
+          status?: Database["public"]["Enums"]["player_status"] | null;
+          ubicacion_maps_url?: string | null;
+        };
         Relationships: [];
       };
     };
@@ -811,42 +886,39 @@ export type Database = {
         Args: { p_match_id: string };
         Returns: undefined;
       };
-      current_player_id: {
-        Args: never;
-        Returns: string;
-      };
+      current_player_id: { Args: never; Returns: string };
       current_user_role: {
         Args: never;
         Returns: Database["public"]["Enums"]["user_role"];
       };
-      is_active_member_of_grupo: {
-        Args: { p_grupo_id: string };
-        Returns: boolean;
+      flag_player_change_request: {
+        Args: { p_comment?: string; p_request_id: string };
+        Returns: undefined;
       };
       get_invite_by_token: {
         Args: { p_token: string };
         Returns: {
-          invite_id: string;
-          invite_phone: string;
-          invite_nombre_tentativo: string | null;
-          invite_used_at: string | null;
-          invite_declined_at: string | null;
-          invite_expires_at: string;
-          grupo_id: string;
-          grupo_nombre: string;
+          convocatoria_fecha: string;
+          convocatoria_hora: string;
+          convocatoria_id: string;
+          grupo_cupo_titulares: number;
           grupo_dia_semana: number;
           grupo_hora: string;
-          grupo_cupo_titulares: number;
+          grupo_id: string;
+          grupo_nombre: string;
+          invite_declined_at: string;
+          invite_expires_at: string;
+          invite_id: string;
+          invite_nombre_tentativo: string;
+          invite_phone: string;
+          invite_used_at: string;
+          lugar_google_maps_url: string;
           lugar_nombre: string;
-          lugar_google_maps_url: string | null;
-          convocatoria_id: string | null;
-          convocatoria_fecha: string | null;
-          convocatoria_hora: string | null;
         }[];
       };
-      flag_player_change_request: {
-        Args: { p_comment?: string; p_request_id: string };
-        Returns: undefined;
+      is_active_member_of_grupo: {
+        Args: { p_grupo_id: string };
+        Returns: boolean;
       };
       reject_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };

@@ -1,0 +1,33 @@
+-- ============================================================================
+-- Fase 9 hotfix: GRANT UPDATE para los campos de contacto editables por admin
+-- ============================================================================
+--
+-- Contexto:
+--   El form 'Contacto y datos personales' en /jugadores/[id] (mergeado en
+--   PR #64) deja al admin editar phone, email, apodo, pierna_habil y
+--   fecha_nacimiento sin pasar por veedor. Son datos de contacto / identidad,
+--   no ratings.
+--
+-- Problema:
+--   La RLS de Fase 2 (FUT-26, 20260522180149_rls_policies_phase2.sql) hizo
+--   defense-in-depth con column-level GRANT: revoco UPDATE sobre players
+--   para authenticated y solo dio GRANT sobre `private_notes`. Cualquier otro
+--   UPDATE desde la API client falla con "permission denied for table
+--   players" antes de evaluar la policy.
+--
+-- Fix:
+--   GRANT UPDATE solo sobre las columnas nuevas que el admin puede tocar
+--   directo. La policy players_update_admin_notes (admin-only) sigue gateando
+--   por rol. El trigger players_enforce_immutability sigue bloqueando los
+--   sensibles porque sus checks son explicitos por columna (nombre, edad,
+--   role_field, etc.) y no incluyen los de Fase 9.
+--
+-- Out of scope:
+--   - auth_user_id: lo setea solo el flow de signup (PR 8) via service_role.
+--   - avatar_url y ubicacion_maps_url: los edita el jugador desde /mi-perfil
+--     (PR 9). Cuando se construya esa pantalla se agregara el GRANT con la
+--     policy correspondiente.
+-- ============================================================================
+
+grant update (phone, email, apodo, pierna_habil, fecha_nacimiento)
+  on public.players to authenticated;
