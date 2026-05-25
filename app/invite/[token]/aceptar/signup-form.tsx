@@ -159,12 +159,7 @@ export function SignupForm({ token, nombreTentativo, phone }: Props) {
           <label htmlFor="pierna_habil" className={labelClass}>
             Pierna hábil <span className="text-neutral-500">(opcional)</span>
           </label>
-          <select
-            id="pierna_habil"
-            name="pierna_habil"
-            defaultValue=""
-            className={inputClass}
-          >
+          <select id="pierna_habil" name="pierna_habil" defaultValue="" className={inputClass}>
             {PIERNA_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
