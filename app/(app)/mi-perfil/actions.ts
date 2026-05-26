@@ -60,7 +60,7 @@ export async function joinSuplenteQueue(
   if (!grupoId) return { error: "Falta el id del grupo." };
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("player_join_suplente_queue", {
+  const { data, error } = await supabase.rpc("player_join_suplente_queue", {
     p_grupo_id: grupoId,
   });
 
@@ -71,5 +71,7 @@ export async function joinSuplenteQueue(
   }
 
   revalidatePath("/mi-perfil");
-  return { success: "Te anotaste al final de la cola." };
+  return {
+    success: data === "titular" ? "Entraste como titular." : "Entraste a la cola de suplentes.",
+  };
 }
