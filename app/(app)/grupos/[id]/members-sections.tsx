@@ -2,12 +2,11 @@
 
 import { useMemo, useState } from "react";
 
-import { DemoteForm, PromoteForm, RemoveMemberForm } from "./membership-forms";
+import { RemoveMemberForm } from "./membership-forms";
 
 type Member = {
   id: string;
-  tipo: "titular" | "suplente";
-  orden: number | null;
+  joined_at: string;
   player: {
     id: string;
     nombre: string;
@@ -29,38 +28,22 @@ function matchesQuery(m: Member, q: string): boolean {
 }
 
 export function MembersSections({
-  titulares,
-  suplentes,
+  miembros,
   cupoTitulares,
 }: {
-  titulares: Member[];
-  suplentes: Member[];
+  miembros: Member[];
   cupoTitulares: number;
 }) {
   const [query, setQuery] = useState("");
   const q = normalize(query.trim());
 
-  // Titulares ordenados alfabeticamente (el orden FIFO solo aplica a
-  // suplentes, en titulares no hay un "orden" significativo).
-  const titularesAlfa = useMemo(() => {
-    return [...titulares].sort((a, b) => {
-      const an = a.player?.nombre ?? "";
-      const bn = b.player?.nombre ?? "";
-      return an.localeCompare(bn, "es");
-    });
-  }, [titulares]);
-
-  const titularesFiltrados = useMemo(
-    () => titularesAlfa.filter((m) => matchesQuery(m, q)),
-    [titularesAlfa, q],
-  );
-  const suplentesFiltrados = useMemo(
-    () => suplentes.filter((m) => matchesQuery(m, q)),
-    [suplentes, q],
-  );
+  // Orden de alta inmutable (lo da el server). El primero al final del array
+  // ya quedo primero por el order by joined_at asc.
+  const ordenados = useMemo(() => miembros, [miembros]);
+  const filtrados = useMemo(() => ordenados.filter((m) => matchesQuery(m, q)), [ordenados, q]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <input
         type="search"
         placeholder="Buscar miembro por nombre o apodo…"
@@ -72,75 +55,51 @@ export function MembersSections({
       <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-            Titulares
+            Miembros del grupo
           </h2>
           <p className="text-sm text-neutral-700">
-            {q ? `${titularesFiltrados.length} de ${titulares.length}` : `${titulares.length}`} de{" "}
-            {cupoTitulares}
+            {q ? `${filtrados.length} de ${miembros.length}` : `${miembros.length} en total`}
           </p>
         </div>
-        {titulares.length === 0 ? (
-          <p className="mt-3 text-sm text-neutral-500">Sin titulares todavía.</p>
-        ) : titularesFiltrados.length === 0 ? (
-          <p className="mt-3 text-sm text-neutral-500">Ningún titular coincide con la búsqueda.</p>
-        ) : (
-          <ul className="mt-3 divide-y divide-neutral-100">
-            {titularesFiltrados.map((m) => (
-              <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <span className="text-sm font-medium text-neutral-900">
-                  {m.player?.nombre ?? "—"}
-                  {m.player?.apodo ? (
-                    <span className="ml-2 text-xs font-normal text-neutral-500">
-                      ({m.player.apodo})
-                    </span>
-                  ) : null}
-                </span>
-                <div className="flex items-center gap-2">
-                  <DemoteForm membresiaId={m.id} />
-                  <RemoveMemberForm membresiaId={m.id} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-            Cola de suplentes (FIFO)
-          </h2>
-          <p className="text-sm text-neutral-700">
-            {q ? `${suplentesFiltrados.length} de ${suplentes.length}` : `${suplentes.length}`}
-          </p>
-        </div>
-        {suplentes.length === 0 ? (
-          <p className="mt-3 text-sm text-neutral-500">Sin suplentes en cola.</p>
-        ) : suplentesFiltrados.length === 0 ? (
-          <p className="mt-3 text-sm text-neutral-500">Ningún suplente coincide con la búsqueda.</p>
+        <p className="mt-1 text-xs text-neutral-500">
+          Orden de alta. Los primeros {cupoTitulares} entran como titulares en cada convocatoria; el
+          resto como suplentes.
+        </p>
+        {miembros.length === 0 ? (
+          <p className="mt-3 text-sm text-neutral-500">Sin miembros todavía.</p>
+        ) : filtrados.length === 0 ? (
+          <p className="mt-3 text-sm text-neutral-500">Ningún miembro coincide con la búsqueda.</p>
         ) : (
           <ol className="mt-3 divide-y divide-neutral-100">
-            {suplentesFiltrados.map((m) => (
-              <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <span className="flex items-center gap-3">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-700">
-                    {m.orden ?? "?"}
+            {filtrados.map((m) => {
+              const posicionReal = ordenados.findIndex((x) => x.id === m.id) + 1;
+              const esTitular = posicionReal <= cupoTitulares;
+              return (
+                <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                  <span className="flex items-center gap-3">
+                    <span
+                      className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ring-1 ${
+                        esTitular
+                          ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                          : "bg-amber-50 text-amber-700 ring-amber-200"
+                      }`}
+                      title={esTitular ? "Entraría como titular" : "Entraría como suplente"}
+                    >
+                      {posicionReal}
+                    </span>
+                    <span className="text-sm font-medium text-neutral-900">
+                      {m.player?.nombre ?? "—"}
+                      {m.player?.apodo ? (
+                        <span className="ml-2 text-xs font-normal text-neutral-500">
+                          ({m.player.apodo})
+                        </span>
+                      ) : null}
+                    </span>
                   </span>
-                  <span className="text-sm font-medium text-neutral-900">
-                    {m.player?.nombre ?? "—"}
-                    {m.player?.apodo ? (
-                      <span className="ml-2 text-xs font-normal text-neutral-500">
-                        ({m.player.apodo})
-                      </span>
-                    ) : null}
-                  </span>
-                </span>
-                <div className="flex items-center gap-2">
-                  <PromoteForm membresiaId={m.id} />
                   <RemoveMemberForm membresiaId={m.id} />
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ol>
         )}
       </section>

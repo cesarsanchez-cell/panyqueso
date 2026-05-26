@@ -2,6 +2,8 @@
 
 import { useActionState } from "react";
 
+import { formatArLocal } from "@/lib/phone";
+
 import { acceptInvite, type AcceptInviteState } from "./actions";
 
 type Props = {
@@ -55,10 +57,10 @@ export function SignupForm({ token, nombreTentativo, phone }: Props) {
       <input type="hidden" name="token" value={token} />
 
       <div>
-        <label className={labelClass}>Teléfono</label>
+        <label className={labelClass}>Celular</label>
         <input
           type="text"
-          value={phone}
+          value={formatArLocal(phone)}
           disabled
           readOnly
           className={`${inputClass} cursor-not-allowed bg-neutral-100 font-mono`}
