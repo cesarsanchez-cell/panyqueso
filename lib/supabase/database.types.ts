@@ -79,6 +79,7 @@ export type Database = {
           id: string;
           player_id: string;
           updated_at: string;
+          waitlist_order: number | null;
         };
         Insert: {
           added_at?: string;
@@ -87,6 +88,7 @@ export type Database = {
           id?: string;
           player_id: string;
           updated_at?: string;
+          waitlist_order?: number | null;
         };
         Update: {
           added_at?: string;
@@ -95,6 +97,7 @@ export type Database = {
           id?: string;
           player_id?: string;
           updated_at?: string;
+          waitlist_order?: number | null;
         };
         Relationships: [
           {
@@ -122,42 +125,51 @@ export type Database = {
       };
       convocatorias: {
         Row: {
+          cierre_at: string | null;
           created_at: string;
           created_by: string;
+          cupo_max: number | null;
           cupo_maximo: number;
           fecha: string;
           grupo_id: string | null;
           hora: string;
           id: string;
           lugar_id: string | null;
+          modo: Database["public"]["Enums"]["convocatoria_modo"];
           notas: string | null;
           status: Database["public"]["Enums"]["convocatoria_status"];
           team_draft: Json | null;
           updated_at: string;
         };
         Insert: {
+          cierre_at?: string | null;
           created_at?: string;
           created_by: string;
+          cupo_max?: number | null;
           cupo_maximo?: number;
           fecha: string;
           grupo_id?: string | null;
           hora?: string;
           id?: string;
           lugar_id?: string | null;
+          modo?: Database["public"]["Enums"]["convocatoria_modo"];
           notas?: string | null;
           status?: Database["public"]["Enums"]["convocatoria_status"];
           team_draft?: Json | null;
           updated_at?: string;
         };
         Update: {
+          cierre_at?: string | null;
           created_at?: string;
           created_by?: string;
+          cupo_max?: number | null;
           cupo_maximo?: number;
           fecha?: string;
           grupo_id?: string | null;
           hora?: string;
           id?: string;
           lugar_id?: string | null;
+          modo?: Database["public"]["Enums"]["convocatoria_modo"];
           notas?: string | null;
           status?: Database["public"]["Enums"]["convocatoria_status"];
           team_draft?: Json | null;
@@ -260,6 +272,8 @@ export type Database = {
       };
       grupos: {
         Row: {
+          auto_renovar: boolean;
+          cierre_minutes_after_start: number;
           created_at: string;
           cupo_titulares: number;
           dia_semana: number;
@@ -272,6 +286,8 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          auto_renovar?: boolean;
+          cierre_minutes_after_start?: number;
           created_at?: string;
           cupo_titulares?: number;
           dia_semana: number;
@@ -284,6 +300,8 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          auto_renovar?: boolean;
+          cierre_minutes_after_start?: number;
           created_at?: string;
           cupo_titulares?: number;
           dia_semana?: number;
@@ -948,7 +966,7 @@ export type Database = {
       };
       player_join_suplente_queue: {
         Args: { p_grupo_id: string };
-        Returns: undefined;
+        Returns: string;
       };
       reject_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
@@ -956,7 +974,12 @@ export type Database = {
       };
     };
     Enums: {
-      attendance_status: "pendiente" | "confirmado" | "declinado" | "ausente_sin_aviso";
+      attendance_status:
+        | "pendiente"
+        | "confirmado"
+        | "declinado"
+        | "ausente_sin_aviso"
+        | "lista_espera";
       change_request_action:
         | "create_player"
         | "update_sensitive_fields"
@@ -964,6 +987,7 @@ export type Database = {
         | "reactivate_player"
         | "assign_initial_ratings";
       change_request_status: "pending" | "approved" | "rejected" | "flagged";
+      convocatoria_modo: "cerrada" | "abierta";
       convocatoria_status: "abierta" | "cerrada" | "jugada" | "cancelada";
       grupo_status: "activo" | "archivado";
       match_team_label: "A" | "B";
@@ -1104,7 +1128,13 @@ export const Constants = {
   },
   public: {
     Enums: {
-      attendance_status: ["pendiente", "confirmado", "declinado", "ausente_sin_aviso"],
+      attendance_status: [
+        "pendiente",
+        "confirmado",
+        "declinado",
+        "ausente_sin_aviso",
+        "lista_espera",
+      ],
       change_request_action: [
         "create_player",
         "update_sensitive_fields",
@@ -1113,6 +1143,7 @@ export const Constants = {
         "assign_initial_ratings",
       ],
       change_request_status: ["pending", "approved", "rejected", "flagged"],
+      convocatoria_modo: ["cerrada", "abierta"],
       convocatoria_status: ["abierta", "cerrada", "jugada", "cancelada"],
       grupo_status: ["activo", "archivado"],
       match_team_label: ["A", "B"],
