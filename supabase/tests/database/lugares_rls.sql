@@ -82,12 +82,13 @@ $$;
 -- ---------------------------------------------------------------------------
 select plan(13);
 
--- 1. sin rol no ve lugares.
+-- 1. sin rol pero authenticated: SI ve lugares (Fase 9: lugares_select_authenticated).
+-- Antes era 0 (solo admin/veedor); ahora 1 porque el player tambien lee.
 select _as('00000000-0000-0000-0000-0000000000a3');
 select is(
   (select count(*)::int from public.lugares),
-  0,
-  'sin rol: NO ve lugares'
+  1,
+  'sin rol (authenticated): SI ve lugares - policy lugares_select_authenticated'
 );
 
 -- 2. veedor ve lugares.
