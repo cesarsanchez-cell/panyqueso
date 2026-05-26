@@ -33,33 +33,150 @@ function formatFecha(iso: string): string {
   });
 }
 
-const TIPO_LABEL = {
-  titular: "Titular",
-  suplente: "Suplente",
-} as const;
-
 type SupabaseLike = Awaited<ReturnType<typeof createClient>>;
 
-async function loadMembresiasActivas(supabase: SupabaseLike, playerId: string) {
-  const { data, error } = await supabase
+type GrupoInfo = {
+  id: string;
+  nombre: string;
+  dia_semana: number;
+  hora: string;
+  cupo_titulares: number;
+  status: string;
+  lugar: { nombre: string } | null;
+};
+
+type LineupMember = {
+  membresiaId: string;
+  playerId: string;
+  tipo: "titular" | "suplente";
+  orden: number | null;
+  nombre: string;
+  apodo: string | null;
+  isMe: boolean;
+};
+
+type GrupoLineup = {
+  grupo: GrupoInfo;
+  miTipo: "titular" | "suplente";
+  miOrden: number | null;
+  titulares: LineupMember[];
+  suplentes: LineupMember[];
+};
+
+async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<GrupoLineup[]> {
+  // 1. Grupos donde el player tiene membresia activa.
+  const { data: misMembresias } = await supabase
+    .from("grupo_membresias")
+    .select("grupo_id, tipo, orden")
+    .eq("player_id", playerId)
+    .eq("status", "activo");
+
+  const misRows = misMembresias ?? [];
+  if (misRows.length === 0) return [];
+
+  const grupoIds = misRows.map((m) => m.grupo_id);
+
+  // 2. Todas las membresias activas de esos grupos (lineup completo).
+  const { data: lineup } = await supabase
     .from("grupo_membresias")
     .select(
-      "id, tipo, orden, status, grupo:grupos!grupo_id(id, nombre, dia_semana, hora, cupo_titulares, lugar:lugares!lugar_id(nombre))",
+      "id, grupo_id, tipo, orden, player_id, grupo:grupos!grupo_id(id, nombre, dia_semana, hora, cupo_titulares, status, lugar:lugares!lugar_id(nombre))",
     )
     .eq("status", "activo")
-    .eq("player_id", playerId)
-    .order("tipo", { ascending: true })
-    .order("orden", { ascending: true, nullsFirst: true });
+    .in("grupo_id", grupoIds);
 
-  if (error) {
-    throw new Error(`No se pudieron cargar tus grupos: ${error.message}`);
+  const lineupRows = lineup ?? [];
+  if (lineupRows.length === 0) return [];
+
+  // 3. Players (via view publica, sin ratings ni datos sensibles).
+  const playerIds = Array.from(new Set(lineupRows.map((r) => r.player_id)));
+  const { data: playersData } = await supabase
+    .from("players_public")
+    .select("id, nombre, apodo")
+    .in("id", playerIds);
+
+  const playerById = new Map<string, { nombre: string; apodo: string | null }>();
+  for (const p of playersData ?? []) {
+    if (p.id) playerById.set(p.id, { nombre: p.nombre ?? "—", apodo: p.apodo ?? null });
   }
-  return data ?? [];
+
+  // 4. Agrupar por grupo.
+  const groupMap = new Map<
+    string,
+    {
+      grupo: GrupoInfo;
+      members: LineupMember[];
+      mine: { tipo: "titular" | "suplente"; orden: number | null };
+    }
+  >();
+
+  // Pre-cargar la info propia para saber tipo + orden en cada grupo.
+  const mineByGrupo = new Map<string, { tipo: "titular" | "suplente"; orden: number | null }>();
+  for (const m of misRows) {
+    if (m.tipo === "titular" || m.tipo === "suplente") {
+      mineByGrupo.set(m.grupo_id, { tipo: m.tipo, orden: m.orden });
+    }
+  }
+
+  for (const row of lineupRows) {
+    if (!row.grupo) continue;
+    if (row.tipo !== "titular" && row.tipo !== "suplente") continue;
+    const playerInfo = playerById.get(row.player_id) ?? { nombre: "—", apodo: null };
+    const member: LineupMember = {
+      membresiaId: row.id,
+      playerId: row.player_id,
+      tipo: row.tipo,
+      orden: row.orden,
+      nombre: playerInfo.nombre,
+      apodo: playerInfo.apodo,
+      isMe: row.player_id === playerId,
+    };
+
+    const existing = groupMap.get(row.grupo_id);
+    if (existing) {
+      existing.members.push(member);
+    } else {
+      const mine = mineByGrupo.get(row.grupo_id);
+      if (!mine) continue;
+      groupMap.set(row.grupo_id, {
+        grupo: {
+          id: row.grupo.id,
+          nombre: row.grupo.nombre,
+          dia_semana: row.grupo.dia_semana,
+          hora: row.grupo.hora,
+          cupo_titulares: row.grupo.cupo_titulares,
+          status: row.grupo.status,
+          lugar: row.grupo.lugar ? { nombre: row.grupo.lugar.nombre } : null,
+        },
+        members: [member],
+        mine,
+      });
+    }
+  }
+
+  // 5. Separar titulares (alfabetico) y suplentes (FIFO) por grupo.
+  const result: GrupoLineup[] = [];
+  for (const [, g] of groupMap) {
+    const titulares = g.members
+      .filter((m) => m.tipo === "titular")
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+    const suplentes = g.members
+      .filter((m) => m.tipo === "suplente")
+      .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+    result.push({
+      grupo: g.grupo,
+      miTipo: g.mine.tipo,
+      miOrden: g.mine.orden,
+      titulares,
+      suplentes,
+    });
+  }
+
+  result.sort((a, b) => a.grupo.dia_semana - b.grupo.dia_semana);
+  return result;
 }
 
 async function loadGruposInactivos(supabase: SupabaseLike, playerId: string) {
-  // Grupos donde el player tiene membresia inactiva (ex titular o ex suplente)
-  // Y todavia no tiene una activa. Excluimos grupos archivados.
   const { data, error } = await supabase
     .from("grupo_membresias")
     .select(
@@ -90,7 +207,6 @@ async function loadNextConvocatoria(supabase: SupabaseLike, playerId: string) {
   }
   if (!data) return null;
 
-  // Filtramos en memoria: convocatorias abiertas, fecha >= hoy.
   const upcoming = data.find((row) => {
     const c = row.convocatoria;
     if (!c) return false;
@@ -108,33 +224,27 @@ export default async function MiPerfilPage({
   const ctx = await requireUser();
   const sp = await searchParams;
 
-  // Solo para players. Admin/veedor no tienen contexto aca.
   if (ctx.profile.role !== "player") {
     redirect("/");
   }
 
   const supabase = await createClient();
 
-  // RPC SECURITY DEFINER porque el rol player no tiene SELECT directo en
-  // public.players (los datos publicos van por players_public, que omite
-  // status e id). Esta RPC devuelve solo los campos safe del propio jugador.
   const { data: playerRows } = await supabase.rpc("get_my_player_summary");
   const player = playerRows && playerRows.length > 0 ? playerRows[0] : null;
 
-  let gruposActivos: Awaited<ReturnType<typeof loadMembresiasActivas>> = [];
+  let lineups: GrupoLineup[] = [];
   let gruposInactivos: Awaited<ReturnType<typeof loadGruposInactivos>> = [];
   let nextConv: Awaited<ReturnType<typeof loadNextConvocatoria>> = null;
   if (player) {
-    [gruposActivos, gruposInactivos, nextConv] = await Promise.all([
-      loadMembresiasActivas(supabase, player.id),
+    [lineups, gruposInactivos, nextConv] = await Promise.all([
+      loadLineups(supabase, player.id),
       loadGruposInactivos(supabase, player.id),
       loadNextConvocatoria(supabase, player.id),
     ]);
   }
 
-  // Filtrar inactivos: solo grupos cuyo status='activo' (no archivados) y
-  // donde el player NO tiene una membresia activa simultanea.
-  const activeGrupoIds = new Set(gruposActivos.map((m) => m.grupo?.id).filter(Boolean));
+  const activeGrupoIds = new Set(lineups.map((l) => l.grupo.id));
   const reJoinable = gruposInactivos.filter((m) => {
     if (!m.grupo) return false;
     if (m.grupo.status !== "activo") return false;
@@ -192,62 +302,28 @@ export default async function MiPerfilPage({
         </section>
       ) : null}
 
-      <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
+      {lineups.length === 0 ? (
+        <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
             Tus grupos
           </h2>
-          <p className="text-sm text-neutral-700">
-            {gruposActivos.length} {gruposActivos.length === 1 ? "grupo" : "grupos"}
-          </p>
-        </div>
-        {gruposActivos.length === 0 ? (
           <p className="mt-3 text-sm text-neutral-500">
             Todavía no estás en ningún grupo activo. Si te invitaron por un link de WhatsApp y ya
             completaste tu alta, esperá unos segundos y refrescá.
           </p>
-        ) : (
-          <ul className="mt-3 divide-y divide-neutral-100">
-            {gruposActivos.map((m) => {
-              const g = m.grupo;
-              if (!g) return null;
-              const dia = DIA_LABEL[g.dia_semana];
-              const hora = formatHora(g.hora);
-              const tipoLabel = m.tipo === "titular" ? TIPO_LABEL.titular : TIPO_LABEL.suplente;
-              return (
-                <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-neutral-900">{g.nombre}</p>
-                    <p className="text-xs text-neutral-500">
-                      {dia} {hora} · {g.lugar?.nombre ?? "—"}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        m.tipo === "titular"
-                          ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-                          : "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
-                      }`}
-                    >
-                      {tipoLabel}
-                      {m.tipo === "suplente" && m.orden ? ` #${m.orden}` : ""}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+        </section>
+      ) : (
+        lineups.map((l) => <GrupoCard key={l.grupo.id} lineup={l} />)
+      )}
 
       {reJoinable.length > 0 ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-            Anotarme en la cola
+            Volver al grupo
           </h2>
           <p className="mt-1 text-xs text-neutral-500">
-            Te bajaste de estos grupos. Podés volver a sumarte como suplente al final de la cola.
+            Te bajaste de estos grupos. Podés volver a sumarte ahora; si hay cupo entrás como
+            titular, si no como suplente al final de la cola.
           </p>
           <ul className="mt-3 space-y-3">
             {reJoinable.map((m) => {
@@ -267,7 +343,7 @@ export default async function MiPerfilPage({
                     </p>
                   </div>
                   <div className="sm:w-56">
-                    <JoinQueueButton grupoId={g.id} label="Anotarme en la cola" />
+                    <JoinQueueButton grupoId={g.id} label="Volver al grupo" />
                   </div>
                 </li>
               );
@@ -282,5 +358,91 @@ export default async function MiPerfilPage({
         </Link>
       </p>
     </div>
+  );
+}
+
+function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
+  const { grupo, miTipo, miOrden, titulares, suplentes } = lineup;
+  const dia = DIA_LABEL[grupo.dia_semana];
+  const hora = formatHora(grupo.hora);
+  const miLabel = miTipo === "titular" ? "Sos titular" : `Sos suplente #${miOrden ?? "?"}`;
+  const miBadgeClass =
+    miTipo === "titular"
+      ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+      : "bg-amber-50 text-amber-700 ring-1 ring-amber-200";
+
+  return (
+    <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-neutral-900">{grupo.nombre}</h2>
+          <p className="text-xs text-neutral-500">
+            {dia} {hora} · {grupo.lugar?.nombre ?? "—"} · cupo {grupo.cupo_titulares}
+          </p>
+        </div>
+        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${miBadgeClass}`}>
+          {miLabel}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            Titulares ({titulares.length}/{grupo.cupo_titulares})
+          </h3>
+          {titulares.length === 0 ? (
+            <p className="mt-2 text-xs text-neutral-500">Sin titulares.</p>
+          ) : (
+            <ul className="mt-2 space-y-1">
+              {titulares.map((m) => (
+                <li
+                  key={m.membresiaId}
+                  className={`rounded px-2 py-1 text-sm ${
+                    m.isMe ? "bg-emerald-50 font-semibold text-emerald-900" : "text-neutral-800"
+                  }`}
+                >
+                  {m.nombre}
+                  {m.apodo ? (
+                    <span className="ml-1 text-xs text-neutral-500">({m.apodo})</span>
+                  ) : null}
+                  {m.isMe ? <span className="ml-2 text-xs text-emerald-700">· vos</span> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            Cola de suplentes ({suplentes.length})
+          </h3>
+          {suplentes.length === 0 ? (
+            <p className="mt-2 text-xs text-neutral-500">Sin suplentes.</p>
+          ) : (
+            <ol className="mt-2 space-y-1">
+              {suplentes.map((m) => (
+                <li
+                  key={m.membresiaId}
+                  className={`flex items-center gap-2 rounded px-2 py-1 text-sm ${
+                    m.isMe ? "bg-amber-50 font-semibold text-amber-900" : "text-neutral-800"
+                  }`}
+                >
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-700">
+                    {m.orden ?? "?"}
+                  </span>
+                  <span>
+                    {m.nombre}
+                    {m.apodo ? (
+                      <span className="ml-1 text-xs text-neutral-500">({m.apodo})</span>
+                    ) : null}
+                    {m.isMe ? <span className="ml-2 text-xs text-amber-700">· vos</span> : null}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }

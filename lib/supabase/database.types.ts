@@ -948,7 +948,7 @@ export type Database = {
       };
       player_join_suplente_queue: {
         Args: { p_grupo_id: string };
-        Returns: undefined;
+        Returns: string;
       };
       reject_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
