@@ -18,7 +18,15 @@ function mapError(code: string | undefined, fallback: string): string {
     case "P0043":
       return "Este grupo está archivado.";
     case "P0044":
-      return "Ya estás activo en este grupo.";
+      return "No estás en el grupo de esta convocatoria.";
+    case "P0050":
+      return "El grupo no existe.";
+    case "P0053":
+      return "La convocatoria no existe.";
+    case "P0057":
+      return "La convocatoria ya no está abierta. Si necesitás un cambio, hablalo con el organizador.";
+    case "P0059":
+      return "Ya estás en esta convocatoria.";
     default:
       return fallback;
   }
@@ -47,6 +55,58 @@ export async function declineConvocatoria(
 
   revalidatePath("/mi-perfil");
   return { success: "Listo, avisaste que no vas." };
+}
+
+export async function undoDeclineConvocatoria(
+  _prev: OneClickState,
+  formData: FormData,
+): Promise<OneClickState> {
+  const ctx = await requireUser();
+  if (ctx.profile.role !== "player") return { error: "Solo el jugador puede retractarse." };
+
+  const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
+  if (!convocatoriaId) return { error: "Falta el id de la convocatoria." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("player_undo_decline_convocatoria", {
+    p_convocatoria_id: convocatoriaId,
+  });
+
+  if (error) {
+    return {
+      error: mapError((error as { code?: string }).code, `No se pudo retractar: ${error.message}`),
+    };
+  }
+
+  revalidatePath("/mi-perfil");
+  return { success: "Listo, volviste a la convocatoria." };
+}
+
+export async function joinOpenConvocatoria(
+  _prev: OneClickState,
+  formData: FormData,
+): Promise<OneClickState> {
+  const ctx = await requireUser();
+  if (ctx.profile.role !== "player") return { error: "Solo el jugador puede anotarse." };
+
+  const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
+  if (!convocatoriaId) return { error: "Falta el id de la convocatoria." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("player_join_open_convocatoria", {
+    p_convocatoria_id: convocatoriaId,
+  });
+
+  if (error) {
+    return {
+      error: mapError((error as { code?: string }).code, `No se pudo anotar: ${error.message}`),
+    };
+  }
+
+  revalidatePath("/mi-perfil");
+  return {
+    success: data === "titular" ? "Entraste como titular." : "Entraste a la cola de suplentes.",
+  };
 }
 
 export async function joinSuplenteQueue(

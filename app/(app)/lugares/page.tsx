@@ -17,7 +17,9 @@ export default async function LugaresPage() {
   const supabase = await createClient();
   const { data: lugares, error } = await supabase
     .from("lugares")
-    .select("id, nombre, created_at, created_by, creator:profiles!created_by(nombre)")
+    .select(
+      "id, nombre, ubicacion_maps_url, created_at, created_by, creator:profiles!created_by(nombre)",
+    )
     .order("nombre", { ascending: true });
 
   if (error) {
@@ -54,11 +56,21 @@ export default async function LugaresPage() {
           <ul className="mt-3 divide-y divide-neutral-100">
             {lugares.map((l) => (
               <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-medium text-neutral-900">{l.nombre}</p>
                   <p className="text-xs text-neutral-500">
                     Creado por {l.creator?.nombre ?? "—"} · {formatDate(l.created_at)}
                   </p>
+                  {l.ubicacion_maps_url ? (
+                    <a
+                      href={l.ubicacion_maps_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-block text-xs text-neutral-700 underline transition hover:text-neutral-900"
+                    >
+                      Ver en Maps ↗
+                    </a>
+                  ) : null}
                 </div>
               </li>
             ))}

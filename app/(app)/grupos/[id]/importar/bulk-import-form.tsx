@@ -2,6 +2,8 @@
 
 import { useActionState, useState } from "react";
 
+import { formatArLocal } from "@/lib/phone";
+
 import { bulkCreateInvitations, type BulkImportState } from "./actions";
 
 const labelClass = "block text-sm font-medium text-neutral-800";
@@ -27,7 +29,7 @@ export function BulkImportForm({ grupoId }: { grupoId: string }) {
             name="entries"
             required
             rows={10}
-            placeholder={"+5491155551234,Juan Pérez\n+5491155556789,Diego López"}
+            placeholder={"1155551234,Juan Pérez\n3514567890,Diego López"}
             className={`${inputClass} font-mono`}
           />
         </div>
@@ -86,7 +88,7 @@ function ImportResults({
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-neutral-900">{row.nombre}</p>
-                  <p className="truncate text-xs text-neutral-500">{row.phone}</p>
+                  <p className="truncate text-xs text-neutral-500">{formatArLocal(row.phone)}</p>
                 </div>
                 <CopyOneButton row={row} />
               </li>
@@ -157,7 +159,9 @@ function CopyAllButton({
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
-    const text = aceptadas.map((row) => `${row.nombre} (${row.phone}): ${row.link}`).join("\n");
+    const text = aceptadas
+      .map((row) => `${row.nombre} (${formatArLocal(row.phone)}): ${row.link}`)
+      .join("\n");
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);

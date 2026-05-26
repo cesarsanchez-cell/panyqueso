@@ -2,13 +2,7 @@
 
 import { useActionState, useMemo, useRef, useState } from "react";
 
-import {
-  addMember,
-  demoteToSuplente,
-  promoteToTitular,
-  removeMember,
-  type MembershipState,
-} from "../actions";
+import { addMember, removeMember, type MembershipState } from "../actions";
 
 // ----------------------------------------------------------------------------
 // AddMemberForm: agregar un player como titular o suplente al grupo.
@@ -141,32 +135,8 @@ export function AddMemberForm({
 // ----------------------------------------------------------------------------
 // Acciones por membresia (botones simples q invocan server actions).
 // ----------------------------------------------------------------------------
-const btnNeutral =
-  "rounded border border-neutral-300 bg-white px-2 py-0.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60";
 const btnDanger =
   "rounded border border-red-200 bg-white px-2 py-0.5 text-xs font-medium text-red-700 transition hover:bg-red-50";
-
-export function PromoteForm({ membresiaId }: { membresiaId: string }) {
-  return (
-    <form action={promoteToTitular}>
-      <input type="hidden" name="membresia_id" value={membresiaId} />
-      <button type="submit" className={btnNeutral} title="Subir a titular">
-        ↑ Titular
-      </button>
-    </form>
-  );
-}
-
-export function DemoteForm({ membresiaId }: { membresiaId: string }) {
-  return (
-    <form action={demoteToSuplente}>
-      <input type="hidden" name="membresia_id" value={membresiaId} />
-      <button type="submit" className={btnNeutral} title="Bajar a suplente (al final de la cola)">
-        ↓ Suplente
-      </button>
-    </form>
-  );
-}
 
 export function RemoveMemberForm({ membresiaId }: { membresiaId: string }) {
   return (

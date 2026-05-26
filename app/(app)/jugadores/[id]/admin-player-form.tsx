@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { arLocalFromE164 } from "@/lib/phone";
 import type { Database } from "@/lib/supabase/database.types";
 
 import { updatePlayerData, type UpdatePlayerState } from "./actions";
@@ -180,16 +181,18 @@ export function AdminPlayerForm({ playerId, initial }: { playerId: string; initi
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label htmlFor="phone" className={labelClass}>
-              Teléfono (WhatsApp)
+              Celular (WhatsApp)
             </label>
             <input
               id="phone"
               name="phone"
               type="tel"
-              defaultValue={initial.phone ?? ""}
-              placeholder="+5491155551234"
+              inputMode="tel"
+              defaultValue={arLocalFromE164(initial.phone)}
+              placeholder="1155551234"
               className={`${inputClass} font-mono`}
             />
+            <p className="mt-1 text-xs text-neutral-500">10 dígitos (código de área + número).</p>
             <ErrorLine msg={fieldError(state, "phone")} />
           </div>
           <div>

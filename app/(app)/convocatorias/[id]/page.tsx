@@ -3,10 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { requireRole } from "@/lib/auth/require-role";
+import { formatArLocal } from "@/lib/phone";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { parseTeamDraft, type TeamDraft, type TeamLabel } from "@/lib/teams/draft";
 
+import { AddGuestForm } from "./add-guest-form";
 import { AddPlayerForm } from "./add-player-form";
 import { CancelForm } from "./cancel-form";
 import { ConfirmMatchForm } from "./confirm-match-form";
@@ -143,7 +145,7 @@ export default async function ConvocatoriaDetallePage({
   const { data: convocadosRaw, error: convError } = await supabase
     .from("convocatoria_players")
     .select(
-      `id, added_at, attendance_status,
+      `id, added_at, attendance_status, nombre_libre, rol_en_convocatoria, orden_suplente,
        player:players!player_id(id, nombre, role_field, position_pref, status, internal_score)`,
     )
     .eq("convocatoria_id", id)
@@ -180,9 +182,10 @@ export default async function ConvocatoriaDetallePage({
     goalsByPlayerId = Object.fromEntries((statsRows ?? []).map((r) => [r.player_id, r.goals]));
   }
 
-  // Selector: solo se muestra si admin + abierta. Carga players approved
-  // filtrados por searchParams, excluyendo los ya convocados.
-  const showSelector = isAdmin && isOpen;
+  // Selector: admin puede editar el roster en abierta, cerrada y jugada.
+  // En cerrada/jugada es "ultimo recurso" para registrar eventualidades
+  // (faltazos, invitados que cubrieron, etc).
+  const showSelector = isAdmin && (isOpen || isClosed || isPlayed);
 
   // Invites: solo si la convocatoria pertenece a un grupo (Fase 9).
   const canInvite = isAdmin && isOpen && convocatoria.grupo_id !== null;
@@ -212,7 +215,7 @@ export default async function ConvocatoriaDetallePage({
     pendingInvites = (invitesRaw ?? []).map((row) => ({
       id: row.id,
       phone: row.phone,
-      nombre: row.nombre_tentativo ?? row.phone,
+      nombre: row.nombre_tentativo ?? formatArLocal(row.phone),
       link: origin ? `${origin}/invite/${row.token}` : `/invite/${row.token}`,
       expiresAt: row.expires_at,
     }));
@@ -331,24 +334,12 @@ export default async function ConvocatoriaDetallePage({
         {convocados.length === 0 ? (
           <p className="mt-3 text-sm text-neutral-500">Sin convocados todavía.</p>
         ) : (
-          <ul className="mt-3 divide-y divide-neutral-100">
-            {convocados.map((cp) => (
-              <li key={cp.id} className="flex items-center justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-neutral-900">
-                    {cp.player?.nombre ?? "—"}
-                  </p>
-                  <p className="text-xs text-neutral-500">
-                    {cp.player ? ROLE_LABEL[cp.player.role_field] : "—"} ·{" "}
-                    {cp.player ? POSITION_LABEL[cp.player.position_pref] : "—"}
-                  </p>
-                </div>
-                {showSelector ? (
-                  <RemovePlayerForm convocatoriaId={convocatoria.id} convocatoriaPlayerId={cp.id} />
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          <ConvocadosLista
+            convocados={convocados}
+            cupoMaximo={convocatoria.cupo_maximo}
+            convocatoriaId={convocatoria.id}
+            mostrarSacar={showSelector}
+          />
         )}
       </section>
 
@@ -444,6 +435,15 @@ export default async function ConvocatoriaDetallePage({
               ))}
             </ul>
           )}
+
+          <div className="mt-6 border-t border-neutral-200 pt-4">
+            <p className="text-xs text-neutral-500">
+              Para emergencias (alguien que no está en el catálogo y vino a cubrir un faltazo):
+            </p>
+            <div className="mt-2">
+              <AddGuestForm convocatoriaId={convocatoria.id} />
+            </div>
+          </div>
         </section>
       ) : null}
 
@@ -883,6 +883,147 @@ function DraftTeamColumn({
         ARQ {positionDist.arquero} · DEF {positionDist.defensor} · MED {positionDist.mediocampista}{" "}
         · DEL {positionDist.delantero}
       </p>
+    </div>
+  );
+}
+
+type ConvocadoRow = {
+  id: string;
+  attendance_status: string;
+  nombre_libre: string | null;
+  rol_en_convocatoria: "titular" | "suplente";
+  orden_suplente: number | null;
+  player: {
+    id: string;
+    nombre: string;
+    role_field: RoleField;
+    position_pref: PositionPref;
+  } | null;
+};
+
+function nombreDe(cp: ConvocadoRow): string {
+  if (cp.player) return cp.player.nombre;
+  return cp.nombre_libre ?? "—";
+}
+
+function subtituloDe(cp: ConvocadoRow): string {
+  if (cp.player) {
+    return `${ROLE_LABEL[cp.player.role_field]} · ${POSITION_LABEL[cp.player.position_pref]}`;
+  }
+  return "Invitado libre";
+}
+
+function ConvocadosLista({
+  convocados,
+  cupoMaximo,
+  convocatoriaId,
+  mostrarSacar,
+}: {
+  convocados: ConvocadoRow[];
+  cupoMaximo: number;
+  convocatoriaId: string;
+  mostrarSacar: boolean;
+}) {
+  const titulares = convocados
+    .filter((cp) => cp.rol_en_convocatoria === "titular" && cp.attendance_status !== "declinado")
+    .sort((a, b) => nombreDe(a).localeCompare(nombreDe(b), "es"));
+  const suplentes = convocados
+    .filter((cp) => cp.rol_en_convocatoria === "suplente" && cp.attendance_status !== "declinado")
+    .sort((a, b) => (a.orden_suplente ?? 0) - (b.orden_suplente ?? 0));
+  const declinados = convocados.filter((cp) => cp.attendance_status === "declinado");
+
+  return (
+    <div className="mt-3 space-y-5">
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          Titulares ({titulares.length}/{cupoMaximo})
+        </h3>
+        {titulares.length === 0 ? (
+          <p className="mt-2 text-xs text-neutral-500">Sin titulares.</p>
+        ) : (
+          <ol className="mt-2 divide-y divide-neutral-100">
+            {titulares.map((cp, i) => (
+              <li key={cp.id} className="flex items-center justify-between gap-3 py-2.5">
+                <span className="flex items-center gap-3">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-neutral-900">
+                      {nombreDe(cp)}
+                      {cp.player === null ? (
+                        <span className="ml-2 text-xs font-normal text-neutral-500">
+                          (invitado)
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="block text-xs text-neutral-500">{subtituloDe(cp)}</span>
+                  </span>
+                </span>
+                {mostrarSacar ? (
+                  <RemovePlayerForm convocatoriaId={convocatoriaId} convocatoriaPlayerId={cp.id} />
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          Cola de suplentes ({suplentes.length})
+        </h3>
+        {suplentes.length === 0 ? (
+          <p className="mt-2 text-xs text-neutral-500">Sin suplentes.</p>
+        ) : (
+          <ol className="mt-2 divide-y divide-neutral-100">
+            {suplentes.map((cp) => (
+              <li key={cp.id} className="flex items-center justify-between gap-3 py-2.5">
+                <span className="flex items-center gap-3">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-50 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+                    {cp.orden_suplente ?? "?"}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-neutral-900">
+                      {nombreDe(cp)}
+                      {cp.player === null ? (
+                        <span className="ml-2 text-xs font-normal text-neutral-500">
+                          (invitado)
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="block text-xs text-neutral-500">{subtituloDe(cp)}</span>
+                  </span>
+                </span>
+                {mostrarSacar ? (
+                  <RemovePlayerForm convocatoriaId={convocatoriaId} convocatoriaPlayerId={cp.id} />
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+
+      {declinados.length > 0 ? (
+        <details className="text-xs">
+          <summary className="cursor-pointer font-medium text-neutral-500 hover:text-neutral-700">
+            Se bajaron de este partido ({declinados.length})
+          </summary>
+          <ul className="mt-2 divide-y divide-neutral-100">
+            {declinados.map((cp) => (
+              <li key={cp.id} className="flex items-center justify-between gap-3 py-2">
+                <span className="min-w-0">
+                  <span className="block truncate text-sm text-neutral-700">{nombreDe(cp)}</span>
+                  <span className="block text-xs text-neutral-500">{subtituloDe(cp)}</span>
+                </span>
+                {mostrarSacar ? (
+                  <RemovePlayerForm convocatoriaId={convocatoriaId} convocatoriaPlayerId={cp.id} />
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </div>
   );
 }

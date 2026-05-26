@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { formatArLocal } from "@/lib/phone";
+
 import { cancelInvitation } from "../actions";
 
 export type PendingInvite = {
@@ -20,7 +22,7 @@ export function PendingInvitesList({ invites }: { invites: PendingInvite[] }) {
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-neutral-900">{inv.nombre}</p>
             <p className="truncate text-xs text-neutral-500">
-              {inv.phone} · vence {formatDate(inv.expiresAt)}
+              {formatArLocal(inv.phone)} · vence {formatDate(inv.expiresAt)}
             </p>
           </div>
           <div className="flex items-center gap-2">

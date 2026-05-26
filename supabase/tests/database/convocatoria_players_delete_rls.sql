@@ -65,11 +65,12 @@ insert into public.convocatorias (
 );
 
 -- 3 convocados (uno por test, asi DELETE no se pisa entre asserts).
-insert into public.convocatoria_players (id, convocatoria_id, player_id)
+insert into public.convocatoria_players (id, convocatoria_id, player_id, rol_en_convocatoria)
 values
   ('00000000-0000-0000-0000-0000000000d1',
    '00000000-0000-0000-0000-0000000000c1',
-   '00000000-0000-0000-0000-0000000000b1');
+   '00000000-0000-0000-0000-0000000000b1',
+   'titular');
 
 -- Necesitamos varios players para 3 filas convocadas. Insertamos extras.
 insert into public.players (id, nombre, edad, role_field, position_pref,
@@ -79,13 +80,15 @@ insert into public.players (id, nombre, edad, role_field, position_pref,
   ('00000000-0000-0000-0000-0000000000b3', 'Player3', 27, 'jugador_campo',
    'delantero', 7, 7, 7, 'approved', '00000000-0000-0000-0000-0000000000a1');
 
-insert into public.convocatoria_players (id, convocatoria_id, player_id) values
+insert into public.convocatoria_players (id, convocatoria_id, player_id, rol_en_convocatoria) values
   ('00000000-0000-0000-0000-0000000000d2',
    '00000000-0000-0000-0000-0000000000c1',
-   '00000000-0000-0000-0000-0000000000b2'),
+   '00000000-0000-0000-0000-0000000000b2',
+   'titular'),
   ('00000000-0000-0000-0000-0000000000d3',
    '00000000-0000-0000-0000-0000000000c1',
-   '00000000-0000-0000-0000-0000000000b3');
+   '00000000-0000-0000-0000-0000000000b3',
+   'titular');
 
 create or replace function _as(p_id uuid)
 returns void

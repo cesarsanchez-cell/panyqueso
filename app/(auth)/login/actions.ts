@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { parseArPhone } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 
 // Schema minimo: tipos. La normalizacion (trim/lowercase) y validacion de
@@ -13,8 +14,6 @@ const LoginSchema = z.object({
 });
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const E164_RE = /^\+[1-9]\d{6,14}$/;
-const PHONE_NORMALIZE_RE = /[\s\-().]/g;
 
 export type LoginState = { error: string; identifier: string } | null;
 
@@ -29,18 +28,14 @@ function syntheticEmailFromPhone(phone: string): string {
   return `${phone.toLowerCase()}@phone.fdlm.local`;
 }
 
-// Detecta si el identifier es un celular (E.164 una vez normalizado) o email.
-// Retorna el email real a usar contra Supabase Auth: si era phone, devuelve
-// el email sintetico.
+// Detecta si el identifier es un celular AR o email. Si es celular, devuelve
+// el email sintetico que espera Supabase Auth. parseArPhone acepta el numero
+// con o sin +54/9/0/espacios/guiones y lo normaliza a +549<10 digitos>.
 function resolveLoginEmail(identifier: string): string | null {
-  const normalizedPhone = identifier.replace(PHONE_NORMALIZE_RE, "");
-  if (E164_RE.test(normalizedPhone)) {
-    return syntheticEmailFromPhone(normalizedPhone);
-  }
+  const phone = parseArPhone(identifier);
+  if (phone) return syntheticEmailFromPhone(phone);
   const lower = identifier.toLowerCase();
-  if (EMAIL_RE.test(lower)) {
-    return lower;
-  }
+  if (EMAIL_RE.test(lower)) return lower;
   return null;
 }
 
@@ -62,7 +57,7 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   const email = resolveLoginEmail(parsed.data.identifier);
   if (!email) {
     return {
-      error: "Email o celular inválido (celular en formato +5491155551234)",
+      error: "Email o celular inválido (celular: 10 dígitos, ej. 1155551234)",
       identifier,
     };
   }

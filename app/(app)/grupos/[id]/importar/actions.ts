@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { headers } from "next/headers";
 
 import { requireRole } from "@/lib/auth/require-role";
+import { parseArPhone } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 
 export type BulkImportEntry = {
@@ -25,13 +26,8 @@ export type BulkImportState =
       salteadas: BulkImportSkipped[];
     };
 
-const E164_REGEX = /^\+[1-9]\d{6,14}$/;
 const MAX_LINES = 200;
 const DAYS_VALID = 30;
-
-function normalizePhone(raw: string): string {
-  return raw.replace(/[\s\-().]/g, "");
-}
 
 function generateToken(): string {
   return randomBytes(24).toString("base64url");
@@ -68,12 +64,12 @@ function parseLine(raw: string): ParsedLine | null {
     return { ok: false, raw: trimmed, razon: "Nombre demasiado largo (máx 80 caracteres)." };
   }
 
-  const phone = normalizePhone(phoneRaw);
-  if (!E164_REGEX.test(phone)) {
+  const phone = parseArPhone(phoneRaw);
+  if (!phone) {
     return {
       ok: false,
       raw: trimmed,
-      razon: "Teléfono inválido. Debe estar en formato E.164 (+5491155551234).",
+      razon: "Celular inválido. Ingresá los 10 dígitos (ej: 1155551234).",
     };
   }
 

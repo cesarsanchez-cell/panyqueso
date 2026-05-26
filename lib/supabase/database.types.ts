@@ -77,7 +77,10 @@ export type Database = {
           attendance_status: Database["public"]["Enums"]["attendance_status"];
           convocatoria_id: string;
           id: string;
-          player_id: string;
+          nombre_libre: string | null;
+          orden_suplente: number | null;
+          player_id: string | null;
+          rol_en_convocatoria: Database["public"]["Enums"]["membresia_tipo"];
           updated_at: string;
           waitlist_order: number | null;
         };
@@ -86,7 +89,10 @@ export type Database = {
           attendance_status?: Database["public"]["Enums"]["attendance_status"];
           convocatoria_id: string;
           id?: string;
-          player_id: string;
+          nombre_libre?: string | null;
+          orden_suplente?: number | null;
+          player_id?: string | null;
+          rol_en_convocatoria: Database["public"]["Enums"]["membresia_tipo"];
           updated_at?: string;
           waitlist_order?: number | null;
         };
@@ -95,7 +101,10 @@ export type Database = {
           attendance_status?: Database["public"]["Enums"]["attendance_status"];
           convocatoria_id?: string;
           id?: string;
-          player_id?: string;
+          nombre_libre?: string | null;
+          orden_suplente?: number | null;
+          player_id?: string | null;
+          rol_en_convocatoria?: Database["public"]["Enums"]["membresia_tipo"];
           updated_at?: string;
           waitlist_order?: number | null;
         };
@@ -337,6 +346,7 @@ export type Database = {
           google_maps_url: string | null;
           id: string;
           nombre: string;
+          ubicacion_maps_url: string | null;
         };
         Insert: {
           created_at?: string;
@@ -344,6 +354,7 @@ export type Database = {
           google_maps_url?: string | null;
           id?: string;
           nombre: string;
+          ubicacion_maps_url?: string | null;
         };
         Update: {
           created_at?: string;
@@ -351,6 +362,7 @@ export type Database = {
           google_maps_url?: string | null;
           id?: string;
           nombre?: string;
+          ubicacion_maps_url?: string | null;
         };
         Relationships: [
           {
@@ -887,6 +899,18 @@ export type Database = {
       };
     };
     Functions: {
+      _conv_compactar_cola: {
+        Args: { p_convocatoria_id: string; p_from_orden: number };
+        Returns: undefined;
+      };
+      _next_partido_at: {
+        Args: { p_dia_semana: number; p_hora: string };
+        Returns: string;
+      };
+      admin_remove_from_convocatoria: {
+        Args: { p_convocatoria_player_id: string };
+        Returns: undefined;
+      };
       approve_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
@@ -903,6 +927,10 @@ export type Database = {
         };
         Returns: string;
       };
+      close_and_create_next_convocatoria: {
+        Args: { p_convocatoria_id: string };
+        Returns: string;
+      };
       compute_internal_score: {
         Args: {
           p_edad: number;
@@ -915,6 +943,10 @@ export type Database = {
       confirm_match_cleanup: {
         Args: { p_match_id: string };
         Returns: undefined;
+      };
+      create_convocatoria_from_grupo: {
+        Args: { p_fecha?: string; p_grupo_id: string };
+        Returns: string;
       };
       current_player_id: { Args: never; Returns: string };
       current_user_role: {
@@ -973,16 +1005,32 @@ export type Database = {
           status: Database["public"]["Enums"]["player_status"];
         }[];
       };
+      has_any_membership_in_grupo: {
+        Args: { p_grupo_id: string };
+        Returns: boolean;
+      };
       is_active_member_of_grupo: {
         Args: { p_grupo_id: string };
+        Returns: boolean;
+      };
+      is_member_of_conv_grupo: {
+        Args: { p_convocatoria_id: string };
         Returns: boolean;
       };
       player_decline_convocatoria: {
         Args: { p_convocatoria_id: string };
         Returns: undefined;
       };
+      player_join_open_convocatoria: {
+        Args: { p_convocatoria_id: string };
+        Returns: string;
+      };
       player_join_suplente_queue: {
         Args: { p_grupo_id: string };
+        Returns: string;
+      };
+      player_undo_decline_convocatoria: {
+        Args: { p_convocatoria_id: string };
         Returns: string;
       };
       reject_player_change_request: {

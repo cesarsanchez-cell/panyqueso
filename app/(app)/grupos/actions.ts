@@ -3,10 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth/require-role";
-import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
-
-type MembresiaTipo = Database["public"]["Enums"]["membresia_tipo"];
 
 type GrupoFormValues = {
   nombre: string;
@@ -176,9 +173,11 @@ export async function unarchiveGrupo(formData: FormData): Promise<void> {
 }
 
 // ============================================================================
-// addMember: agregar player al grupo. El tipo se decide automaticamente:
-// si hay cupo de titulares libre -> titular; si no -> suplente al final de la
-// cola FIFO. No pedimos al admin que elija.
+// addMember: agrega un player a la bolsa del grupo. El modelo nuevo no
+// distingue titular/suplente a nivel grupo: ese rol nace en cada convocatoria
+// segun orden joined_at y cupo. Por compat con el schema (tipo NOT NULL)
+// guardamos 'titular' como placeholder. El trigger se encarga de poner al
+// jugador en la conv abierta si existe.
 // ============================================================================
 export async function addMember(
   _prev: MembershipState,
@@ -194,75 +193,54 @@ export async function addMember(
 
   const supabase = await createClient();
 
-  // Decidir tipo segun cupo de titulares libre.
-  const [{ data: grupo, error: grupoErr }, { count: titularesCount, error: countErr }] =
-    await Promise.all([
-      supabase.from("grupos").select("cupo_titulares").eq("id", grupo_id).maybeSingle(),
-      supabase
-        .from("grupo_membresias")
-        .select("id", { count: "exact", head: true })
-        .eq("grupo_id", grupo_id)
-        .eq("tipo", "titular")
-        .eq("status", "activo"),
-    ]);
+  // Si ya existe una membresia (activa o inactiva), reactivamos en lugar
+  // de insertar. Reseteamos joined_at para que entre al final de la bolsa.
+  const { data: existing } = await supabase
+    .from("grupo_membresias")
+    .select("id, status")
+    .eq("grupo_id", grupo_id)
+    .eq("player_id", player_id)
+    .maybeSingle();
 
-  if (grupoErr || !grupo) {
-    return { error: `No se pudo leer el grupo: ${grupoErr?.message ?? "no existe"}` };
-  }
-  if (countErr) {
-    return { error: `No se pudo contar titulares: ${countErr.message}` };
-  }
-
-  const hayCupoTitular = (titularesCount ?? 0) < grupo.cupo_titulares;
-  const tipo: MembresiaTipo = hayCupoTitular ? "titular" : "suplente";
-
-  // Si va a suplente, calcular orden = max + 1.
-  let orden: number | null = null;
-  if (tipo === "suplente") {
-    const { data: maxRow, error: maxErr } = await supabase
-      .from("grupo_membresias")
-      .select("orden")
-      .eq("grupo_id", grupo_id)
-      .eq("tipo", "suplente")
-      .eq("status", "activo")
-      .order("orden", { ascending: false })
-      .limit(1);
-
-    if (maxErr) return { error: `No se pudo calcular el orden: ${maxErr.message}` };
-
-    const maxOrden = maxRow && maxRow.length > 0 ? (maxRow[0]?.orden ?? 0) : 0;
-    orden = maxOrden + 1;
-  }
-
-  const { error } = await supabase.from("grupo_membresias").insert({
-    grupo_id,
-    player_id,
-    tipo,
-    orden,
-  });
-
-  if (error) {
-    // 23505 = unique violation: jugador ya está activo en el grupo.
-    if (error.code === "23505") {
+  if (existing) {
+    if (existing.status === "activo") {
       return { error: "El jugador ya es miembro activo de este grupo." };
     }
-    return { error: `No se pudo agregar: ${error.message}` };
+    const { error: upErr } = await supabase
+      .from("grupo_membresias")
+      .update({
+        status: "activo",
+        inactivated_at: null,
+        inactivated_by: null,
+        tipo: "titular",
+        orden: null,
+        joined_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id);
+    if (upErr) return { error: `No se pudo reactivar: ${upErr.message}` };
+  } else {
+    const { error } = await supabase.from("grupo_membresias").insert({
+      grupo_id,
+      player_id,
+      tipo: "titular",
+      orden: null,
+    });
+    if (error) {
+      if (error.code === "23505") {
+        return { error: "El jugador ya es miembro activo de este grupo." };
+      }
+      return { error: `No se pudo agregar: ${error.message}` };
+    }
   }
 
   revalidatePath(`/grupos/${grupo_id}`);
-  return {
-    success:
-      tipo === "titular"
-        ? "Jugador agregado como titular."
-        : `Jugador agregado como suplente #${orden}.`,
-  };
+  return { success: "Jugador agregado a la bolsa del grupo." };
 }
 
 // ============================================================================
-// removeMember: marca la membresía como inactiva.
-// - Si era suplente: los suplentes con orden mayor corren un puesto.
-// - Si era titular: el primer suplente activo (orden=1) sube a titular y la
-//   cola se compacta desde orden=1.
+// removeMember: marca la membresia como inactiva. El trigger sync_open_conv
+// se encarga de sacar al player de la convocatoria abierta y subir el primer
+// suplente si era titular.
 // ============================================================================
 export async function removeMember(formData: FormData): Promise<void> {
   await requireRole("admin");
@@ -271,137 +249,17 @@ export async function removeMember(formData: FormData): Promise<void> {
   if (!membresia_id) return;
 
   const supabase = await createClient();
-
-  // Leer la membresía antes para saber tipo y orden.
-  const { data: m, error: readErr } = await supabase
+  const { data: m } = await supabase
     .from("grupo_membresias")
-    .select("id, grupo_id, tipo, orden, status")
+    .select("id, grupo_id, status")
     .eq("id", membresia_id)
     .maybeSingle();
 
-  if (readErr || !m || m.status !== "activo") return;
+  if (!m || m.status !== "activo") return;
 
-  // Inactivar.
-  const { error: upErr } = await supabase
+  await supabase
     .from("grupo_membresias")
     .update({ status: "inactivo", inactivated_at: new Date().toISOString() })
-    .eq("id", membresia_id);
-
-  if (upErr) return;
-
-  if (m.tipo === "suplente" && m.orden !== null) {
-    // Era suplente: compactar la cola desde el orden que vacio.
-    await compactSuplenteQueue(supabase, m.grupo_id, m.orden);
-  } else if (m.tipo === "titular") {
-    // Era titular: promover al primer suplente activo y compactar.
-    const { data: first } = await supabase
-      .from("grupo_membresias")
-      .select("id")
-      .eq("grupo_id", m.grupo_id)
-      .eq("tipo", "suplente")
-      .eq("status", "activo")
-      .order("orden", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (first) {
-      await supabase
-        .from("grupo_membresias")
-        .update({ tipo: "titular", orden: null })
-        .eq("id", first.id);
-      // Despues del ascenso, los suplentes con orden > 1 corren un puesto.
-      await compactSuplenteQueue(supabase, m.grupo_id, 1);
-    }
-  }
-
-  revalidatePath(`/grupos/${m.grupo_id}`);
-}
-
-// ============================================================================
-// promoteToTitular: suplente -> titular. Compacta la cola. Respeta el cupo
-// (no promueve si el cupo de titulares ya esta lleno; admin debe sacar a
-// otro titular primero).
-// ============================================================================
-export async function promoteToTitular(formData: FormData): Promise<void> {
-  await requireRole("admin");
-
-  const membresia_id = String(formData.get("membresia_id") ?? "").trim();
-  if (!membresia_id) return;
-
-  const supabase = await createClient();
-
-  const { data: m } = await supabase
-    .from("grupo_membresias")
-    .select("id, grupo_id, tipo, orden, status")
-    .eq("id", membresia_id)
-    .maybeSingle();
-
-  if (!m || m.status !== "activo" || m.tipo !== "suplente") return;
-
-  // Enforce cupo antes de promover.
-  const [{ data: grupo }, { count: titularesCount }] = await Promise.all([
-    supabase.from("grupos").select("cupo_titulares").eq("id", m.grupo_id).maybeSingle(),
-    supabase
-      .from("grupo_membresias")
-      .select("id", { count: "exact", head: true })
-      .eq("grupo_id", m.grupo_id)
-      .eq("tipo", "titular")
-      .eq("status", "activo"),
-  ]);
-  if (!grupo) return;
-  if ((titularesCount ?? 0) >= grupo.cupo_titulares) {
-    // No quedan cupos; no hacemos nada. La UI deberia evitar este caso pero
-    // este guard previene el problema si llega al action.
-    return;
-  }
-
-  const oldOrden = m.orden;
-  await supabase
-    .from("grupo_membresias")
-    .update({ tipo: "titular", orden: null })
-    .eq("id", membresia_id);
-
-  if (oldOrden !== null) {
-    await compactSuplenteQueue(supabase, m.grupo_id, oldOrden);
-  }
-
-  revalidatePath(`/grupos/${m.grupo_id}`);
-}
-
-// ============================================================================
-// demoteToSuplente: titular -> suplente al final de la cola.
-// ============================================================================
-export async function demoteToSuplente(formData: FormData): Promise<void> {
-  await requireRole("admin");
-
-  const membresia_id = String(formData.get("membresia_id") ?? "").trim();
-  if (!membresia_id) return;
-
-  const supabase = await createClient();
-
-  const { data: m } = await supabase
-    .from("grupo_membresias")
-    .select("id, grupo_id, tipo, status")
-    .eq("id", membresia_id)
-    .maybeSingle();
-
-  if (!m || m.status !== "activo" || m.tipo !== "titular") return;
-
-  const { data: maxRow } = await supabase
-    .from("grupo_membresias")
-    .select("orden")
-    .eq("grupo_id", m.grupo_id)
-    .eq("tipo", "suplente")
-    .eq("status", "activo")
-    .order("orden", { ascending: false })
-    .limit(1);
-
-  const maxOrden = maxRow && maxRow.length > 0 ? (maxRow[0]?.orden ?? 0) : 0;
-  const nuevoOrden = maxOrden + 1;
-
-  await supabase
-    .from("grupo_membresias")
-    .update({ tipo: "suplente", orden: nuevoOrden })
     .eq("id", membresia_id);
 
   revalidatePath(`/grupos/${m.grupo_id}`);
@@ -435,32 +293,4 @@ export async function cancelInvitation(formData: FormData): Promise<void> {
     .eq("id", invitation_id);
 
   revalidatePath(`/grupos/${inv.grupo_id}`);
-}
-
-// ============================================================================
-// Helper: compactar la cola FIFO tras una salida.
-// Decrementa orden en 1 para todos los suplentes activos con orden > fromOrden.
-// ============================================================================
-async function compactSuplenteQueue(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  grupo_id: string,
-  fromOrden: number,
-): Promise<void> {
-  const { data: toShift } = await supabase
-    .from("grupo_membresias")
-    .select("id, orden")
-    .eq("grupo_id", grupo_id)
-    .eq("tipo", "suplente")
-    .eq("status", "activo")
-    .gt("orden", fromOrden);
-
-  if (!toShift || toShift.length === 0) return;
-
-  for (const row of toShift) {
-    if (row.orden === null) continue;
-    await supabase
-      .from("grupo_membresias")
-      .update({ orden: row.orden - 1 })
-      .eq("id", row.id);
-  }
 }

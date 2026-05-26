@@ -2,6 +2,8 @@
 
 import { useActionState, useState } from "react";
 
+import { formatArLocal } from "@/lib/phone";
+
 import {
   cancelConvocatoriaInvitation,
   createInvitation,
@@ -59,7 +61,7 @@ export function InviteSection({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-neutral-900">{inv.nombre}</p>
                   <p className="truncate text-xs text-neutral-500">
-                    {inv.phone} · vence {formatDate(inv.expiresAt)}
+                    {formatArLocal(inv.phone)} · vence {formatDate(inv.expiresAt)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -97,16 +99,18 @@ function InviteForm({ convocatoriaId, origin }: { convocatoriaId: string; origin
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label htmlFor="invite-phone" className={labelClass}>
-            Teléfono
+            Celular
           </label>
           <input
             id="invite-phone"
             name="phone"
             type="tel"
+            inputMode="tel"
             required
-            placeholder="+5491155551234"
+            placeholder="1155551234"
             className={`${inputClass} font-mono`}
           />
+          <p className="mt-1 text-xs text-neutral-500">10 dígitos (sin 0 ni 15).</p>
         </div>
         <div>
           <label htmlFor="invite-nombre" className={labelClass}>
