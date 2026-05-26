@@ -87,8 +87,7 @@ export async function updateMyPlayerData(
 
   const fechaRaw = String(formData.get("fecha_nacimiento") ?? "").trim();
   if (!fechaRaw) errors.fecha_nacimiento = "Obligatoria.";
-  else if (!FECHA_REGEX.test(fechaRaw))
-    errors.fecha_nacimiento = "Formato AAAA-MM-DD.";
+  else if (!FECHA_REGEX.test(fechaRaw)) errors.fecha_nacimiento = "Formato AAAA-MM-DD.";
 
   const apodoRaw = String(formData.get("apodo") ?? "").trim();
   if (apodoRaw.length > MAX_APODO) errors.apodo = `Máximo ${MAX_APODO} caracteres.`;

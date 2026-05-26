@@ -171,11 +171,7 @@ export function MisDatosForm({ initial }: { initial: MisDatosInitial }) {
         </select>
       </Field>
 
-      <Field
-        label="Posición preferida"
-        htmlFor="position_pref"
-        error={fieldErrors.position_pref}
-      >
+      <Field label="Posición preferida" htmlFor="position_pref" error={fieldErrors.position_pref}>
         <select
           id="position_pref"
           name="position_pref"

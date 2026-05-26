@@ -77,8 +77,8 @@ export default async function PerfilPage() {
             Mis datos
           </h2>
           <p className="mt-1 text-xs text-neutral-500">
-            Podés actualizar todo menos tu celular (clave de ingreso) y tus calificaciones
-            (las gestiona el admin junto al veedor).
+            Podés actualizar todo menos tu celular (clave de ingreso) y tus calificaciones (las
+            gestiona el admin junto al veedor).
           </p>
           <div className="mt-4">
             <MisDatosForm initial={playerData} />
