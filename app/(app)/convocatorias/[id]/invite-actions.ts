@@ -4,17 +4,13 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth/require-role";
+import { parseArPhone } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 
 export type CreateInvitationState = null | { error: string } | { success: string; token: string };
 
-const E164_REGEX = /^\+[1-9]\d{6,14}$/;
 const MAX_DAYS_VALID = 30;
 const CUTOFF_HOURS = 8;
-
-function normalizePhone(raw: string): string {
-  return raw.replace(/[\s\-().]/g, "");
-}
 
 function generateToken(): string {
   return randomBytes(24).toString("base64url");
@@ -42,10 +38,10 @@ export async function createInvitation(
   if (!convocatoriaId) return { error: "Falta el id de la convocatoria." };
 
   const phoneRaw = String(formData.get("phone") ?? "").trim();
-  if (!phoneRaw) return { error: "El teléfono es obligatorio." };
-  const phone = normalizePhone(phoneRaw);
-  if (!E164_REGEX.test(phone)) {
-    return { error: "Teléfono inválido. Debe estar en formato E.164 (ej: +5491155551234)." };
+  if (!phoneRaw) return { error: "El celular es obligatorio." };
+  const phone = parseArPhone(phoneRaw);
+  if (!phone) {
+    return { error: "Celular inválido. Ingresá los 10 dígitos (ej: 1155551234)." };
   }
 
   const nombre = String(formData.get("nombre") ?? "").trim();

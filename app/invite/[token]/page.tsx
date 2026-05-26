@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { formatArLocal } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 
 import { DeclineButton } from "./decline-button";
@@ -157,7 +158,7 @@ export default async function InvitePage({
             </Field>
             <Field label="Cupo">{invite.grupo_cupo_titulares} titulares</Field>
             <Field label="Tu teléfono">
-              <span className="font-mono">{invite.invite_phone}</span>
+              <span className="font-mono">{formatArLocal(invite.invite_phone)}</span>
             </Field>
           </dl>
           <p className="mt-4 text-xs text-neutral-500">

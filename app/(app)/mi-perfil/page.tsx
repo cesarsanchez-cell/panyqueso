@@ -5,7 +5,9 @@ import { requireUser } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 
 import { DeclineButton } from "./decline-button";
+import { JoinConvocatoriaButton } from "./join-convocatoria-button";
 import { JoinQueueButton } from "./join-queue-button";
+import { UndoDeclineButton } from "./undo-decline-button";
 
 type SearchParams = { welcome?: string };
 
@@ -42,178 +44,332 @@ type GrupoInfo = {
   hora: string;
   cupo_titulares: number;
   status: string;
-  lugar: { nombre: string } | null;
+  lugar: { nombre: string; maps: string | null } | null;
 };
 
 type LineupMember = {
-  membresiaId: string;
-  playerId: string;
-  tipo: "titular" | "suplente";
+  playerId: string | null;
+  rol: "titular" | "suplente";
   orden: number | null;
   nombre: string;
   apodo: string | null;
   isMe: boolean;
+  esInvitadoLibre: boolean;
 };
+
+type MiEstado =
+  | "titular_convo"
+  | "suplente_convo"
+  | "declinado_convo"
+  | "no_anotado_convo"
+  | "bajado_grupo";
 
 type GrupoLineup = {
   grupo: GrupoInfo;
-  miTipo: "titular" | "suplente";
+  openConv: {
+    id: string;
+    fecha: string;
+    hora: string;
+    status: string;
+    lugar: { nombre: string; maps: string | null } | null;
+  } | null;
+  miEstado: MiEstado;
   miOrden: number | null;
   titulares: LineupMember[];
   suplentes: LineupMember[];
 };
 
 async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<GrupoLineup[]> {
-  // 1. Grupos donde el player tiene membresia activa.
+  // 1. Membresias del player (activas e inactivas).
   const { data: misMembresias } = await supabase
     .from("grupo_membresias")
-    .select("grupo_id, tipo, orden")
-    .eq("player_id", playerId)
-    .eq("status", "activo");
+    .select("grupo_id, tipo, orden, status")
+    .eq("player_id", playerId);
 
   const misRows = misMembresias ?? [];
   if (misRows.length === 0) return [];
 
-  const grupoIds = misRows.map((m) => m.grupo_id);
-
-  // 2. Todas las membresias activas de esos grupos (lineup completo).
-  const { data: lineup } = await supabase
-    .from("grupo_membresias")
-    .select(
-      "id, grupo_id, tipo, orden, player_id, grupo:grupos!grupo_id(id, nombre, dia_semana, hora, cupo_titulares, status, lugar:lugares!lugar_id(nombre))",
-    )
-    .eq("status", "activo")
-    .in("grupo_id", grupoIds);
-
-  const lineupRows = lineup ?? [];
-  if (lineupRows.length === 0) return [];
-
-  // 3. Players (via view publica, sin ratings ni datos sensibles).
-  const playerIds = Array.from(new Set(lineupRows.map((r) => r.player_id)));
-  const { data: playersData } = await supabase
-    .from("players_public")
-    .select("id, nombre, apodo")
-    .in("id", playerIds);
-
-  const playerById = new Map<string, { nombre: string; apodo: string | null }>();
-  for (const p of playersData ?? []) {
-    if (p.id) playerById.set(p.id, { nombre: p.nombre ?? "—", apodo: p.apodo ?? null });
-  }
-
-  // 4. Agrupar por grupo.
-  const groupMap = new Map<
-    string,
-    {
-      grupo: GrupoInfo;
-      members: LineupMember[];
-      mine: { tipo: "titular" | "suplente"; orden: number | null };
-    }
-  >();
-
-  // Pre-cargar la info propia para saber tipo + orden en cada grupo.
-  const mineByGrupo = new Map<string, { tipo: "titular" | "suplente"; orden: number | null }>();
+  // Por grupo, recordamos el estado de membresia en el grupo.
+  const grupoMembership = new Map<string, "activo" | "inactivo">();
   for (const m of misRows) {
-    if (m.tipo === "titular" || m.tipo === "suplente") {
-      mineByGrupo.set(m.grupo_id, { tipo: m.tipo, orden: m.orden });
+    const existing = grupoMembership.get(m.grupo_id);
+    if (m.status === "activo") {
+      grupoMembership.set(m.grupo_id, "activo");
+    } else if (existing !== "activo") {
+      grupoMembership.set(m.grupo_id, "inactivo");
     }
   }
 
-  for (const row of lineupRows) {
-    if (!row.grupo) continue;
-    if (row.tipo !== "titular" && row.tipo !== "suplente") continue;
-    const playerInfo = playerById.get(row.player_id) ?? { nombre: "—", apodo: null };
-    const member: LineupMember = {
-      membresiaId: row.id,
-      playerId: row.player_id,
-      tipo: row.tipo,
-      orden: row.orden,
-      nombre: playerInfo.nombre,
-      apodo: playerInfo.apodo,
-      isMe: row.player_id === playerId,
-    };
+  const grupoIds = Array.from(grupoMembership.keys());
+  if (grupoIds.length === 0) return [];
 
-    const existing = groupMap.get(row.grupo_id);
-    if (existing) {
-      existing.members.push(member);
-    } else {
-      const mine = mineByGrupo.get(row.grupo_id);
-      if (!mine) continue;
-      groupMap.set(row.grupo_id, {
-        grupo: {
-          id: row.grupo.id,
-          nombre: row.grupo.nombre,
-          dia_semana: row.grupo.dia_semana,
-          hora: row.grupo.hora,
-          cupo_titulares: row.grupo.cupo_titulares,
-          status: row.grupo.status,
-          lugar: row.grupo.lugar ? { nombre: row.grupo.lugar.nombre } : null,
-        },
-        members: [member],
-        mine,
-      });
-    }
-  }
+  // 2. Info de grupos.
+  const { data: gruposData } = await supabase
+    .from("grupos")
+    .select(
+      "id, nombre, dia_semana, hora, cupo_titulares, status, lugar:lugares!lugar_id(nombre, ubicacion_maps_url)",
+    )
+    .in("id", grupoIds);
 
-  // 5. Separar titulares (alfabetico) y suplentes (FIFO) por grupo.
-  const result: GrupoLineup[] = [];
-  for (const [, g] of groupMap) {
-    const titulares = g.members
-      .filter((m) => m.tipo === "titular")
-      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
-    const suplentes = g.members
-      .filter((m) => m.tipo === "suplente")
-      .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
-    result.push({
-      grupo: g.grupo,
-      miTipo: g.mine.tipo,
-      miOrden: g.mine.orden,
-      titulares,
-      suplentes,
+  const grupoInfoMap = new Map<string, GrupoInfo>();
+  for (const g of gruposData ?? []) {
+    grupoInfoMap.set(g.id, {
+      id: g.id,
+      nombre: g.nombre,
+      dia_semana: g.dia_semana,
+      hora: g.hora,
+      cupo_titulares: g.cupo_titulares,
+      status: g.status,
+      lugar: g.lugar ? { nombre: g.lugar.nombre, maps: g.lugar.ubicacion_maps_url } : null,
     });
   }
 
-  result.sort((a, b) => a.grupo.dia_semana - b.grupo.dia_semana);
-  return result;
-}
+  // 3. Convocatorias relevantes: abiertas + canceladas con fecha >= hoy.
+  // Las abiertas se muestran con su roster; las canceladas como aviso.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const { data: convs } = await supabase
+    .from("convocatorias")
+    .select("id, fecha, hora, grupo_id, status, lugar:lugares!lugar_id(nombre, ubicacion_maps_url)")
+    .in("grupo_id", grupoIds)
+    .in("status", ["abierta", "cancelada"])
+    .gte("fecha", todayIso)
+    .order("fecha", { ascending: true });
 
-async function loadGruposInactivos(supabase: SupabaseLike, playerId: string) {
-  const { data, error } = await supabase
-    .from("grupo_membresias")
-    .select(
-      "id, status, grupo:grupos!grupo_id(id, nombre, dia_semana, hora, status, lugar:lugares!lugar_id(nombre))",
-    )
-    .eq("status", "inactivo")
-    .eq("player_id", playerId);
-
-  if (error) {
-    throw new Error(`No se pudieron cargar grupos inactivos: ${error.message}`);
+  type ConvBrief = {
+    id: string;
+    fecha: string;
+    hora: string;
+    status: string;
+    lugar: { nombre: string; maps: string | null } | null;
+  };
+  const openConvByGrupo = new Map<string, ConvBrief>();
+  for (const c of convs ?? []) {
+    if (!c.grupo_id) continue;
+    const brief: ConvBrief = {
+      id: c.id,
+      fecha: c.fecha,
+      hora: c.hora,
+      status: c.status,
+      lugar: c.lugar ? { nombre: c.lugar.nombre, maps: c.lugar.ubicacion_maps_url } : null,
+    };
+    const existing = openConvByGrupo.get(c.grupo_id);
+    if (!existing) {
+      openConvByGrupo.set(c.grupo_id, brief);
+    } else if (existing.status === "cancelada" && c.status === "abierta") {
+      openConvByGrupo.set(c.grupo_id, brief);
+    }
   }
-  return data ?? [];
-}
 
-async function loadNextConvocatoria(supabase: SupabaseLike, playerId: string) {
-  const today = new Date().toISOString().slice(0, 10);
-  const { data, error } = await supabase
-    .from("convocatoria_players")
-    .select(
-      "id, attendance_status, convocatoria:convocatorias!convocatoria_id(id, fecha, status, grupo:grupos!grupo_id(id, nombre, dia_semana, hora, lugar:lugares!lugar_id(nombre)))",
-    )
-    .eq("player_id", playerId)
-    .in("attendance_status", ["pendiente", "confirmado"])
-    .order("convocatoria(fecha)", { ascending: true });
-
-  if (error) {
-    throw new Error(`No se pudo cargar tu próxima convocatoria: ${error.message}`);
+  // 4. Roster de cada convocatoria abierta.
+  const convIds = Array.from(openConvByGrupo.values()).map((c) => c.id);
+  type CPRow = {
+    id: string;
+    convocatoria_id: string;
+    player_id: string | null;
+    nombre_libre: string | null;
+    attendance_status: string;
+    rol_en_convocatoria: "titular" | "suplente";
+    orden_suplente: number | null;
+  };
+  const convRoster = new Map<string, CPRow[]>();
+  if (convIds.length > 0) {
+    const { data: cpData } = await supabase
+      .from("convocatoria_players")
+      .select(
+        "id, convocatoria_id, player_id, nombre_libre, attendance_status, rol_en_convocatoria, orden_suplente",
+      )
+      .in("convocatoria_id", convIds);
+    for (const cp of cpData ?? []) {
+      const list = convRoster.get(cp.convocatoria_id);
+      if (list) list.push(cp as CPRow);
+      else convRoster.set(cp.convocatoria_id, [cp as CPRow]);
+    }
   }
-  if (!data) return null;
 
-  const upcoming = data.find((row) => {
-    const c = row.convocatoria;
-    if (!c) return false;
-    if (c.status === "cancelada") return false;
-    return c.fecha >= today;
+  // 5. Resolver nombres de players via view publica.
+  const playerIds = new Set<string>();
+  for (const rows of convRoster.values()) {
+    for (const r of rows) {
+      if (r.player_id) playerIds.add(r.player_id);
+    }
+  }
+  // Para grupos sin convocatoria abierta usamos grupo_membresias activas
+  // como fallback (mostrar el roster del grupo). Las cargamos despues.
+  const grupoLineupRows = new Map<
+    string,
+    Array<{ player_id: string; tipo: "titular" | "suplente"; orden: number | null }>
+  >();
+  const grupoSinConv = grupoIds.filter((id) => !openConvByGrupo.has(id));
+  if (grupoSinConv.length > 0) {
+    const { data: gmData } = await supabase
+      .from("grupo_membresias")
+      .select("grupo_id, player_id, tipo, orden")
+      .eq("status", "activo")
+      .in("grupo_id", grupoSinConv);
+    for (const r of gmData ?? []) {
+      if (r.tipo !== "titular" && r.tipo !== "suplente") continue;
+      playerIds.add(r.player_id);
+      const list = grupoLineupRows.get(r.grupo_id);
+      const entry = { player_id: r.player_id, tipo: r.tipo, orden: r.orden };
+      if (list) list.push(entry);
+      else grupoLineupRows.set(r.grupo_id, [entry]);
+    }
+  }
+
+  const playerById = new Map<string, { nombre: string; apodo: string | null }>();
+  const playerIdsList = Array.from(playerIds);
+  if (playerIdsList.length > 0) {
+    const { data: playersData } = await supabase
+      .from("players_public")
+      .select("id, nombre, apodo")
+      .in("id", playerIdsList);
+    for (const p of playersData ?? []) {
+      if (p.id) playerById.set(p.id, { nombre: p.nombre ?? "—", apodo: p.apodo ?? null });
+    }
+  }
+
+  // 6. Construir resultado por grupo.
+  const result: GrupoLineup[] = [];
+  for (const grupoId of grupoIds) {
+    const grupo = grupoInfoMap.get(grupoId);
+    if (!grupo) continue;
+    if (grupo.status !== "activo") continue;
+
+    const memStatus = grupoMembership.get(grupoId);
+    const openConv = openConvByGrupo.get(grupoId) ?? null;
+
+    let titulares: LineupMember[] = [];
+    let suplentes: LineupMember[] = [];
+    let miEstado: MiEstado;
+    let miOrden: number | null = null;
+
+    if (openConv && openConv.status === "cancelada") {
+      // Conv cancelada futura: tarjeta minimal, sin roster.
+      miEstado = memStatus === "inactivo" ? "bajado_grupo" : "no_anotado_convo";
+      result.push({ grupo, openConv, miEstado, miOrden, titulares: [], suplentes: [] });
+      continue;
+    }
+
+    if (openConv) {
+      const roster = convRoster.get(openConv.id) ?? [];
+      const activeRoster = roster.filter((r) => r.attendance_status !== "declinado");
+
+      titulares = activeRoster
+        .filter((r) => r.rol_en_convocatoria === "titular")
+        .map((r) => {
+          const esInvitado = r.player_id === null;
+          const info = esInvitado
+            ? { nombre: r.nombre_libre ?? "—", apodo: null }
+            : (playerById.get(r.player_id!) ?? { nombre: "—", apodo: null });
+          return {
+            playerId: r.player_id,
+            rol: "titular" as const,
+            orden: null,
+            nombre: info.nombre,
+            apodo: info.apodo,
+            isMe: r.player_id !== null && r.player_id === playerId,
+            esInvitadoLibre: esInvitado,
+          };
+        })
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+
+      suplentes = activeRoster
+        .filter((r) => r.rol_en_convocatoria === "suplente")
+        .map((r) => {
+          const esInvitado = r.player_id === null;
+          const info = esInvitado
+            ? { nombre: r.nombre_libre ?? "—", apodo: null }
+            : (playerById.get(r.player_id!) ?? { nombre: "—", apodo: null });
+          return {
+            playerId: r.player_id,
+            rol: "suplente" as const,
+            orden: r.orden_suplente,
+            nombre: info.nombre,
+            apodo: info.apodo,
+            isMe: r.player_id !== null && r.player_id === playerId,
+            esInvitadoLibre: esInvitado,
+          };
+        })
+        .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+
+      const myConvRow = roster.find((r) => r.player_id === playerId);
+      if (memStatus === "inactivo") {
+        miEstado = "bajado_grupo";
+      } else if (myConvRow && myConvRow.attendance_status === "declinado") {
+        miEstado = "declinado_convo";
+      } else if (myConvRow && myConvRow.rol_en_convocatoria === "titular") {
+        miEstado = "titular_convo";
+      } else if (myConvRow && myConvRow.rol_en_convocatoria === "suplente") {
+        miEstado = "suplente_convo";
+        miOrden = myConvRow.orden_suplente;
+      } else {
+        // Miembro activo del grupo pero no figura en el roster de la conv.
+        // Tipico cuando declino la conv anterior. Puede anotarse.
+        miEstado = "no_anotado_convo";
+      }
+    } else {
+      // Sin convocatoria abierta: mostrar roster del grupo como referencia.
+      const lineupRows = grupoLineupRows.get(grupoId) ?? [];
+      titulares = lineupRows
+        .filter((r) => r.tipo === "titular")
+        .map((r) => {
+          const info = playerById.get(r.player_id) ?? { nombre: "—", apodo: null };
+          return {
+            playerId: r.player_id,
+            rol: "titular" as const,
+            orden: null,
+            nombre: info.nombre,
+            apodo: info.apodo,
+            isMe: r.player_id === playerId,
+            esInvitadoLibre: false,
+          };
+        })
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+      suplentes = lineupRows
+        .filter((r) => r.tipo === "suplente")
+        .map((r) => {
+          const info = playerById.get(r.player_id) ?? { nombre: "—", apodo: null };
+          return {
+            playerId: r.player_id,
+            rol: "suplente" as const,
+            orden: r.orden,
+            nombre: info.nombre,
+            apodo: info.apodo,
+            isMe: r.player_id === playerId,
+            esInvitadoLibre: false,
+          };
+        })
+        .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+
+      if (memStatus === "inactivo") {
+        miEstado = "bajado_grupo";
+      } else {
+        const myRow = lineupRows.find((r) => r.player_id === playerId);
+        if (myRow?.tipo === "titular") {
+          miEstado = "titular_convo";
+        } else if (myRow?.tipo === "suplente") {
+          miEstado = "suplente_convo";
+          miOrden = myRow.orden;
+        } else {
+          miEstado = "bajado_grupo";
+        }
+      }
+    }
+
+    result.push({ grupo, openConv, miEstado, miOrden, titulares, suplentes });
+  }
+
+  result.sort((a, b) => {
+    // Primero los que tienen conv proxima, ordenados por fecha ascendente.
+    // Despues los que no tienen conv (orden por dia_semana habitual).
+    const aFecha = a.openConv?.fecha ?? null;
+    const bFecha = b.openConv?.fecha ?? null;
+    if (aFecha && bFecha) return aFecha.localeCompare(bFecha);
+    if (aFecha) return -1;
+    if (bFecha) return 1;
+    return a.grupo.dia_semana - b.grupo.dia_semana;
   });
-  return upcoming ?? null;
+  return result;
 }
 
 export default async function MiPerfilPage({
@@ -234,23 +390,9 @@ export default async function MiPerfilPage({
   const player = playerRows && playerRows.length > 0 ? playerRows[0] : null;
 
   let lineups: GrupoLineup[] = [];
-  let gruposInactivos: Awaited<ReturnType<typeof loadGruposInactivos>> = [];
-  let nextConv: Awaited<ReturnType<typeof loadNextConvocatoria>> = null;
   if (player) {
-    [lineups, gruposInactivos, nextConv] = await Promise.all([
-      loadLineups(supabase, player.id),
-      loadGruposInactivos(supabase, player.id),
-      loadNextConvocatoria(supabase, player.id),
-    ]);
+    lineups = await loadLineups(supabase, player.id);
   }
-
-  const activeGrupoIds = new Set(lineups.map((l) => l.grupo.id));
-  const reJoinable = gruposInactivos.filter((m) => {
-    if (!m.grupo) return false;
-    if (m.grupo.status !== "activo") return false;
-    if (activeGrupoIds.has(m.grupo.id)) return false;
-    return true;
-  });
 
   return (
     <div className="space-y-6">
@@ -272,36 +414,6 @@ export default async function MiPerfilPage({
         </p>
       </div>
 
-      {nextConv && nextConv.convocatoria ? (
-        <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-            Tu próximo partido
-          </h2>
-          <div className="mt-3 space-y-1">
-            <p className="text-base font-semibold text-neutral-900">
-              {nextConv.convocatoria.grupo?.nombre ?? "Partido"}
-            </p>
-            <p className="text-sm text-neutral-700">
-              {formatFecha(nextConv.convocatoria.fecha)}
-              {nextConv.convocatoria.grupo
-                ? ` · ${formatHora(nextConv.convocatoria.grupo.hora)} · ${
-                    nextConv.convocatoria.grupo.lugar?.nombre ?? "—"
-                  }`
-                : ""}
-            </p>
-          </div>
-          <div className="mt-4">
-            <DeclineButton
-              convocatoriaId={nextConv.convocatoria.id}
-              label="No voy a este partido"
-            />
-            <p className="mt-2 text-xs text-neutral-500">
-              Si te bajás siendo titular, tu lugar pasa al primer suplente.
-            </p>
-          </div>
-        </section>
-      ) : null}
-
       {lineups.length === 0 ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
@@ -316,42 +428,6 @@ export default async function MiPerfilPage({
         lineups.map((l) => <GrupoCard key={l.grupo.id} lineup={l} />)
       )}
 
-      {reJoinable.length > 0 ? (
-        <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-            Volver al grupo
-          </h2>
-          <p className="mt-1 text-xs text-neutral-500">
-            Te bajaste de estos grupos. Podés volver a sumarte ahora; si hay cupo entrás como
-            titular, si no como suplente al final de la cola.
-          </p>
-          <ul className="mt-3 space-y-3">
-            {reJoinable.map((m) => {
-              const g = m.grupo;
-              if (!g) return null;
-              const dia = DIA_LABEL[g.dia_semana];
-              const hora = formatHora(g.hora);
-              return (
-                <li
-                  key={m.id}
-                  className="flex flex-col gap-2 rounded-md border border-neutral-200 bg-neutral-50 p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-neutral-900">{g.nombre}</p>
-                    <p className="text-xs text-neutral-500">
-                      {dia} {hora} · {g.lugar?.nombre ?? "—"}
-                    </p>
-                  </div>
-                  <div className="sm:w-56">
-                    <JoinQueueButton grupoId={g.id} label="Volver al grupo" />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
-
       <p className="text-xs text-neutral-500">
         <Link href="/perfil" className="underline">
           Cambiar mi contraseña
@@ -362,14 +438,65 @@ export default async function MiPerfilPage({
 }
 
 function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
-  const { grupo, miTipo, miOrden, titulares, suplentes } = lineup;
+  const { grupo, openConv, miEstado, miOrden, titulares, suplentes } = lineup;
   const dia = DIA_LABEL[grupo.dia_semana];
   const hora = formatHora(grupo.hora);
-  const miLabel = miTipo === "titular" ? "Sos titular" : `Sos suplente #${miOrden ?? "?"}`;
+  const convCancelada = openConv?.status === "cancelada";
+
+  const miLabel =
+    miEstado === "titular_convo"
+      ? "Sos titular"
+      : miEstado === "suplente_convo"
+        ? `Sos suplente #${miOrden ?? "?"}`
+        : miEstado === "declinado_convo"
+          ? "Te bajaste de este partido"
+          : miEstado === "no_anotado_convo"
+            ? "No anotado"
+            : "Te bajaste del grupo";
+
   const miBadgeClass =
-    miTipo === "titular"
+    miEstado === "titular_convo"
       ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-      : "bg-amber-50 text-amber-700 ring-1 ring-amber-200";
+      : miEstado === "suplente_convo"
+        ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+        : miEstado === "declinado_convo"
+          ? "bg-red-50 text-red-700 ring-1 ring-red-200"
+          : miEstado === "no_anotado_convo"
+            ? "bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200"
+            : "bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200";
+
+  // Lugar del partido: prioridad de la convocatoria, fallback al del grupo.
+  const lugarPartido = openConv?.lugar ?? grupo.lugar;
+  const horaPartido = openConv?.hora ? formatHora(openConv.hora) : hora;
+
+  // Caso especial: convocatoria cancelada con fecha futura. Tarjeta minimal.
+  if (convCancelada && openConv) {
+    return (
+      <section className="rounded-lg border border-neutral-200 bg-neutral-50 p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-neutral-900">{grupo.nombre}</h2>
+            <p className="mt-1 text-sm text-neutral-700">
+              {formatFecha(openConv.fecha)} · {horaPartido} · {lugarPartido?.nombre ?? "—"}
+            </p>
+            {lugarPartido?.maps ? (
+              <a
+                href={lugarPartido.maps}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-block text-xs text-neutral-700 underline transition hover:text-neutral-900"
+              >
+                Ver en Maps ↗
+              </a>
+            ) : null}
+          </div>
+          <span className="shrink-0 rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700 ring-1 ring-red-200">
+            Cancelada
+          </span>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
@@ -377,13 +504,94 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-neutral-900">{grupo.nombre}</h2>
           <p className="text-xs text-neutral-500">
-            {dia} {hora} · {grupo.lugar?.nombre ?? "—"} · cupo {grupo.cupo_titulares}
+            {dia} {hora} habitual · cupo {grupo.cupo_titulares}
           </p>
+          {openConv ? (
+            <>
+              <p className="mt-1 text-sm font-medium text-neutral-900">
+                Próximo partido: {formatFecha(openConv.fecha)} · {horaPartido}
+              </p>
+              <p className="text-xs text-neutral-700">{lugarPartido?.nombre ?? "Sin lugar"}</p>
+              {lugarPartido?.maps ? (
+                <a
+                  href={lugarPartido.maps}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-0.5 inline-block text-xs text-neutral-700 underline transition hover:text-neutral-900"
+                >
+                  Ver en Maps ↗
+                </a>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-xs text-neutral-700">
+                {grupo.lugar?.nombre ?? "Sin lugar definido"}
+              </p>
+              {grupo.lugar?.maps ? (
+                <a
+                  href={grupo.lugar.maps}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-0.5 inline-block text-xs text-neutral-700 underline transition hover:text-neutral-900"
+                >
+                  Ver en Maps ↗
+                </a>
+              ) : null}
+            </>
+          )}
         </div>
         <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${miBadgeClass}`}>
           {miLabel}
         </span>
       </div>
+
+      {miEstado === "declinado_convo" && openConv ? (
+        <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3">
+          <p className="text-xs text-red-800">
+            Avisaste que no vas a este partido. Si querés volver, entrás como titular si hay cupo o
+            al final de la cola de suplentes.
+          </p>
+          <div className="mt-2">
+            <UndoDeclineButton convocatoriaId={openConv.id} label="Volver al partido" />
+          </div>
+        </div>
+      ) : null}
+
+      {miEstado === "no_anotado_convo" && openConv ? (
+        <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+          <p className="text-xs text-neutral-700">
+            Estás en el grupo pero todavía no te anotaste a este partido. Si querés ir, entrás como
+            titular si hay cupo o al final de la cola de suplentes.
+          </p>
+          <div className="mt-2">
+            <JoinConvocatoriaButton convocatoriaId={openConv.id} label="Anotarme al partido" />
+          </div>
+        </div>
+      ) : null}
+
+      {miEstado === "bajado_grupo" ? (
+        <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+          <p className="text-xs text-neutral-600">
+            Te bajaste de este grupo. Podés volver ahora: si hay cupo entrás como titular, si no
+            como suplente al final de la cola.
+          </p>
+          <div className="mt-2">
+            <JoinQueueButton grupoId={grupo.id} label="Volver al grupo" />
+          </div>
+        </div>
+      ) : null}
+
+      {(miEstado === "titular_convo" || miEstado === "suplente_convo") && openConv ? (
+        <div className="mt-4 rounded-md border border-neutral-200 bg-white p-3">
+          <DeclineButton convocatoriaId={openConv.id} label="No voy a este partido" />
+          <p className="mt-2 text-xs text-neutral-500">
+            {miEstado === "titular_convo"
+              ? "Si te bajás, el primer suplente sube a titular."
+              : "Si te bajás, la cola se acomoda. Podés volver más tarde."}
+          </p>
+        </div>
+      ) : null}
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div>
@@ -393,22 +601,30 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
           {titulares.length === 0 ? (
             <p className="mt-2 text-xs text-neutral-500">Sin titulares.</p>
           ) : (
-            <ul className="mt-2 space-y-1">
-              {titulares.map((m) => (
+            <ol className="mt-2 space-y-1">
+              {titulares.map((m, i) => (
                 <li
-                  key={m.membresiaId}
-                  className={`rounded px-2 py-1 text-sm ${
+                  key={m.playerId ?? `libre-${i}`}
+                  className={`flex items-center gap-2 rounded px-2 py-1 text-sm ${
                     m.isMe ? "bg-emerald-50 font-semibold text-emerald-900" : "text-neutral-800"
                   }`}
                 >
-                  {m.nombre}
-                  {m.apodo ? (
-                    <span className="ml-1 text-xs text-neutral-500">({m.apodo})</span>
-                  ) : null}
-                  {m.isMe ? <span className="ml-2 text-xs text-emerald-700">· vos</span> : null}
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-50 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                    {i + 1}
+                  </span>
+                  <span>
+                    {m.nombre}
+                    {m.apodo ? (
+                      <span className="ml-1 text-xs text-neutral-500">({m.apodo})</span>
+                    ) : null}
+                    {m.esInvitadoLibre ? (
+                      <span className="ml-1 text-xs text-neutral-500">(invitado)</span>
+                    ) : null}
+                    {m.isMe ? <span className="ml-2 text-xs text-emerald-700">· vos</span> : null}
+                  </span>
                 </li>
               ))}
-            </ul>
+            </ol>
           )}
         </div>
 
@@ -420,9 +636,9 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
             <p className="mt-2 text-xs text-neutral-500">Sin suplentes.</p>
           ) : (
             <ol className="mt-2 space-y-1">
-              {suplentes.map((m) => (
+              {suplentes.map((m, i) => (
                 <li
-                  key={m.membresiaId}
+                  key={m.playerId ?? `libre-${i}`}
                   className={`flex items-center gap-2 rounded px-2 py-1 text-sm ${
                     m.isMe ? "bg-amber-50 font-semibold text-amber-900" : "text-neutral-800"
                   }`}
@@ -434,6 +650,9 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
                     {m.nombre}
                     {m.apodo ? (
                       <span className="ml-1 text-xs text-neutral-500">({m.apodo})</span>
+                    ) : null}
+                    {m.esInvitadoLibre ? (
+                      <span className="ml-1 text-xs text-neutral-500">(invitado)</span>
                     ) : null}
                     {m.isMe ? <span className="ml-2 text-xs text-amber-700">· vos</span> : null}
                   </span>

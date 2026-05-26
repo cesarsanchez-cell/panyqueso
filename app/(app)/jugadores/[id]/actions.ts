@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth/require-role";
+import { parseArPhone } from "@/lib/phone";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -27,15 +28,10 @@ const POSITIONS: readonly PositionPref[] = ["arquero", "defensor", "mediocampist
 const ADMIN_STATUSES: readonly PlayerStatus[] = ["approved", "inactive"];
 const PIERNA_VALUES: readonly PiernaHabil[] = ["derecha", "izquierda", "ambas"];
 
-const E164_REGEX = /^\+[1-9]\d{6,14}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_NOMBRE = 80;
 const MAX_APODO = 40;
-
-function normalizePhoneInput(raw: string): string {
-  return raw.replace(/[\s\-().]/g, "");
-}
 
 function parseFechaNacimiento(raw: string): { fecha: string; edad: number } | null {
   if (!FECHA_REGEX.test(raw)) return null;
@@ -106,9 +102,9 @@ export async function updatePlayerData(
   const phoneRaw = String(formData.get("phone") ?? "").trim();
   let phone: string | null = null;
   if (phoneRaw) {
-    const normalized = normalizePhoneInput(phoneRaw);
-    if (!E164_REGEX.test(normalized)) errors.phone = "Formato E.164 (+5491155551234).";
-    else phone = normalized;
+    const parsed = parseArPhone(phoneRaw);
+    if (!parsed) errors.phone = "Celular inválido. Ingresá los 10 dígitos (ej: 1155551234).";
+    else phone = parsed;
   }
 
   const emailRaw = String(formData.get("email") ?? "").trim();

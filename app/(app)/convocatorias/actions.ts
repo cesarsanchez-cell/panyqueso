@@ -94,3 +94,56 @@ export async function createConvocatoria(
   revalidatePath("/convocatorias");
   redirect(`/convocatorias/${data.id}`);
 }
+
+// ============================================================================
+// createConvocatoriaFromGrupo: nuevo flujo. Admin elige grupo + fecha. Se
+// llama al RPC que hereda lugar/hora/cupo del grupo y arma el roster.
+// ============================================================================
+export type CreateFromGrupoState = null | { error: string } | { success: string };
+
+function mapRpcError(code: string | undefined, fallback: string): string {
+  switch (code) {
+    case "P0050":
+      return "El grupo no existe.";
+    case "P0051":
+      return "El grupo está archivado.";
+    case "P0052":
+      return "Ya hay una convocatoria abierta o cerrada en esa fecha para este grupo.";
+    case "P0058":
+      return "La fecha es anterior al día de hoy.";
+    default:
+      return fallback;
+  }
+}
+
+export async function createConvocatoriaFromGrupo(
+  _prev: CreateFromGrupoState,
+  formData: FormData,
+): Promise<CreateFromGrupoState> {
+  await requireRole("admin");
+
+  const grupoId = String(formData.get("grupo_id") ?? "").trim();
+  const fecha = String(formData.get("fecha") ?? "").trim();
+
+  if (!grupoId) return { error: "Elegí un grupo." };
+  if (!fecha || !isYYYYMMDD(fecha)) return { error: "Fecha inválida." };
+
+  const supabase = await createClient();
+  const { data: newConvId, error } = await supabase.rpc("create_convocatoria_from_grupo", {
+    p_grupo_id: grupoId,
+    p_fecha: fecha,
+  });
+
+  if (error || !newConvId) {
+    return {
+      error: mapRpcError(
+        (error as { code?: string } | null)?.code,
+        `No se pudo crear: ${error?.message ?? "sin detalle"}`,
+      ),
+    };
+  }
+
+  revalidatePath("/convocatorias");
+  revalidatePath(`/grupos/${grupoId}`);
+  redirect(`/convocatorias/${newConvId}`);
+}

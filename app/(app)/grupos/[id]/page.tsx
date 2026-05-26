@@ -3,9 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { requireRole } from "@/lib/auth/require-role";
+import { formatArLocal } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 
 import { ArchiveGrupoForm } from "./archive-form";
+import { ConvocatoriaCiclo } from "./convocatoria-ciclo";
 import { EditGrupoForm } from "./edit-grupo-form";
 import { MembersSections } from "./members-sections";
 import { AddMemberForm } from "./membership-forms";
@@ -30,7 +32,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
   const { data: grupo, error: grupoErr } = await supabase
     .from("grupos")
     .select(
-      "id, nombre, lugar_id, dia_semana, hora, cupo_titulares, status, lugar:lugares!lugar_id(nombre)",
+      "id, nombre, lugar_id, dia_semana, hora, cupo_titulares, status, auto_renovar, lugar:lugares!lugar_id(nombre)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -46,14 +48,14 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
     { data: lugares },
     { data: players },
     { data: pendingInvitesRaw, error: invitesErr },
+    { data: openConvRow },
   ] = await Promise.all([
     supabase
       .from("grupo_membresias")
-      .select("id, tipo, orden, status, joined_at, player:players!player_id(id, nombre, apodo)")
+      .select("id, status, joined_at, player:players!player_id(id, nombre, apodo)")
       .eq("grupo_id", id)
       .eq("status", "activo")
-      .order("tipo", { ascending: true })
-      .order("orden", { ascending: true, nullsFirst: true }),
+      .order("joined_at", { ascending: true }),
     supabase.from("lugares").select("id, nombre").order("nombre", { ascending: true }),
     supabase
       .from("players")
@@ -68,7 +70,74 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
       .is("declined_at", null)
       .gt("expires_at", nowIso)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("convocatorias")
+      .select("id, fecha, cierre_at")
+      .eq("grupo_id", id)
+      .eq("status", "abierta")
+      .order("fecha", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
   ]);
+
+  // Conteos + roster de la convocatoria abierta (si hay).
+  type ConvRosterMember = {
+    playerId: string | null;
+    nombre: string;
+    apodo: string | null;
+    rol: "titular" | "suplente";
+    orden: number | null;
+    attendanceStatus: string;
+    esInvitadoLibre: boolean;
+  };
+  let openConv: {
+    id: string;
+    fecha: string;
+    cierre_at: string | null;
+    invitedCount: number;
+    confirmadosCount: number;
+    declinadosCount: number;
+    titulares: ConvRosterMember[];
+    suplentes: ConvRosterMember[];
+    declinados: ConvRosterMember[];
+  } | null = null;
+  if (openConvRow) {
+    const { data: cpRows } = await supabase
+      .from("convocatoria_players")
+      .select(
+        "player_id, nombre_libre, attendance_status, rol_en_convocatoria, orden_suplente, player:players!player_id(nombre, apodo)",
+      )
+      .eq("convocatoria_id", openConvRow.id);
+    const rows = cpRows ?? [];
+    const mapped: ConvRosterMember[] = rows.map((r) => {
+      const esInvitado = r.player_id === null;
+      return {
+        playerId: r.player_id,
+        nombre: esInvitado ? (r.nombre_libre ?? "—") : (r.player?.nombre ?? "—"),
+        apodo: esInvitado ? null : (r.player?.apodo ?? null),
+        rol: r.rol_en_convocatoria as "titular" | "suplente",
+        orden: r.orden_suplente,
+        attendanceStatus: r.attendance_status,
+        esInvitadoLibre: esInvitado,
+      };
+    });
+    const activos = mapped.filter((m) => m.attendanceStatus !== "declinado");
+    openConv = {
+      id: openConvRow.id,
+      fecha: openConvRow.fecha,
+      cierre_at: openConvRow.cierre_at,
+      invitedCount: activos.length,
+      confirmadosCount: activos.filter((m) => m.attendanceStatus === "confirmado").length,
+      declinadosCount: mapped.filter((m) => m.attendanceStatus === "declinado").length,
+      titulares: activos
+        .filter((m) => m.rol === "titular")
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+      suplentes: activos
+        .filter((m) => m.rol === "suplente")
+        .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)),
+      declinados: mapped.filter((m) => m.attendanceStatus === "declinado"),
+    };
+  }
 
   if (invitesErr) {
     throw new Error(`No se pudieron cargar las invitaciones: ${invitesErr.message}`);
@@ -79,15 +148,12 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
   }
 
   const memList = membresias ?? [];
-  const titulares = memList.filter((m) => m.tipo === "titular");
-  const suplentes = memList.filter((m) => m.tipo === "suplente");
 
   const ocupados = new Set(memList.map((m) => m.player?.id).filter(Boolean) as string[]);
   const availablePlayers = (players ?? [])
     .filter((p) => !ocupados.has(p.id))
     .map((p) => ({ id: p.id, nombre: p.apodo ? `${p.nombre} (${p.apodo})` : p.nombre }));
 
-  const hayCupoTitular = titulares.length < grupo.cupo_titulares;
   const isActive = grupo.status === "activo";
 
   const h = await headers();
@@ -98,7 +164,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
   const pendingInvites: PendingInvite[] = (pendingInvitesRaw ?? []).map((row) => ({
     id: row.id,
     phone: row.phone,
-    nombre: row.nombre_tentativo ?? row.phone,
+    nombre: row.nombre_tentativo ?? formatArLocal(row.phone),
     link: origin ? `${origin}/invite/${row.token}` : `/invite/${row.token}`,
     expiresAt: row.expires_at,
   }));
@@ -151,14 +217,18 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
         </div>
       </section>
 
+      {isActive ? (
+        <ConvocatoriaCiclo grupoId={grupo.id} autoRenovar={grupo.auto_renovar} open={openConv} />
+      ) : null}
+
       <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
           Agregar miembro
         </h2>
         <p className="mt-1 text-xs text-neutral-500">
-          {hayCupoTitular
-            ? `Hay ${grupo.cupo_titulares - titulares.length} cupo(s) de titular libre(s).`
-            : "Cupo de titulares lleno. Nuevos miembros van a la cola de suplentes."}
+          El grupo es una bolsa de jugadores candidatos. Cuando se crea una convocatoria, los
+          primeros {grupo.cupo_titulares} por orden de alta entran como titulares, el resto como
+          suplentes.
         </p>
         <div className="mt-3">
           {availablePlayers.length === 0 ? (
@@ -199,11 +269,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
         )}
       </section>
 
-      <MembersSections
-        titulares={titulares}
-        suplentes={suplentes}
-        cupoTitulares={grupo.cupo_titulares}
-      />
+      <MembersSections miembros={memList} cupoTitulares={grupo.cupo_titulares} />
     </div>
   );
 }
