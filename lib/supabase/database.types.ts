@@ -947,6 +947,23 @@ export type Database = {
           lugar_nombre: string;
         }[];
       };
+      get_my_player_full: {
+        Args: never;
+        Returns: {
+          apodo: string;
+          email: string;
+          fecha_nacimiento: string;
+          id: string;
+          nombre: string;
+          phone: string;
+          pierna_habil: Database["public"]["Enums"]["pierna_habil_enum"];
+          position_pref: Database["public"]["Enums"]["position_pref"];
+          positions_possible: Database["public"]["Enums"]["position_pref"][];
+          role_field: Database["public"]["Enums"]["player_role_field"];
+          status: Database["public"]["Enums"]["player_status"];
+          ubicacion_maps_url: string;
+        }[];
+      };
       get_my_player_summary: {
         Args: never;
         Returns: {
@@ -970,6 +987,20 @@ export type Database = {
       };
       reject_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
+        Returns: undefined;
+      };
+      update_my_player_data: {
+        Args: {
+          p_apodo: string;
+          p_email: string;
+          p_fecha_nacimiento: string;
+          p_nombre: string;
+          p_pierna_habil: Database["public"]["Enums"]["pierna_habil_enum"];
+          p_position_pref: Database["public"]["Enums"]["position_pref"];
+          p_positions_possible: Database["public"]["Enums"]["position_pref"][];
+          p_role_field: Database["public"]["Enums"]["player_role_field"];
+          p_ubicacion_maps_url: string;
+        };
         Returns: undefined;
       };
     };
