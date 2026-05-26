@@ -58,9 +58,9 @@ export default async function ImportarGrupoPage({ params }: { params: Promise<{ 
         <div className="mt-3 space-y-3 text-sm text-neutral-700">
           <p>
             Una línea por jugador con formato{" "}
-            <code className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs">celular,Nombre</code>.
-            El celular son <strong>los 10 dígitos AR</strong> (código de área + número, sin 0 ni
-            15). Aceptamos también con espacios, guiones, prefijo <code>+54</code> o el 9 móvil; los
+            <code className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs">celular,Nombre</code>. El
+            celular son <strong>los 10 dígitos AR</strong> (código de área + número, sin 0 ni 15).
+            Aceptamos también con espacios, guiones, prefijo <code>+54</code> o el 9 móvil; los
             normalizamos. Ejemplo:
           </p>
           <pre className="overflow-x-auto rounded-md bg-neutral-50 px-3 py-2 text-xs leading-relaxed text-neutral-700">
