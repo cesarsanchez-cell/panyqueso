@@ -1,43 +1,96 @@
 import { requireUser } from "@/lib/auth/require-role";
+import { createClient } from "@/lib/supabase/server";
 
+import { MisDatosForm, type MisDatosInitial } from "./mis-datos-form";
 import { PerfilForm } from "./perfil-form";
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "Admin",
   veedor: "Veedor",
+  player: "Jugador",
 };
 
 export default async function PerfilPage() {
   const { email, profile } = await requireUser();
   const roleLabel = profile.role ? ROLE_LABEL[profile.role] : "—";
+  const isPlayer = profile.role === "player";
+
+  // Solo para players: cargamos el row de players via RPC SECURITY DEFINER
+  // (el rol player no tiene SELECT directo sobre public.players).
+  let playerData: MisDatosInitial | null = null;
+  if (isPlayer) {
+    const supabase = await createClient();
+    const { data: rows, error } = await supabase.rpc("get_my_player_full");
+    if (error) {
+      throw new Error(`No se pudieron cargar tus datos: ${error.message}`);
+    }
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (row) {
+      playerData = {
+        nombre: row.nombre,
+        apodo: row.apodo,
+        fecha_nacimiento: row.fecha_nacimiento,
+        email: row.email,
+        phone: row.phone,
+        pierna_habil: row.pierna_habil,
+        role_field: row.role_field,
+        position_pref: row.position_pref,
+        positions_possible: row.positions_possible ?? [],
+        ubicacion_maps_url: row.ubicacion_maps_url,
+      };
+    }
+  }
 
   return (
     <div className="space-y-8">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Tu perfil</h1>
-        <p className="text-sm text-neutral-600">Información de tu cuenta y cambio de contraseña.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Mi cuenta</h1>
+        <p className="text-sm text-neutral-600">
+          {isPlayer
+            ? "Tus datos personales y cambio de contraseña."
+            : "Información de tu cuenta y cambio de contraseña."}
+        </p>
       </header>
 
       <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Datos</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Cuenta</h2>
         <dl className="mt-3 space-y-2 text-sm">
           <div className="flex justify-between gap-3">
-            <dt className="text-neutral-500">Email</dt>
+            <dt className="text-neutral-500">Email de ingreso</dt>
             <dd className="truncate text-neutral-900">{email}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-neutral-500">Nombre</dt>
-            <dd className="text-neutral-900">{profile.nombre ?? "—"}</dd>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="text-neutral-500">Rol</dt>
             <dd className="text-neutral-900">{roleLabel}</dd>
           </div>
         </dl>
-        <p className="mt-4 text-xs text-neutral-500">
-          El nombre y rol los gestiona el admin. Si necesitás cambios, pedíselos.
-        </p>
+        {!isPlayer ? (
+          <p className="mt-4 text-xs text-neutral-500">
+            El nombre y rol los gestiona el admin. Si necesitás cambios, pedíselos.
+          </p>
+        ) : null}
       </section>
+
+      {isPlayer && playerData ? (
+        <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+            Mis datos
+          </h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Podés actualizar todo menos tu celular (clave de ingreso) y tus calificaciones (las
+            gestiona el admin junto al veedor).
+          </p>
+          <div className="mt-4">
+            <MisDatosForm initial={playerData} />
+          </div>
+        </section>
+      ) : null}
+
+      {isPlayer && !playerData ? (
+        <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Todavía no tenemos tus datos de jugador vinculados. Hablá con el admin.
+        </section>
+      ) : null}
 
       <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
