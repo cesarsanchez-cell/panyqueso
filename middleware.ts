@@ -5,8 +5,9 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 
 // Rutas accesibles sin sesion. Toda otra ruta exige login.
 // /invite/<token> es publico: el token es la capability (Fase 9 PR 7).
-// /recuperar y /auth/callback son publicos para el flujo de reset de password.
-const PUBLIC_PATHS = ["/login", "/invite", "/recuperar", "/auth/callback"];
+// /recuperar, /auth/callback y /auth/confirm son publicos para el flujo de
+// reset de password (el ultimo es cross-device via verifyOtp).
+const PUBLIC_PATHS = ["/login", "/invite", "/recuperar", "/auth/callback", "/auth/confirm"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
