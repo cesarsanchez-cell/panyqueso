@@ -91,6 +91,7 @@ select _as('00000000-0000-0000-0000-0000000000a2');
 select throws_ok(
   $$select public.create_next_convocatoria('00000000-0000-0000-0000-0000000000c1'::uuid)$$,
   'P0001',
+  'forbidden',
   'no-admin: create_next_convocatoria lanza forbidden (P0001)'
 );
 

@@ -54,8 +54,8 @@ insert into public.grupo_membresias (grupo_id, player_id, tipo, orden, status) v
 
 -- Conv + match FUTURO (c1/m1) y conv + match PASADO (c2/m2), ambos de e1.
 insert into public.convocatorias (id, fecha, hora, cupo_maximo, status, grupo_id, created_by) values
-  ('00000000-0000-0000-0000-0000000000c1', current_date + 3, '20:00', 2, 'cerrada', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000a1'),
-  ('00000000-0000-0000-0000-0000000000c2', current_date - 7, '20:00', 2, 'jugada',  '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000a1');
+  ('00000000-0000-0000-0000-0000000000c1', current_date + 3, '20:00', 6, 'cerrada', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000a1'),
+  ('00000000-0000-0000-0000-0000000000c2', current_date - 7, '20:00', 6, 'jugada',  '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000a1');
 
 insert into public.matches (id, convocatoria_id, fecha) values
   ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c1', current_date + 3),
