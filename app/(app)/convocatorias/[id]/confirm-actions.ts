@@ -128,7 +128,9 @@ function checkWarnings(
   );
 
   if (missingA.length > 0 || missingB.length > 0) {
-    blockingErrors.push("Hay jugadores en el draft que ya no están convocados. Regenerá el draft.");
+    blockingErrors.push(
+      "Hay jugadores en el draft que ya no son titulares (alguien se bajó o cambió la cola). Regenerá el draft.",
+    );
   }
 
   const diff = Math.abs(scoreA - scoreB);
@@ -176,11 +178,17 @@ export async function confirmMatch(
   const draft = parseTeamDraft(conv.team_draft);
   if (!draft) return { error: "No hay draft cargado. Generá uno primero." };
 
-  // Cargar info de los convocados (player_id que estan en el draft).
+  // Cargar SOLO los titulares no-declinados actuales (mismo filtro que el
+  // generador en draft-actions). Asi, si despues de generar el draft un titular
+  // se baja (la DB lo marca declinado y promueve un suplente), el draft queda
+  // viejo: el jugador bajado ya no entra en byId y checkWarnings lo detecta
+  // como "ya no convocado", bloqueando la confirmacion hasta regenerar.
   const { data: convocados, error: convocadosErr } = await supabase
     .from("convocatoria_players")
     .select(`player:players!player_id(id, nombre, role_field, position_pref, internal_score)`)
-    .eq("convocatoria_id", convocatoriaId);
+    .eq("convocatoria_id", convocatoriaId)
+    .eq("rol_en_convocatoria", "titular")
+    .neq("attendance_status", "declinado");
 
   if (convocadosErr) return { error: `No se pudieron leer convocados: ${convocadosErr.message}` };
 
