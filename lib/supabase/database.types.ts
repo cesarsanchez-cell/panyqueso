@@ -948,6 +948,10 @@ export type Database = {
         Args: { p_fecha?: string; p_grupo_id: string };
         Returns: string;
       };
+      create_next_convocatoria: {
+        Args: { p_source_conv_id: string };
+        Returns: string;
+      };
       current_player_id: { Args: never; Returns: string };
       current_user_role: {
         Args: never;
