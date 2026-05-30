@@ -353,6 +353,20 @@ export async function confirmMatch(
 
   if (updErr) return rollback(`actualizar status (${updErr.message})`);
 
+  // Bug 4: auto-crear la proxima convocatoria heredando el roster. Best-effort:
+  // el match ya esta confirmado (lo critico); si la auto-renovacion falla solo
+  // logueamos y seguimos. El admin siempre puede crearla manualmente despues.
+  // create_next_convocatoria es no-op si el grupo no auto-renueva o no hay grupo.
+  const { error: nextErr } = await supabase.rpc("create_next_convocatoria", {
+    p_source_conv_id: conv.id,
+  });
+  if (nextErr) {
+    console.error(
+      `confirmMatch: no se pudo auto-crear la proxima convocatoria (conv=${conv.id}):`,
+      nextErr.message,
+    );
+  }
+
   revalidatePath(`/convocatorias/${conv.id}`);
   revalidatePath("/convocatorias");
   redirect(`/convocatorias/${conv.id}?confirmed=1`);
