@@ -3,10 +3,11 @@
 -- ============================================================================
 --
 -- Cubre:
---   - admin puede DELETE.
+--   - admin puede DELETE convocatoria_players.
 --   - veedor NO puede DELETE (policy filtra fila).
 --   - sin rol NO puede DELETE.
---   - convocatorias siguen con DELETE bloqueado (no afectamos otras tablas).
+--   - convocatorias: admin puede DELETE las 'abierta' (Bug 5: cancelar =
+--     eliminar) pero NO las 'cerrada'/'jugada' (la policy restringe a abierta).
 -- ============================================================================
 
 begin;
@@ -55,14 +56,16 @@ insert into public.players (
   '00000000-0000-0000-0000-0000000000a1'
 );
 
--- Convocatoria abierta.
+-- Convocatoria abierta (c1) y una cerrada (c2) para los asserts de DELETE.
 insert into public.convocatorias (
-  id, fecha, hora, cupo_maximo, created_by
-) values (
-  '00000000-0000-0000-0000-0000000000c1',
-  current_date + 1, '20:00', 12,
-  '00000000-0000-0000-0000-0000000000a1'
-);
+  id, fecha, hora, cupo_maximo, status, created_by
+) values
+  ('00000000-0000-0000-0000-0000000000c1',
+   current_date + 1, '20:00', 12, 'abierta',
+   '00000000-0000-0000-0000-0000000000a1'),
+  ('00000000-0000-0000-0000-0000000000c2',
+   current_date + 1, '20:00', 12, 'cerrada',
+   '00000000-0000-0000-0000-0000000000a1');
 
 -- 3 convocados (uno por test, asi DELETE no se pisa entre asserts).
 insert into public.convocatoria_players (id, convocatoria_id, player_id, rol_en_convocatoria)
@@ -106,7 +109,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Plan
 -- ---------------------------------------------------------------------------
-select plan(4);
+select plan(5);
 
 -- 1. veedor NO puede DELETE (policy filtra fila).
 select _as('00000000-0000-0000-0000-0000000000a2');
@@ -132,12 +135,22 @@ select lives_ok(
   'admin: DELETE lives_ok'
 );
 
--- 4. convocatorias sigue con DELETE bloqueado (no afectamos otras tablas).
+-- 4. Bug 5: admin SI puede DELETE una convocatoria 'abierta' (cascada en
+-- convocatoria_players via FK ON DELETE CASCADE).
+select _as('00000000-0000-0000-0000-0000000000a1');
+select isnt_empty(
+  $$delete from public.convocatorias
+     where id = '00000000-0000-0000-0000-0000000000c1' returning 1$$,
+  'convocatorias: admin DELETE de una abierta funciona (Bug 5)'
+);
+
+-- 5. admin NO puede DELETE una convocatoria 'cerrada' (la policy restringe a
+-- status='abierta'; cerrada/jugada conservan historia).
 select _as('00000000-0000-0000-0000-0000000000a1');
 select is_empty(
   $$delete from public.convocatorias
-     where id = '00000000-0000-0000-0000-0000000000c1' returning 1$$,
-  'convocatorias: DELETE sigue bloqueado para admin (no afectamos esa tabla)'
+     where id = '00000000-0000-0000-0000-0000000000c2' returning 1$$,
+  'convocatorias: admin NO puede DELETE una cerrada (policy filtra la fila)'
 );
 
 select * from finish();
