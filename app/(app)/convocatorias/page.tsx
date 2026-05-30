@@ -28,12 +28,13 @@ const TABS: { value: Tab; label: string }[] = [
   { value: "abierta", label: "Abiertas" },
   { value: "cerrada", label: "Cerradas" },
   { value: "jugada", label: "Jugadas" },
-  { value: "cancelada", label: "Canceladas" },
   { value: "todas", label: "Todas" },
 ];
 
 function parseTab(raw: string | undefined): Tab {
-  if (raw === "cerrada" || raw === "jugada" || raw === "cancelada" || raw === "todas") return raw;
+  // 'cancelada' ya no se produce (Bug 5): las convocatorias canceladas se
+  // eliminan. Se conserva en el enum por compatibilidad, pero sin tab.
+  if (raw === "cerrada" || raw === "jugada" || raw === "todas") return raw;
   return "abierta";
 }
 

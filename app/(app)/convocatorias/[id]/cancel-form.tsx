@@ -16,6 +16,16 @@ export function CancelForm({ convocatoriaId }: { convocatoriaId: string }) {
       <button
         type="submit"
         disabled={pending}
+        onClick={(e) => {
+          // El borrado es irreversible (no queda registro de la convocatoria).
+          if (
+            !window.confirm(
+              "¿Cancelar y eliminar esta convocatoria? No queda registro y no se puede deshacer.",
+            )
+          ) {
+            e.preventDefault();
+          }
+        }}
         className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending ? "Cancelando…" : "Cancelar convocatoria"}
