@@ -1000,6 +1000,18 @@ export type Database = {
           ubicacion_maps_url: string;
         }[];
       };
+      get_my_confirmed_match_teams: {
+        Args: never;
+        Returns: {
+          apodo: string | null;
+          fecha: string;
+          grupo_id: string;
+          is_goalkeeper: boolean;
+          nombre: string;
+          player_id: string;
+          team_label: string;
+        }[];
+      };
       get_my_player_summary: {
         Args: never;
         Returns: {

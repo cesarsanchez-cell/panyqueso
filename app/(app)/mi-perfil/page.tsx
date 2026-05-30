@@ -64,6 +64,20 @@ type MiEstado =
   | "no_anotado_convo"
   | "bajado_grupo";
 
+type ConfirmedTeamMember = {
+  playerId: string;
+  nombre: string;
+  apodo: string | null;
+  isGoalkeeper: boolean;
+  isMe: boolean;
+};
+
+type ConfirmedTeams = {
+  fecha: string;
+  teamA: ConfirmedTeamMember[];
+  teamB: ConfirmedTeamMember[];
+};
+
 type GrupoLineup = {
   grupo: GrupoInfo;
   openConv: {
@@ -77,7 +91,35 @@ type GrupoLineup = {
   miOrden: number | null;
   titulares: LineupMember[];
   suplentes: LineupMember[];
+  confirmedTeams: ConfirmedTeams | null;
 };
+
+// Equipos confirmados del próximo match por grupo (RPC neutral, sin scores).
+async function loadConfirmedTeams(
+  supabase: SupabaseLike,
+  playerId: string,
+): Promise<Map<string, ConfirmedTeams>> {
+  const byGrupo = new Map<string, ConfirmedTeams>();
+  const { data } = await supabase.rpc("get_my_confirmed_match_teams");
+  for (const row of data ?? []) {
+    if (!row.grupo_id || !row.player_id) continue;
+    let entry = byGrupo.get(row.grupo_id);
+    if (!entry) {
+      entry = { fecha: row.fecha, teamA: [], teamB: [] };
+      byGrupo.set(row.grupo_id, entry);
+    }
+    const member: ConfirmedTeamMember = {
+      playerId: row.player_id,
+      nombre: row.nombre ?? "—",
+      apodo: row.apodo,
+      isGoalkeeper: row.is_goalkeeper,
+      isMe: row.player_id === playerId,
+    };
+    if (row.team_label === "A") entry.teamA.push(member);
+    else if (row.team_label === "B") entry.teamB.push(member);
+  }
+  return byGrupo;
+}
 
 async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<GrupoLineup[]> {
   // 1. Membresias del player (activas e inactivas).
@@ -88,6 +130,9 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
 
   const misRows = misMembresias ?? [];
   if (misRows.length === 0) return [];
+
+  // Equipos confirmados del próximo partido (Bug 7), por grupo.
+  const confirmedByGrupo = await loadConfirmedTeams(supabase, playerId);
 
   // Por grupo, recordamos el estado de membresia en el grupo.
   const grupoMembership = new Map<string, "activo" | "inactivo">();
@@ -346,7 +391,15 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
       }
     }
 
-    result.push({ grupo, openConv, miEstado, miOrden, titulares, suplentes });
+    result.push({
+      grupo,
+      openConv,
+      miEstado,
+      miOrden,
+      titulares,
+      suplentes,
+      confirmedTeams: confirmedByGrupo.get(grupoId) ?? null,
+    });
   }
 
   result.sort((a, b) => {
@@ -427,8 +480,43 @@ export default async function MiPerfilPage({
   );
 }
 
+function ConfirmedTeamColumn({
+  label,
+  members,
+}: {
+  label: string;
+  members: ConfirmedTeamMember[];
+}) {
+  return (
+    <div className="rounded bg-white p-2 ring-1 ring-emerald-100">
+      <p className="text-xs font-semibold text-emerald-900">{label}</p>
+      {members.length === 0 ? (
+        <p className="mt-1 text-xs text-neutral-500">Sin jugadores.</p>
+      ) : (
+        <ul className="mt-1 space-y-0.5">
+          {members.map((m) => (
+            <li
+              key={m.playerId}
+              className={`text-sm ${m.isMe ? "font-semibold text-emerald-900" : "text-neutral-800"}`}
+            >
+              {m.isGoalkeeper ? (
+                <span className="mr-1" title="Arquero">
+                  🧤
+                </span>
+              ) : null}
+              {m.nombre}
+              {m.apodo ? <span className="ml-1 text-xs text-neutral-500">({m.apodo})</span> : null}
+              {m.isMe ? <span className="ml-1 text-xs text-emerald-700">· vos</span> : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
-  const { grupo, openConv, miEstado, miOrden, titulares, suplentes } = lineup;
+  const { grupo, openConv, miEstado, miOrden, titulares, suplentes, confirmedTeams } = lineup;
   const dia = DIA_LABEL[grupo.dia_semana];
   const hora = formatHora(grupo.hora);
 
@@ -525,7 +613,7 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
             titular si hay cupo o al final de la cola de suplentes.
           </p>
           <div className="mt-2">
-            <JoinConvocatoriaButton convocatoriaId={openConv.id} label="Anotarme al partido" />
+            <JoinConvocatoriaButton convocatoriaId={openConv.id} label="Me anoto" />
           </div>
         </div>
       ) : null}
@@ -550,6 +638,18 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
               ? "Si te bajás, el primer suplente sube a titular."
               : "Si te bajás, la cola se acomoda. Podés volver más tarde."}
           </p>
+        </div>
+      ) : null}
+
+      {confirmedTeams ? (
+        <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50/40 p-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+            Equipos del próximo partido · {formatFecha(confirmedTeams.fecha)}
+          </h3>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            <ConfirmedTeamColumn label="Equipo A" members={confirmedTeams.teamA} />
+            <ConfirmedTeamColumn label="Equipo B" members={confirmedTeams.teamB} />
+          </div>
         </div>
       ) : null}
 
