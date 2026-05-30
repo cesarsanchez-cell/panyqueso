@@ -148,3 +148,27 @@ pnpm db:types
   `20260605100000`, `20260605110000`, `20260606100000`, `20260606110000`.
 - [ ] `RESEND_API_KEY` + `RESEND_FROM` cargadas en Vercel (Production).
 - [ ] `pnpm db:types` post-deploy para formalizar las firmas de las RPCs nuevas.
+
+---
+
+## 9. Findings de auditoría y resolución
+
+### Major 1 — `confirmMatch` podía confirmar un draft con jugadores declinados — ✅ RESUELTO (PR #100)
+
+**Hallazgo:** el admin genera teams solo con titulares no-declinados, pero si
+después un titular se baja, la DB lo marca `declinado` (conservando
+`rol='titular'`) y promueve al primer suplente; el `team_draft` queda viejo.
+`confirmMatch` recargaba `convocatoria_players` **sin filtrar** `rol`/`attendance`,
+así que el jugador bajado seguía en `byId` y el check de "missing" no disparaba.
+Impacto: confirmar un match con alguien que avisó que no va, omitiendo al
+suplente promovido, y mostrar equipos incorrectos en /mi-perfil.
+
+**Resolución:** `confirmMatch` ahora carga solo
+`rol_en_convocatoria='titular' AND attendance_status <> 'declinado'` (mismo
+filtro que el generador). El jugador bajado deja de estar en `byId`;
+`checkWarnings` lo detecta como "ya no titular" y bloquea pidiendo regenerar.
+Test: `supabase/tests/database/confirm_titulares_filter.sql` guarda el contrato
+del filtro (un titular declinado conserva `rol='titular'`, por eso filtrar por
+rol solo no alcanza). Nota: `confirmMatch` es server action TS y el proyecto no
+tiene runner JS, así que el test de integración del action en sí queda fuera de
+alcance; el pgTAP cubre el invariante de datos subyacente.
