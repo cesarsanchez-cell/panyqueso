@@ -31,10 +31,15 @@ async function loadConvocadosForGenerator(
   supabase: Awaited<ReturnType<typeof createClient>>,
   convocatoriaId: string,
 ): Promise<GeneratorInput[]> {
+  // Solo los titulares juegan el partido. Los suplentes están en cola de
+  // espera por si baja un titular: NO entran al balance (evita el 7v6).
+  // Tampoco entran los que declinaron.
   const { data } = await supabase
     .from("convocatoria_players")
     .select(`player:players!player_id(id, nombre, role_field, position_pref, internal_score)`)
-    .eq("convocatoria_id", convocatoriaId);
+    .eq("convocatoria_id", convocatoriaId)
+    .eq("rol_en_convocatoria", "titular")
+    .neq("attendance_status", "declinado");
 
   if (!data) return [];
   return data
