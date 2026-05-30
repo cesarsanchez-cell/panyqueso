@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
@@ -274,16 +275,16 @@ export async function cancelConvocatoria(
     return { error: "Solo se pueden cancelar convocatorias abiertas." };
   }
 
-  const { error } = await supabase
-    .from("convocatorias")
-    .update({ status: "cancelada" })
-    .eq("id", convocatoriaId);
+  // Bug 5: una conv cancelada no aporta al historial. La eliminamos en vez de
+  // dejarla con status='cancelada'. convocatoria_players cascada; las invites
+  // se desvinculan (ON DELETE SET NULL). La RLS solo permite borrar 'abierta'.
+  const { error } = await supabase.from("convocatorias").delete().eq("id", convocatoriaId);
 
   if (error) {
     return { error: `No se pudo cancelar: ${error.message}` };
   }
 
-  revalidatePath(`/convocatorias/${convocatoriaId}`);
+  // El row ya no existe: redirigimos al listado (la página de detalle daría 404).
   revalidatePath("/convocatorias");
-  return { success: "Convocatoria cancelada." };
+  redirect("/convocatorias");
 }

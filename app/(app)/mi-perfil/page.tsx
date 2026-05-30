@@ -124,14 +124,14 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
     });
   }
 
-  // 3. Convocatorias relevantes: abiertas + canceladas con fecha >= hoy.
-  // Las abiertas se muestran con su roster; las canceladas como aviso.
+  // 3. Convocatorias abiertas con fecha >= hoy, con su roster.
+  // (Las canceladas ya no existen: Bug 5 las elimina en vez de persistirlas.)
   const todayIso = new Date().toISOString().slice(0, 10);
   const { data: convs } = await supabase
     .from("convocatorias")
     .select("id, fecha, hora, grupo_id, status, lugar:lugares!lugar_id(nombre, ubicacion_maps_url)")
     .in("grupo_id", grupoIds)
-    .in("status", ["abierta", "cancelada"])
+    .eq("status", "abierta")
     .gte("fecha", todayIso)
     .order("fecha", { ascending: true });
 
@@ -152,10 +152,7 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
       status: c.status,
       lugar: c.lugar ? { nombre: c.lugar.nombre, maps: c.lugar.ubicacion_maps_url } : null,
     };
-    const existing = openConvByGrupo.get(c.grupo_id);
-    if (!existing) {
-      openConvByGrupo.set(c.grupo_id, brief);
-    } else if (existing.status === "cancelada" && c.status === "abierta") {
+    if (!openConvByGrupo.has(c.grupo_id)) {
       openConvByGrupo.set(c.grupo_id, brief);
     }
   }
@@ -242,13 +239,6 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
     let suplentes: LineupMember[] = [];
     let miEstado: MiEstado;
     let miOrden: number | null = null;
-
-    if (openConv && openConv.status === "cancelada") {
-      // Conv cancelada futura: tarjeta minimal, sin roster.
-      miEstado = memStatus === "inactivo" ? "bajado_grupo" : "no_anotado_convo";
-      result.push({ grupo, openConv, miEstado, miOrden, titulares: [], suplentes: [] });
-      continue;
-    }
 
     if (openConv) {
       const roster = convRoster.get(openConv.id) ?? [];
@@ -441,7 +431,6 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
   const { grupo, openConv, miEstado, miOrden, titulares, suplentes } = lineup;
   const dia = DIA_LABEL[grupo.dia_semana];
   const hora = formatHora(grupo.hora);
-  const convCancelada = openConv?.status === "cancelada";
 
   const miLabel =
     miEstado === "titular_convo"
@@ -468,35 +457,6 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
   // Lugar del partido: prioridad de la convocatoria, fallback al del grupo.
   const lugarPartido = openConv?.lugar ?? grupo.lugar;
   const horaPartido = openConv?.hora ? formatHora(openConv.hora) : hora;
-
-  // Caso especial: convocatoria cancelada con fecha futura. Tarjeta minimal.
-  if (convCancelada && openConv) {
-    return (
-      <section className="rounded-lg border border-neutral-200 bg-neutral-50 p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold text-neutral-900">{grupo.nombre}</h2>
-            <p className="mt-1 text-sm text-neutral-700">
-              {formatFecha(openConv.fecha)} · {horaPartido} · {lugarPartido?.nombre ?? "—"}
-            </p>
-            {lugarPartido?.maps ? (
-              <a
-                href={lugarPartido.maps}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1 inline-block text-xs text-neutral-700 underline transition hover:text-neutral-900"
-              >
-                Ver en Maps ↗
-              </a>
-            ) : null}
-          </div>
-          <span className="shrink-0 rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700 ring-1 ring-red-200">
-            Cancelada
-          </span>
-        </div>
-      </section>
-    );
-  }
 
   return (
     <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
