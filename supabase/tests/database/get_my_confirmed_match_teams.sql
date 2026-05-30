@@ -46,7 +46,7 @@ insert into public.lugares (id, nombre, created_by) values
 
 -- Grupo e1: P1 y P2 miembros activos. P3 NO esta en e1.
 insert into public.grupos (id, nombre, lugar_id, dia_semana, hora, cupo_titulares, owner_id) values
-  ('00000000-0000-0000-0000-0000000000e1', 'Grupo e1', '00000000-0000-0000-0000-00000000000a', 2, '20:00', 2, '00000000-0000-0000-0000-0000000000a1');
+  ('00000000-0000-0000-0000-0000000000e1', 'Grupo e1', '00000000-0000-0000-0000-00000000000a', 2, '20:00', 6, '00000000-0000-0000-0000-0000000000a1');
 
 insert into public.grupo_membresias (grupo_id, player_id, tipo, orden, status) values
   ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000b1', 'titular', null, 'activo'),
