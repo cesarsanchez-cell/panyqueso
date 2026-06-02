@@ -227,8 +227,10 @@ async function computeRolForNewEntry(
 ): Promise<{ rol: "titular" | "suplente"; ordenSuplente: number | null }> {
   if (!grupoId) return { rol: "titular", ordenSuplente: null };
 
-  const [{ data: grupo }, { count: titularesCount }] = await Promise.all([
-    supabase.from("grupos").select("cupo_titulares").eq("id", grupoId).maybeSingle(),
+  // Fase 10: el cupo de titulares lo manda la CONVOCATORIA (cupo_maximo, editable
+  // por el admin), no el grupo. El grupo es solo el default al crearla.
+  const [{ data: conv }, { count: titularesCount }] = await Promise.all([
+    supabase.from("convocatorias").select("cupo_maximo").eq("id", convocatoriaId).maybeSingle(),
     supabase
       .from("convocatoria_players")
       .select("id", { count: "exact", head: true })
@@ -237,7 +239,7 @@ async function computeRolForNewEntry(
       .neq("attendance_status", "declinado"),
   ]);
 
-  if (!grupo || (titularesCount ?? 0) < grupo.cupo_titulares) {
+  if (!conv || (titularesCount ?? 0) < conv.cupo_maximo) {
     return { rol: "titular", ordenSuplente: null };
   }
 
