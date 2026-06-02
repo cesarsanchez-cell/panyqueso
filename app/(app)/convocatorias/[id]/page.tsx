@@ -12,6 +12,7 @@ import { AddGuestForm } from "./add-guest-form";
 import { AddPlayerForm } from "./add-player-form";
 import { CancelForm } from "./cancel-form";
 import { ConfirmMatchForm } from "./confirm-match-form";
+import { CupoEditor } from "./cupo-editor";
 import { ClearDraftForm, GenerateDraftForm, PromoteToGKForm, SwapPlayerForm } from "./draft-forms";
 import { GoalsForm, type GoalsFormTeam } from "./goals-form";
 import { InviteSection, type PendingConvocatoriaInvite } from "./invite-section";
@@ -318,6 +319,10 @@ export default async function ConvocatoriaDetallePage({
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Notas</h2>
           <p className="mt-2 whitespace-pre-line text-sm text-neutral-700">{convocatoria.notas}</p>
         </section>
+      ) : null}
+
+      {isAdmin && isOpen ? (
+        <CupoEditor convocatoriaId={convocatoria.id} cupoActual={convocatoria.cupo_maximo} />
       ) : null}
 
       <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
