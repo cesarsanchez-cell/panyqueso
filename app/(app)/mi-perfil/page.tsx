@@ -76,6 +76,8 @@ type ConfirmedTeams = {
   fecha: string;
   teamA: ConfirmedTeamMember[];
   teamB: ConfirmedTeamMember[];
+  // Suplentes que no entraron a ningún equipo (entran solo si baja alguien).
+  bench: ConfirmedTeamMember[];
 };
 
 type GrupoLineup = {
@@ -105,7 +107,7 @@ async function loadConfirmedTeams(
     if (!row.grupo_id || !row.player_id) continue;
     let entry = byGrupo.get(row.grupo_id);
     if (!entry) {
-      entry = { fecha: row.fecha, teamA: [], teamB: [] };
+      entry = { fecha: row.fecha, teamA: [], teamB: [], bench: [] };
       byGrupo.set(row.grupo_id, entry);
     }
     const member: ConfirmedTeamMember = {
@@ -115,8 +117,10 @@ async function loadConfirmedTeams(
       isGoalkeeper: row.is_goalkeeper,
       isMe: row.player_id === playerId,
     };
+    // team_label NULL = banco (suplentes que no entraron como titulares).
     if (row.team_label === "A") entry.teamA.push(member);
     else if (row.team_label === "B") entry.teamB.push(member);
+    else entry.bench.push(member);
   }
   return byGrupo;
 }
@@ -403,10 +407,11 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
   }
 
   result.sort((a, b) => {
-    // Primero los que tienen conv proxima, ordenados por fecha ascendente.
-    // Despues los que no tienen conv (orden por dia_semana habitual).
-    const aFecha = a.openConv?.fecha ?? null;
-    const bFecha = b.openConv?.fecha ?? null;
+    // Orden por el compromiso más próximo: el match confirmado (si lo hay)
+    // pesa antes que la convocatoria abierta. Después, los que no tienen nada
+    // próximo, por día_semana habitual.
+    const aFecha = a.confirmedTeams?.fecha ?? a.openConv?.fecha ?? null;
+    const bFecha = b.confirmedTeams?.fecha ?? b.openConv?.fecha ?? null;
     if (aFecha && bFecha) return aFecha.localeCompare(bFecha);
     if (aFecha) return -1;
     if (bFecha) return 1;
@@ -468,7 +473,13 @@ export default async function MiPerfilPage({
           </p>
         </section>
       ) : (
-        lineups.map((l) => <GrupoCard key={l.grupo.id} lineup={l} />)
+        lineups.map((l) =>
+          l.confirmedTeams ? (
+            <ConfirmedMatchCard key={l.grupo.id} lineup={l} teams={l.confirmedTeams} />
+          ) : (
+            <GrupoCard key={l.grupo.id} lineup={l} />
+          ),
+        )
       )}
 
       <p className="text-xs text-neutral-500">
@@ -515,8 +526,86 @@ function ConfirmedTeamColumn({
   );
 }
 
+// Card del partido con equipos ya confirmados: el roster completo de la
+// convocatoria es redundante (los equipos ya dicen quién juega), así que solo
+// mostramos los equipos + el banco (suplentes que no entraron). La próxima
+// convocatoria de ESTE grupo queda oculta hasta que el partido pase; otros
+// grupos del jugador se muestran de forma independiente.
+function ConfirmedMatchCard({ lineup, teams }: { lineup: GrupoLineup; teams: ConfirmedTeams }) {
+  const { grupo } = lineup;
+  const hora = formatHora(grupo.hora);
+  const lugar = grupo.lugar;
+
+  const enEquipo = teams.teamA.some((m) => m.isMe) || teams.teamB.some((m) => m.isMe);
+  const enBanco = teams.bench.some((m) => m.isMe);
+
+  const miLabel = enEquipo ? "Jugás" : enBanco ? "En el banco" : "No estás en este partido";
+  const miBadgeClass = enEquipo
+    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+    : enBanco
+      ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+      : "bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200";
+
+  return (
+    <section className="rounded-lg border border-emerald-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-neutral-900">{grupo.nombre}</h2>
+          <p className="mt-1 text-sm font-medium text-emerald-800">
+            Partido confirmado: {formatFecha(teams.fecha)} · {hora}
+          </p>
+          <p className="text-xs text-neutral-700">{lugar?.nombre ?? "Sin lugar definido"}</p>
+          {lugar?.maps ? (
+            <a
+              href={lugar.maps}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-0.5 inline-block text-xs text-neutral-700 underline transition hover:text-neutral-900"
+            >
+              Ver en Maps ↗
+            </a>
+          ) : null}
+        </div>
+        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${miBadgeClass}`}>
+          {miLabel}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <ConfirmedTeamColumn label="Equipo A" members={teams.teamA} />
+        <ConfirmedTeamColumn label="Equipo B" members={teams.teamB} />
+      </div>
+
+      {teams.bench.length > 0 ? (
+        <div className="mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            Banco ({teams.bench.length})
+          </h3>
+          <p className="mt-0.5 text-xs text-neutral-500">
+            Suplentes que no entraron. Juegan solo si baja alguien.
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+            {teams.bench.map((m) => (
+              <li
+                key={m.playerId}
+                className={`text-sm ${m.isMe ? "font-semibold text-amber-900" : "text-neutral-800"}`}
+              >
+                {m.nombre}
+                {m.apodo ? (
+                  <span className="ml-1 text-xs text-neutral-500">({m.apodo})</span>
+                ) : null}
+                {m.isMe ? <span className="ml-1 text-xs text-amber-700">· vos</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
-  const { grupo, openConv, miEstado, miOrden, titulares, suplentes, confirmedTeams } = lineup;
+  const { grupo, openConv, miEstado, miOrden, titulares, suplentes } = lineup;
   const dia = DIA_LABEL[grupo.dia_semana];
   const hora = formatHora(grupo.hora);
 
@@ -638,18 +727,6 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
               ? "Si te bajás, el primer suplente sube a titular."
               : "Si te bajás, la cola se acomoda. Podés volver más tarde."}
           </p>
-        </div>
-      ) : null}
-
-      {confirmedTeams ? (
-        <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50/40 p-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
-            Equipos del próximo partido · {formatFecha(confirmedTeams.fecha)}
-          </h3>
-          <div className="mt-2 grid gap-3 sm:grid-cols-2">
-            <ConfirmedTeamColumn label="Equipo A" members={confirmedTeams.teamA} />
-            <ConfirmedTeamColumn label="Equipo B" members={confirmedTeams.teamB} />
-          </div>
         </div>
       ) : null}
 

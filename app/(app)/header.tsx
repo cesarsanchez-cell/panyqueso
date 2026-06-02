@@ -12,8 +12,6 @@ const ROLE_LABEL: Record<NonNullable<AuthContext["profile"]["role"]>, string> = 
 
 type NavItem = { label: string; href: string; key?: string };
 
-// Nav vacío para player en este PR — la UI de player (/mi-perfil, etc.) llega
-// en PR 9. Mientras tanto, un player logueado solo ve "Inicio".
 const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, NavItem[]> = {
   admin: [
     { label: "Inicio", href: "/" },
@@ -30,6 +28,7 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
   ],
   player: [
     { label: "Mi perfil", href: "/mi-perfil" },
+    { label: "Historial", href: "/historial" },
     { label: "Mi cuenta", href: "/perfil" },
   ],
 };
