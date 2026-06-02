@@ -63,7 +63,8 @@ type MiEstado =
   | "suplente_convo"
   | "declinado_convo"
   | "no_anotado_convo"
-  | "bajado_grupo";
+  | "bajado_grupo"
+  | "sin_convocatoria";
 
 type ConfirmedTeamMember = {
   playerId: string;
@@ -240,28 +241,9 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
       if (r.player_id) playerIds.add(r.player_id);
     }
   }
-  // Para grupos sin convocatoria abierta usamos grupo_membresias activas
-  // como fallback (mostrar el roster del grupo). Las cargamos despues.
-  const grupoLineupRows = new Map<
-    string,
-    Array<{ player_id: string; tipo: "titular" | "suplente"; orden: number | null }>
-  >();
-  const grupoSinConv = grupoIds.filter((id) => !openConvByGrupo.has(id));
-  if (grupoSinConv.length > 0) {
-    const { data: gmData } = await supabase
-      .from("grupo_membresias")
-      .select("grupo_id, player_id, tipo, orden")
-      .eq("status", "activo")
-      .in("grupo_id", grupoSinConv);
-    for (const r of gmData ?? []) {
-      if (r.tipo !== "titular" && r.tipo !== "suplente") continue;
-      playerIds.add(r.player_id);
-      const list = grupoLineupRows.get(r.grupo_id);
-      const entry = { player_id: r.player_id, tipo: r.tipo, orden: r.orden };
-      if (list) list.push(entry);
-      else grupoLineupRows.set(r.grupo_id, [entry]);
-    }
-  }
+  // Para grupos SIN convocatoria abierta no mostramos un roster: solo el header
+  // del grupo + estado vacio (ver fallback abajo). Antes mostrabamos el roster
+  // del grupo y parecia una convocatoria fantasma.
 
   const playerById = new Map<string, { nombre: string; apodo: string | null }>();
   const playerIdsList = Array.from(playerIds);
@@ -348,52 +330,12 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
         miEstado = "no_anotado_convo";
       }
     } else {
-      // Sin convocatoria abierta: mostrar roster del grupo como referencia.
-      const lineupRows = grupoLineupRows.get(grupoId) ?? [];
-      titulares = lineupRows
-        .filter((r) => r.tipo === "titular")
-        .map((r) => {
-          const info = playerById.get(r.player_id) ?? { nombre: "—", apodo: null };
-          return {
-            playerId: r.player_id,
-            rol: "titular" as const,
-            orden: null,
-            nombre: info.nombre,
-            apodo: info.apodo,
-            isMe: r.player_id === playerId,
-            esInvitadoLibre: false,
-          };
-        })
-        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
-      suplentes = lineupRows
-        .filter((r) => r.tipo === "suplente")
-        .map((r) => {
-          const info = playerById.get(r.player_id) ?? { nombre: "—", apodo: null };
-          return {
-            playerId: r.player_id,
-            rol: "suplente" as const,
-            orden: r.orden,
-            nombre: info.nombre,
-            apodo: info.apodo,
-            isMe: r.player_id === playerId,
-            esInvitadoLibre: false,
-          };
-        })
-        .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
-
-      if (memStatus === "inactivo") {
-        miEstado = "bajado_grupo";
-      } else {
-        const myRow = lineupRows.find((r) => r.player_id === playerId);
-        if (myRow?.tipo === "titular") {
-          miEstado = "titular_convo";
-        } else if (myRow?.tipo === "suplente") {
-          miEstado = "suplente_convo";
-          miOrden = myRow.orden;
-        } else {
-          miEstado = "bajado_grupo";
-        }
-      }
+      // Sin convocatoria abierta: NO mostramos roster (parecia una convocatoria
+      // fantasma). Solo el header del grupo + estado vacio. Si el jugador se
+      // bajo del grupo, conserva el CTA "Volver al grupo".
+      titulares = [];
+      suplentes = [];
+      miEstado = memStatus === "inactivo" ? "bajado_grupo" : "sin_convocatoria";
     }
 
     result.push({
@@ -675,10 +617,23 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
             </>
           )}
         </div>
-        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${miBadgeClass}`}>
-          {miLabel}
-        </span>
+        {miEstado === "sin_convocatoria" ? null : (
+          <span
+            className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${miBadgeClass}`}
+          >
+            {miLabel}
+          </span>
+        )}
       </div>
+
+      {miEstado === "sin_convocatoria" ? (
+        <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+          <p className="text-xs text-neutral-600">
+            Todavía no hay convocatoria abierta para este grupo. Cuando el organizador la abra, vas
+            a aparecer acá.
+          </p>
+        </div>
+      ) : null}
 
       {miEstado === "declinado_convo" && openConv ? (
         <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3">
@@ -727,69 +682,71 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
         </div>
       ) : null}
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-            Titulares ({titulares.length}/{grupo.cupo_titulares})
-          </h3>
-          {titulares.length === 0 ? (
-            <p className="mt-2 text-xs text-neutral-500">Sin titulares.</p>
-          ) : (
-            <ol className="mt-2 space-y-1">
-              {titulares.map((m, i) => (
-                <li
-                  key={m.playerId ?? `libre-${i}`}
-                  className={`flex items-center gap-2 rounded px-2 py-1 text-sm ${
-                    m.isMe ? "bg-emerald-50 font-semibold text-emerald-900" : "text-neutral-800"
-                  }`}
-                >
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-50 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-                    {i + 1}
-                  </span>
-                  <span>
-                    {playerLabel(m.nombre, m.apodo)}
-                    {m.esInvitadoLibre ? (
-                      <span className="ml-1 text-xs text-neutral-500">(invitado)</span>
-                    ) : null}
-                    {m.isMe ? <span className="ml-2 text-xs text-emerald-700">· vos</span> : null}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
+      {openConv ? (
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              Titulares ({titulares.length}/{grupo.cupo_titulares})
+            </h3>
+            {titulares.length === 0 ? (
+              <p className="mt-2 text-xs text-neutral-500">Sin titulares.</p>
+            ) : (
+              <ol className="mt-2 space-y-1">
+                {titulares.map((m, i) => (
+                  <li
+                    key={m.playerId ?? `libre-${i}`}
+                    className={`flex items-center gap-2 rounded px-2 py-1 text-sm ${
+                      m.isMe ? "bg-emerald-50 font-semibold text-emerald-900" : "text-neutral-800"
+                    }`}
+                  >
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-50 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                      {i + 1}
+                    </span>
+                    <span>
+                      {playerLabel(m.nombre, m.apodo)}
+                      {m.esInvitadoLibre ? (
+                        <span className="ml-1 text-xs text-neutral-500">(invitado)</span>
+                      ) : null}
+                      {m.isMe ? <span className="ml-2 text-xs text-emerald-700">· vos</span> : null}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
 
-        <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-            Cola de suplentes ({suplentes.length})
-          </h3>
-          {suplentes.length === 0 ? (
-            <p className="mt-2 text-xs text-neutral-500">Sin suplentes.</p>
-          ) : (
-            <ol className="mt-2 space-y-1">
-              {suplentes.map((m, i) => (
-                <li
-                  key={m.playerId ?? `libre-${i}`}
-                  className={`flex items-center gap-2 rounded px-2 py-1 text-sm ${
-                    m.isMe ? "bg-amber-50 font-semibold text-amber-900" : "text-neutral-800"
-                  }`}
-                >
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-700">
-                    {m.orden ?? "?"}
-                  </span>
-                  <span>
-                    {playerLabel(m.nombre, m.apodo)}
-                    {m.esInvitadoLibre ? (
-                      <span className="ml-1 text-xs text-neutral-500">(invitado)</span>
-                    ) : null}
-                    {m.isMe ? <span className="ml-2 text-xs text-amber-700">· vos</span> : null}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              Cola de suplentes ({suplentes.length})
+            </h3>
+            {suplentes.length === 0 ? (
+              <p className="mt-2 text-xs text-neutral-500">Sin suplentes.</p>
+            ) : (
+              <ol className="mt-2 space-y-1">
+                {suplentes.map((m, i) => (
+                  <li
+                    key={m.playerId ?? `libre-${i}`}
+                    className={`flex items-center gap-2 rounded px-2 py-1 text-sm ${
+                      m.isMe ? "bg-amber-50 font-semibold text-amber-900" : "text-neutral-800"
+                    }`}
+                  >
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-700">
+                      {m.orden ?? "?"}
+                    </span>
+                    <span>
+                      {playerLabel(m.nombre, m.apodo)}
+                      {m.esInvitadoLibre ? (
+                        <span className="ml-1 text-xs text-neutral-500">(invitado)</span>
+                      ) : null}
+                      {m.isMe ? <span className="ml-2 text-xs text-amber-700">· vos</span> : null}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
         </div>
-      </div>
+      ) : null}
     </section>
   );
 }
