@@ -54,6 +54,13 @@ insert into public.grupos (id, nombre, lugar_id, dia_semana, hora, cupo_titulare
   ('00000000-0000-0000-0000-0000000000e1', 'Grupo e1', '00000000-0000-0000-0000-00000000000a', 2, '20:00', 6, '00000000-0000-0000-0000-0000000000a1'),
   ('00000000-0000-0000-0000-0000000000e2', 'Grupo e2', '00000000-0000-0000-0000-00000000000a', 4, '21:00', 6, '00000000-0000-0000-0000-0000000000a1');
 update public.grupos set auto_renovar = false where id = '00000000-0000-0000-0000-0000000000e2';
+-- Fase 10: la fecha de la siguiente snapea al dia del grupo. Alineamos
+-- dia_semana de e1 con el dia de HOY para que, con la conv origen en
+-- current_date, la siguiente caiga deterministicamente en current_date + 7
+-- (independiente del dia en que corra el CI). El snap fuera de ciclo se cubre
+-- en create_next_convocatoria_snap.sql.
+update public.grupos set dia_semana = extract(dow from current_date)::int
+ where id = '00000000-0000-0000-0000-0000000000e1';
 
 -- Conv origen c1 de e1 (cerrada, como tras confirmar el match): 6 titulares,
 -- 1 suplente, 1 declinado.
