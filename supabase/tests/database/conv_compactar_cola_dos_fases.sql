@@ -35,11 +35,13 @@ insert into public.players (
 insert into public.lugares (id, nombre, created_by) values
   ('00000000-0000-0000-0000-00000000000a', 'Cancha', '00000000-0000-0000-0000-0000000000a1');
 
+-- cupo 6 solo para pasar los checks (between 6 and 24); el roster lo armamos a
+-- mano abajo, asi que el valor no afecta la compactacion que probamos.
 insert into public.grupos (id, nombre, lugar_id, dia_semana, hora, cupo_titulares, owner_id) values
-  ('00000000-0000-0000-0000-0000000000e1', 'Grupo e1', '00000000-0000-0000-0000-00000000000a', 2, '20:00', 2, '00000000-0000-0000-0000-0000000000a1');
+  ('00000000-0000-0000-0000-0000000000e1', 'Grupo e1', '00000000-0000-0000-0000-00000000000a', 2, '20:00', 6, '00000000-0000-0000-0000-0000000000a1');
 
 insert into public.convocatorias (id, fecha, hora, cupo_maximo, status, grupo_id, created_by) values
-  ('00000000-0000-0000-0000-0000000000c1', current_date + 3, '20:00', 2, 'abierta', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000a1');
+  ('00000000-0000-0000-0000-0000000000c1', current_date + 3, '20:00', 6, 'abierta', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000a1');
 
 -- 2 titulares (b1,b2) + 3 suplentes (b3=1, b4=2, b5=3).
 insert into public.convocatoria_players (
