@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth/require-role";
+import { playerLabel } from "@/lib/players/label";
 import { createClient } from "@/lib/supabase/server";
 
 import { DeclineButton } from "./decline-button";
@@ -515,8 +516,7 @@ function ConfirmedTeamColumn({
                   🧤
                 </span>
               ) : null}
-              {m.nombre}
-              {m.apodo ? <span className="ml-1 text-xs text-neutral-500">({m.apodo})</span> : null}
+              {playerLabel(m.nombre, m.apodo)}
               {m.isMe ? <span className="ml-1 text-xs text-emerald-700">· vos</span> : null}
             </li>
           ))}
@@ -590,10 +590,7 @@ function ConfirmedMatchCard({ lineup, teams }: { lineup: GrupoLineup; teams: Con
                 key={m.playerId}
                 className={`text-sm ${m.isMe ? "font-semibold text-amber-900" : "text-neutral-800"}`}
               >
-                {m.nombre}
-                {m.apodo ? (
-                  <span className="ml-1 text-xs text-neutral-500">({m.apodo})</span>
-                ) : null}
+                {playerLabel(m.nombre, m.apodo)}
                 {m.isMe ? <span className="ml-1 text-xs text-amber-700">· vos</span> : null}
               </li>
             ))}
@@ -750,10 +747,7 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
                     {i + 1}
                   </span>
                   <span>
-                    {m.nombre}
-                    {m.apodo ? (
-                      <span className="ml-1 text-xs text-neutral-500">({m.apodo})</span>
-                    ) : null}
+                    {playerLabel(m.nombre, m.apodo)}
                     {m.esInvitadoLibre ? (
                       <span className="ml-1 text-xs text-neutral-500">(invitado)</span>
                     ) : null}
@@ -784,10 +778,7 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
                     {m.orden ?? "?"}
                   </span>
                   <span>
-                    {m.nombre}
-                    {m.apodo ? (
-                      <span className="ml-1 text-xs text-neutral-500">({m.apodo})</span>
-                    ) : null}
+                    {playerLabel(m.nombre, m.apodo)}
                     {m.esInvitadoLibre ? (
                       <span className="ml-1 text-xs text-neutral-500">(invitado)</span>
                     ) : null}

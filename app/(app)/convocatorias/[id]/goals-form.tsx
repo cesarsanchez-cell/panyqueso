@@ -2,11 +2,14 @@
 
 import { useActionState, useMemo, useState } from "react";
 
+import { playerLabel } from "@/lib/players/label";
+
 import { saveMatchPlayerGoals, type SaveGoalsState } from "./goals-actions";
 
 export type GoalsFormPlayer = {
   playerId: string;
   nombre: string;
+  apodo: string | null;
   isGoalkeeper: boolean;
 };
 
@@ -98,7 +101,9 @@ export function GoalsForm({ convocatoriaId, teams, initialGoalsByPlayerId }: Pro
                             GK
                           </span>
                         ) : null}
-                        <span className="truncate text-neutral-900">{p.nombre}</span>
+                        <span className="truncate text-neutral-900">
+                          {playerLabel(p.nombre, p.apodo)}
+                        </span>
                       </span>
                     </label>
                     <input

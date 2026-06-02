@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
+import { playerLabel } from "@/lib/players/label";
+
 import { closeAndCreateNext, type CicloState } from "./convocatoria-ciclo-actions";
 
 type ConvRosterMember = {
@@ -143,10 +145,7 @@ function OpenConvocatoriaCard({ grupoId, open }: { grupoId: string; open: OpenCo
                     {i + 1}
                   </span>
                   <span>
-                    {m.nombre}
-                    {m.apodo ? (
-                      <span className="ml-1 text-xs text-neutral-500">({m.apodo})</span>
-                    ) : null}
+                    {playerLabel(m.nombre, m.apodo)}
                     {m.esInvitadoLibre ? (
                       <span className="ml-1 text-xs text-neutral-500">(invitado)</span>
                     ) : null}
@@ -174,10 +173,7 @@ function OpenConvocatoriaCard({ grupoId, open }: { grupoId: string; open: OpenCo
                     {m.orden ?? "?"}
                   </span>
                   <span>
-                    {m.nombre}
-                    {m.apodo ? (
-                      <span className="ml-1 text-xs text-neutral-500">({m.apodo})</span>
-                    ) : null}
+                    {playerLabel(m.nombre, m.apodo)}
                     {m.esInvitadoLibre ? (
                       <span className="ml-1 text-xs text-neutral-500">(invitado)</span>
                     ) : null}
@@ -197,8 +193,7 @@ function OpenConvocatoriaCard({ grupoId, open }: { grupoId: string; open: OpenCo
           <ul className="mt-2 space-y-1 text-neutral-700">
             {open.declinados.map((m, i) => (
               <li key={m.playerId ?? `libre-${i}`} className="rounded px-2 py-0.5">
-                {m.nombre}
-                {m.apodo ? <span className="ml-1 text-neutral-500">({m.apodo})</span> : null}
+                {playerLabel(m.nombre, m.apodo)}
                 {m.esInvitadoLibre ? (
                   <span className="ml-1 text-neutral-500">(invitado)</span>
                 ) : null}
