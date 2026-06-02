@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { requireRole } from "@/lib/auth/require-role";
 import { formatArLocal } from "@/lib/phone";
+import { playerLabel } from "@/lib/players/label";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { parseTeamDraft, type TeamDraft, type TeamLabel } from "@/lib/teams/draft";
@@ -100,7 +101,7 @@ async function loadMatch(supabase: SupabaseLike, convocatoriaId: string) {
          id, team_label, total_score,
          players:match_team_players!match_team_id(
            id, is_goalkeeper, assigned_position,
-           player:players!player_id(id, nombre, role_field, position_pref, internal_score)
+           player:players!player_id(id, nombre, apodo, role_field, position_pref, internal_score)
          )
        )`,
     )
@@ -131,6 +132,7 @@ export default async function ConvocatoriaDetallePage({
     .select(
       `id, fecha, hora, status, cupo_maximo, notas, created_at, team_draft, grupo_id,
        lugar:lugares!lugar_id(id, nombre),
+       grupo:grupos!grupo_id(nombre),
        creator:profiles!created_by(nombre)`,
     )
     .eq("id", id)
@@ -147,7 +149,7 @@ export default async function ConvocatoriaDetallePage({
     .from("convocatoria_players")
     .select(
       `id, added_at, attendance_status, nombre_libre, rol_en_convocatoria, orden_suplente,
-       player:players!player_id(id, nombre, role_field, position_pref, status, internal_score)`,
+       player:players!player_id(id, nombre, apodo, role_field, position_pref, status, internal_score)`,
     )
     .eq("convocatoria_id", id)
     .order("added_at", { ascending: true });
@@ -233,6 +235,7 @@ export default async function ConvocatoriaDetallePage({
   type PlayerInfo = {
     id: string;
     nombre: string;
+    apodo: string | null;
     role_field: RoleField;
     position_pref: PositionPref;
     internal_score: number;
@@ -244,6 +247,7 @@ export default async function ConvocatoriaDetallePage({
       playerInfoById.set(p.id, {
         id: p.id,
         nombre: p.nombre,
+        apodo: p.apodo,
         role_field: p.role_field,
         position_pref: p.position_pref,
         internal_score: Number(p.internal_score),
@@ -258,6 +262,7 @@ export default async function ConvocatoriaDetallePage({
   let availablePlayers: Array<{
     id: string;
     nombre: string;
+    apodo: string | null;
     role_field: RoleField;
     position_pref: PositionPref;
   }> = [];
@@ -265,7 +270,7 @@ export default async function ConvocatoriaDetallePage({
   if (showSelector) {
     let q2 = supabase
       .from("players")
-      .select("id, nombre, role_field, position_pref")
+      .select("id, nombre, apodo, role_field, position_pref")
       .eq("status", "approved")
       .order("nombre", { ascending: true })
       .limit(50);
@@ -301,9 +306,12 @@ export default async function ConvocatoriaDetallePage({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
-            {formatDate(convocatoria.fecha)} · {formatHora(convocatoria.hora)}
+            {convocatoria.grupo?.nombre ?? "Convocatoria"}
           </h1>
-          <p className="mt-1 text-sm text-neutral-600">
+          <p className="mt-1 text-sm font-medium text-neutral-800">
+            {formatDate(convocatoria.fecha)} · {formatHora(convocatoria.hora)}
+          </p>
+          <p className="text-sm text-neutral-600">
             {convocatoria.lugar?.nombre ?? "Lugar sin definir"} · cupo {convocatoria.cupo_maximo}
           </p>
         </div>
@@ -430,7 +438,9 @@ export default async function ConvocatoriaDetallePage({
               {availablePlayers.map((p) => (
                 <li key={p.id} className="flex items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-neutral-900">{p.nombre}</p>
+                    <p className="truncate text-sm font-medium text-neutral-900">
+                      {playerLabel(p.nombre, p.apodo)}
+                    </p>
                     <p className="text-xs text-neutral-500">
                       {ROLE_LABEL[p.role_field]} · {POSITION_LABEL[p.position_pref]}
                     </p>
@@ -576,7 +586,9 @@ function MatchSection({
     players: (t.players ?? []).flatMap((mtp) => {
       const p = mtp.player;
       if (!p) return [];
-      return [{ playerId: p.id, nombre: p.nombre, isGoalkeeper: mtp.is_goalkeeper }];
+      return [
+        { playerId: p.id, nombre: p.nombre, apodo: p.apodo, isGoalkeeper: mtp.is_goalkeeper },
+      ];
     }),
   }));
 
@@ -700,7 +712,9 @@ function GoalsReadOnly({
                           GK
                         </span>
                       ) : null}
-                      <span className="truncate text-neutral-900">{p.nombre}</span>
+                      <span className="truncate text-neutral-900">
+                        {playerLabel(p.nombre, p.apodo)}
+                      </span>
                     </span>
                     <span className="shrink-0 text-xs font-medium text-neutral-700">{g}</span>
                   </li>
@@ -744,7 +758,7 @@ function MatchTeamColumn({ team }: { team: MatchData["teams"][number] }) {
                     GK
                   </span>
                 ) : null}
-                <span className="truncate text-neutral-900">{p.nombre}</span>
+                <span className="truncate text-neutral-900">{playerLabel(p.nombre, p.apodo)}</span>
               </span>
               <span className="shrink-0 text-xs text-neutral-500">
                 {Number(p.internal_score ?? 0).toFixed(2)}
@@ -762,6 +776,7 @@ type PlayerInfoMap = Map<
   {
     id: string;
     nombre: string;
+    apodo: string | null;
     role_field: RoleField;
     position_pref: PositionPref;
     internal_score: number;
@@ -842,7 +857,9 @@ function DraftTeamColumn({
               <span className="inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-800">
                 GK
               </span>
-              <span className="truncate text-neutral-900">{gkInfo.nombre}</span>
+              <span className="truncate text-neutral-900">
+                {playerLabel(gkInfo.nombre, gkInfo.apodo)}
+              </span>
               <span className="shrink-0 text-xs text-neutral-500">
                 {gkInfo.internal_score.toFixed(2)}
               </span>
@@ -864,7 +881,7 @@ function DraftTeamColumn({
           return (
             <li key={id} className="flex items-center justify-between gap-2">
               <span className="flex min-w-0 items-center gap-1.5">
-                <span className="truncate text-neutral-900">{p.nombre}</span>
+                <span className="truncate text-neutral-900">{playerLabel(p.nombre, p.apodo)}</span>
                 <span className="shrink-0 text-xs text-neutral-500">
                   {p.internal_score.toFixed(2)}
                 </span>
@@ -901,13 +918,14 @@ type ConvocadoRow = {
   player: {
     id: string;
     nombre: string;
+    apodo: string | null;
     role_field: RoleField;
     position_pref: PositionPref;
   } | null;
 };
 
 function nombreDe(cp: ConvocadoRow): string {
-  if (cp.player) return cp.player.nombre;
+  if (cp.player) return playerLabel(cp.player.nombre, cp.player.apodo);
   return cp.nombre_libre ?? "—";
 }
 
