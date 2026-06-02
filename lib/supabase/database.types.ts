@@ -1009,7 +1009,19 @@ export type Database = {
           is_goalkeeper: boolean;
           nombre: string;
           player_id: string;
-          team_label: string;
+          team_label: string | null;
+        }[];
+      };
+      get_my_match_history: {
+        Args: never;
+        Returns: {
+          fecha: string;
+          goles: number;
+          grupo_id: string | null;
+          grupo_nombre: string | null;
+          match_id: string;
+          resultado: string;
+          team_label: string | null;
         }[];
       };
       get_my_player_summary: {
