@@ -1065,6 +1065,10 @@ export type Database = {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
       };
+      set_convocatoria_cupo: {
+        Args: { p_convocatoria_id: string; p_nuevo_cupo: number };
+        Returns: undefined;
+      };
       update_my_player_data: {
         Args: {
           p_apodo: string;
