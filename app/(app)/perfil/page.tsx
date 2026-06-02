@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth/require-role";
+import { formatArLocal } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 
 import { MisDatosForm, type MisDatosInitial } from "./mis-datos-form";
@@ -56,8 +57,14 @@ export default async function PerfilPage() {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Cuenta</h2>
         <dl className="mt-3 space-y-2 text-sm">
           <div className="flex justify-between gap-3">
-            <dt className="text-neutral-500">Email de ingreso</dt>
-            <dd className="truncate text-neutral-900">{email}</dd>
+            {/* El jugador ingresa con su celular; su email interno es sintético
+                (...@phone.fdlm.local) y no tiene sentido mostrárselo. */}
+            <dt className="text-neutral-500">
+              {isPlayer && playerData?.phone ? "Celular de ingreso" : "Email de ingreso"}
+            </dt>
+            <dd className="truncate text-neutral-900">
+              {isPlayer && playerData?.phone ? formatArLocal(playerData.phone) : email}
+            </dd>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="text-neutral-500">Rol</dt>
