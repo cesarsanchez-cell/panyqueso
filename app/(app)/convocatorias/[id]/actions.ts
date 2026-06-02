@@ -27,6 +27,36 @@ function statusPermiteEdicion(status: string | null): boolean {
   return status === "abierta" || status === "cerrada" || status === "jugada";
 }
 
+export async function setCupo(_prev: MutationState, formData: FormData): Promise<MutationState> {
+  await requireRole("admin");
+
+  const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
+  const nuevoCupo = Number(String(formData.get("cupo") ?? "").trim());
+
+  if (!convocatoriaId) return { error: "Falta el id de la convocatoria." };
+  if (!Number.isInteger(nuevoCupo) || nuevoCupo < 6 || nuevoCupo > 24) {
+    return { error: "El cupo de titulares debe ser un número entre 6 y 24." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_convocatoria_cupo", {
+    p_convocatoria_id: convocatoriaId,
+    p_nuevo_cupo: nuevoCupo,
+  });
+
+  if (error) {
+    const code = (error as { code?: string }).code;
+    if (code === "P0060")
+      return { error: "Solo se puede cambiar el cupo de una convocatoria abierta." };
+    if (code === "P0061") return { error: "El cupo debe estar entre 6 y 24." };
+    if (code === "P0001") return { error: "No tenés permisos para esta acción." };
+    return { error: `No se pudo cambiar el cupo: ${error.message}` };
+  }
+
+  revalidatePath(`/convocatorias/${convocatoriaId}`);
+  return { success: "Cupo de titulares actualizado." };
+}
+
 export async function addPlayer(_prev: MutationState, formData: FormData): Promise<MutationState> {
   await requireRole("admin");
 
