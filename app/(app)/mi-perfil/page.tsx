@@ -381,8 +381,21 @@ export default async function MiPerfilPage({
   const player = playerRows && playerRows.length > 0 ? playerRows[0] : null;
 
   let lineups: GrupoLineup[] = [];
+  let actividad: { jugados: number; ganados: number; goles: number } | null = null;
   if (player) {
     lineups = await loadLineups(supabase, player.id);
+
+    // Panel de actividad: números positivos del jugador. Reutiliza el RPC del
+    // historial (partidos pasados). Solo se muestra si ya jugó algún partido.
+    const { data: hist } = await supabase.rpc("get_my_match_history");
+    const histRows = hist ?? [];
+    if (histRows.length > 0) {
+      actividad = {
+        jugados: histRows.length,
+        ganados: histRows.filter((r) => r.resultado === "ganado").length,
+        goles: histRows.reduce((acc, r) => acc + (r.goles ?? 0), 0),
+      };
+    }
   }
 
   return (
@@ -404,6 +417,8 @@ export default async function MiPerfilPage({
             : "Tu perfil está pendiente de aprobación del organizador. Igual ya quedaste agregado a tus grupos."}
         </p>
       </div>
+
+      {actividad ? <ActivityPanel actividad={actividad} /> : null}
 
       {lineups.length === 0 ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
@@ -430,6 +445,44 @@ export default async function MiPerfilPage({
           Cambiar mi contraseña
         </Link>
       </p>
+    </div>
+  );
+}
+
+// Panel "Tu actividad": el mimo al jugador. Solo datos positivos (jugados,
+// ganados, goles). Enlaza al historial completo. Nunca expone rating interno.
+function ActivityPanel({
+  actividad,
+}: {
+  actividad: { jugados: number; ganados: number; goles: number };
+}) {
+  return (
+    <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+          Tu actividad
+        </h2>
+        <Link
+          href="/historial"
+          className="text-xs font-medium text-emerald-700 transition hover:underline"
+        >
+          Ver mi historial →
+        </Link>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-3">
+        <ActivityStat label="Jugados" value={actividad.jugados} />
+        <ActivityStat label="Ganados" value={actividad.ganados} />
+        <ActivityStat label="Goles" value={actividad.goles} />
+      </div>
+    </section>
+  );
+}
+
+function ActivityStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-center">
+      <p className="text-2xl font-bold tracking-tight text-neutral-900">{value}</p>
+      <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</p>
     </div>
   );
 }
