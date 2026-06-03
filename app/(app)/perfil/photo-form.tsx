@@ -46,7 +46,7 @@ export function PhotoForm({ currentUrl, nombre }: Props) {
           }}
           className="block text-sm text-neutral-700 file:mr-3 file:rounded-md file:border-0 file:bg-neutral-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-neutral-700"
         />
-        <p className="text-xs text-neutral-500">JPG, PNG o WEBP. Hasta 5 MB.</p>
+        <p className="text-xs text-neutral-500">JPG, PNG o WEBP. Hasta 8 MB.</p>
 
         <div className="flex flex-wrap items-center gap-3">
           <button
