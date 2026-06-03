@@ -1032,6 +1032,7 @@ export type Database = {
         Args: never;
         Returns: {
           apodo: string;
+          avatar_url: string | null;
           id: string;
           nombre: string;
           status: Database["public"]["Enums"]["player_status"];
