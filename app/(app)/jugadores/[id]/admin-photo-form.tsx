@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { type FormEvent, useActionState, useRef, useState } from "react";
+
+import { resizeImage } from "@/lib/images/resize";
 
 import { uploadPlayerPhoto, type AdminPhotoState } from "./photo-actions";
 
@@ -27,12 +29,28 @@ export function AdminPhotoForm({ playerId, currentUrl, nombre }: Props) {
     null,
   );
   const [preview, setPreview] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const shown = preview ?? currentUrl;
+  const working = pending || busy;
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const file = inputRef.current?.files?.[0];
+    const fd = new FormData();
+    fd.set("player_id", playerId);
+    if (file) {
+      setBusy(true);
+      const optimized = await resizeImage(file).catch(() => file);
+      setBusy(false);
+      fd.set("foto", optimized);
+    }
+    formAction(fd);
+  }
 
   return (
-    <form action={formAction} className="flex flex-wrap items-center gap-4">
-      <input type="hidden" name="player_id" value={playerId} />
-
+    <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-4">
       <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full bg-neutral-100 ring-1 ring-neutral-200">
         {shown ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -46,6 +64,7 @@ export function AdminPhotoForm({ playerId, currentUrl, nombre }: Props) {
 
       <div className="space-y-2">
         <input
+          ref={inputRef}
           type="file"
           name="foto"
           accept="image/jpeg,image/png,image/webp"
@@ -55,15 +74,15 @@ export function AdminPhotoForm({ playerId, currentUrl, nombre }: Props) {
           }}
           className="block text-sm text-neutral-700 file:mr-3 file:rounded-md file:border-0 file:bg-neutral-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-neutral-700"
         />
-        <p className="text-xs text-neutral-500">JPG, PNG o WEBP. Hasta 5 MB.</p>
+        <p className="text-xs text-neutral-500">JPG, PNG o WEBP. Se ajusta sola.</p>
 
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
-            disabled={pending}
+            disabled={working}
             className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {pending ? "Subiendo…" : "Guardar foto"}
+            {working ? "Subiendo…" : "Guardar foto"}
           </button>
           {state && "error" in state ? (
             <p

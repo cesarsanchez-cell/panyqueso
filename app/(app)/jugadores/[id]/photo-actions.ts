@@ -8,7 +8,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 export type AdminPhotoState = null | { error: string } | { success: string };
 
-const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const BUCKET = "player-photos";
 
@@ -34,7 +34,7 @@ export async function uploadPlayerPhoto(
     return { error: "Formato no soportado. Usá JPG, PNG o WEBP." };
   }
   if (file.size > MAX_BYTES) {
-    return { error: "La imagen es muy grande (máximo 5 MB)." };
+    return { error: "La imagen es muy grande (máximo 8 MB)." };
   }
 
   const svc = createServiceClient();
