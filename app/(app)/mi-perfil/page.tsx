@@ -407,15 +407,18 @@ export default async function MiPerfilPage({
         </div>
       ) : null}
 
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
-          Hola{player?.nombre ? `, ${player.nombre.split(" ")[0]}` : ""}.
-        </h1>
-        <p className="mt-1 text-sm text-neutral-600">
-          {player?.status === "approved"
-            ? "Tu perfil está aprobado y podés ser convocado a los partidos."
-            : "Tu perfil está pendiente de aprobación del organizador. Igual ya quedaste agregado a tus grupos."}
-        </p>
+      <div className="flex items-center gap-3">
+        {player ? <GreetingAvatar url={player.avatar_url} nombre={player.nombre} /> : null}
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
+            Hola{player?.nombre ? `, ${player.nombre.split(" ")[0]}` : ""}.
+          </h1>
+          <p className="mt-1 text-sm text-neutral-600">
+            {player?.status === "approved"
+              ? "Tu perfil está aprobado y podés ser convocado a los partidos."
+              : "Tu perfil está pendiente de aprobación del organizador. Igual ya quedaste agregado a tus grupos."}
+          </p>
+        </div>
       </div>
 
       {actividad ? <ActivityPanel actividad={actividad} /> : null}
@@ -483,6 +486,28 @@ function ActivityStat({ label, value }: { label: string; value: number }) {
     <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-center">
       <p className="text-2xl font-bold tracking-tight text-neutral-900">{value}</p>
       <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</p>
+    </div>
+  );
+}
+
+function GreetingAvatar({ url, nombre }: { url: string | null; nombre: string }) {
+  const init =
+    nombre
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "?";
+  return (
+    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-neutral-100 ring-1 ring-neutral-200">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-neutral-400">
+          {init}
+        </div>
+      )}
     </div>
   );
 }

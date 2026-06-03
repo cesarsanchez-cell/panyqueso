@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { MisDatosForm, type MisDatosInitial } from "./mis-datos-form";
 import { PerfilForm } from "./perfil-form";
+import { PhotoForm } from "./photo-form";
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "Admin",
@@ -19,6 +20,8 @@ export default async function PerfilPage() {
   // Solo para players: cargamos el row de players via RPC SECURITY DEFINER
   // (el rol player no tiene SELECT directo sobre public.players).
   let playerData: MisDatosInitial | null = null;
+  let playerAvatar: string | null = null;
+  let playerNombre = "";
   if (isPlayer) {
     const supabase = await createClient();
     const { data: rows, error } = await supabase.rpc("get_my_player_full");
@@ -39,7 +42,14 @@ export default async function PerfilPage() {
         positions_possible: row.positions_possible ?? [],
         ubicacion_maps_url: row.ubicacion_maps_url,
       };
+      playerNombre = row.nombre;
     }
+
+    // avatar_url no viene en get_my_player_full; lo trae el summary.
+    const { data: sumRows } = await supabase.rpc("get_my_player_summary");
+    const sum = sumRows && sumRows.length > 0 ? sumRows[0] : null;
+    playerAvatar = sum?.avatar_url ?? null;
+    if (sum?.nombre) playerNombre = sum.nombre;
   }
 
   return (
@@ -77,6 +87,20 @@ export default async function PerfilPage() {
           </p>
         ) : null}
       </section>
+
+      {isPlayer && playerData ? (
+        <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+            Foto de perfil
+          </h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Sumá tu foto. Es opcional y se muestra en tu perfil.
+          </p>
+          <div className="mt-4">
+            <PhotoForm currentUrl={playerAvatar} nombre={playerNombre} />
+          </div>
+        </section>
+      ) : null}
 
       {isPlayer && playerData ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
