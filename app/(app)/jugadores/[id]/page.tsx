@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
+import { AdminPhotoForm } from "./admin-photo-form";
 import { AdminPlayerForm } from "./admin-player-form";
 import { AdminResetPassword } from "./admin-reset-password";
 import { PrivateNotesForm } from "./private-notes-form";
@@ -186,6 +187,24 @@ export default async function JugadorDetallePage({
             ))}
           </ul>
         </div>
+      ) : null}
+
+      {isAdmin ? (
+        <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+            Foto del jugador
+          </h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Podés cargar la foto por el jugador (útil para quienes no se manejan con la app).
+          </p>
+          <div className="mt-4">
+            <AdminPhotoForm
+              playerId={player.id}
+              currentUrl={player.avatar_url}
+              nombre={player.nombre}
+            />
+          </div>
+        </section>
       ) : null}
 
       {isAdmin ? (
