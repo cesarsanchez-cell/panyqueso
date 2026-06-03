@@ -520,6 +520,7 @@ export type Database = {
           convocatoria_id: string;
           created_at: string;
           fecha: string;
+          figura_player_id: string | null;
           id: string;
           notas: string | null;
           score_team_a: number | null;
@@ -537,6 +538,7 @@ export type Database = {
           convocatoria_id: string;
           created_at?: string;
           fecha: string;
+          figura_player_id?: string | null;
           id?: string;
           notas?: string | null;
           score_team_a?: number | null;
@@ -554,6 +556,7 @@ export type Database = {
           convocatoria_id?: string;
           created_at?: string;
           fecha?: string;
+          figura_player_id?: string | null;
           id?: string;
           notas?: string | null;
           score_team_a?: number | null;
@@ -568,6 +571,13 @@ export type Database = {
             columns: ["confirmed_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "matches_figura_player_id_fkey";
+            columns: ["figura_player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
             referencedColumns: ["id"];
           },
           {
@@ -1019,6 +1029,8 @@ export type Database = {
         Args: never;
         Returns: {
           fecha: string;
+          figura_es_mia: boolean;
+          figura_nombre: string | null;
           goles: number;
           grupo_id: string | null;
           grupo_nombre: string | null;
