@@ -68,6 +68,11 @@ insert into public.match_team_players (match_team_id, player_id, is_goalkeeper) 
 insert into public.match_player_stats (match_id, player_id, goals) values
   ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b1', 2);
 
+-- Link de video resumen en f1 (f2 queda sin link).
+update public.matches
+   set video_resumen_url = 'https://sportsreel.com.ar/#/video/test'
+ where id = '00000000-0000-0000-0000-0000000000f1';
+
 create or replace function _as(p_id uuid)
 returns void
 language plpgsql as $$
@@ -78,7 +83,7 @@ begin
 end;
 $$;
 
-select plan(5);
+select plan(7);
 
 select _as('00000000-0000-0000-0000-0000000000a2');
 
@@ -111,7 +116,21 @@ select is(
   'f2 (equipo B, gano A): perdido y goles 0'
 );
 
--- 5. P2 (sin partidos) no ve nada.
+-- 5. f1: devuelve el link del video resumen.
+select is(
+  (select video_resumen_url from public.get_my_match_history() where match_id = '00000000-0000-0000-0000-0000000000f1'),
+  'https://sportsreel.com.ar/#/video/test',
+  'f1: devuelve el link del video resumen'
+);
+
+-- 6. f2: sin link de video (null).
+select is(
+  (select video_resumen_url from public.get_my_match_history() where match_id = '00000000-0000-0000-0000-0000000000f2'),
+  null,
+  'f2: sin link de video (null)'
+);
+
+-- 7. P2 (sin partidos) no ve nada.
 select _as('00000000-0000-0000-0000-0000000000a3');
 select is(
   (select count(*)::int from public.get_my_match_history()),

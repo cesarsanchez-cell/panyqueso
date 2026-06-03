@@ -92,6 +92,16 @@ export default async function HistorialPage() {
                     {r.grupo_nombre ?? "Grupo"}
                   </p>
                   <p className="text-xs text-neutral-500">{formatFecha(r.fecha)}</p>
+                  {r.video_resumen_url ? (
+                    <a
+                      href={r.video_resumen_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:underline"
+                    >
+                      🎥 Ver video
+                    </a>
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {r.goles > 0 ? (

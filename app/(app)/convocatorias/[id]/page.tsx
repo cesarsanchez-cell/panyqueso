@@ -19,6 +19,7 @@ import { GoalsForm, type GoalsFormTeam } from "./goals-form";
 import { InviteSection, type PendingConvocatoriaInvite } from "./invite-section";
 import { RemovePlayerForm } from "./remove-player-form";
 import { ResultForm } from "./result-form";
+import { VideoForm } from "./video-form";
 
 type Status = Database["public"]["Enums"]["convocatoria_status"];
 type RoleField = Database["public"]["Enums"]["player_role_field"];
@@ -96,6 +97,7 @@ async function loadMatch(supabase: SupabaseLike, convocatoriaId: string) {
     .from("matches")
     .select(
       `id, score_team_a, score_team_b, winner, notas, confirmed_at, confirmed_with_warning,
+       video_resumen_url,
        reviewer:profiles!confirmed_by(nombre),
        teams:match_teams!match_id(
          id, team_label, total_score,
@@ -624,6 +626,19 @@ function MatchSection({
         </div>
       ) : null}
 
+      {match.video_resumen_url ? (
+        <div className="mt-4">
+          <a
+            href={match.video_resumen_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-800 shadow-sm transition hover:bg-neutral-50"
+          >
+            🎥 Ver video del partido
+          </a>
+        </div>
+      ) : null}
+
       {isAdmin ? (
         <div className="mt-5 border-t border-neutral-200 pt-5">
           <h3 className="text-sm font-semibold text-neutral-900">
@@ -671,6 +686,19 @@ function MatchSection({
           <GoalsReadOnly teams={goalsFormTeams} goalsByPlayerId={goalsByPlayerId} />
         )}
       </div>
+
+      {isAdmin ? (
+        <div className="mt-5 border-t border-neutral-200 pt-5">
+          <h3 className="text-sm font-semibold text-neutral-900">Video del partido</h3>
+          <p className="mt-1 text-xs text-neutral-500">
+            Pegá el link del resumen (SportsReel, YouTube, Drive). El jugador lo va a ver en su
+            historial.
+          </p>
+          <div className="mt-3">
+            <VideoForm convocatoriaId={convocatoriaId} initialUrl={match.video_resumen_url} />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
