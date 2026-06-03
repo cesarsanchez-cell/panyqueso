@@ -46,11 +46,6 @@ export default async function HistorialPage() {
 
   const rows = data ?? [];
 
-  // Resumen neutral/positivo: jugados, ganados, goles.
-  const jugados = rows.length;
-  const ganados = rows.filter((r) => r.resultado === "ganado").length;
-  const golesTotal = rows.reduce((acc, r) => acc + (r.goles ?? 0), 0);
-
   return (
     <div className="space-y-6">
       <div>
@@ -60,15 +55,7 @@ export default async function HistorialPage() {
         </p>
       </div>
 
-      {jugados > 0 ? (
-        <section className="grid grid-cols-3 gap-3">
-          <SummaryStat label="Jugados" value={jugados} />
-          <SummaryStat label="Ganados" value={ganados} />
-          <SummaryStat label="Goles" value={golesTotal} />
-        </section>
-      ) : null}
-
-      {jugados === 0 ? (
+      {rows.length === 0 ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
             Todavía no jugaste partidos
@@ -120,15 +107,6 @@ export default async function HistorialPage() {
           })}
         </ul>
       )}
-    </div>
-  );
-}
-
-function SummaryStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-4 text-center shadow-sm">
-      <p className="text-2xl font-bold tracking-tight text-neutral-900">{value}</p>
-      <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</p>
     </div>
   );
 }
