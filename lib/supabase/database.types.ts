@@ -525,6 +525,7 @@ export type Database = {
           score_team_a: number | null;
           score_team_b: number | null;
           updated_at: string;
+          video_resumen_url: string | null;
           winner: Database["public"]["Enums"]["match_winner"] | null;
         };
         Insert: {
@@ -541,6 +542,7 @@ export type Database = {
           score_team_a?: number | null;
           score_team_b?: number | null;
           updated_at?: string;
+          video_resumen_url?: string | null;
           winner?: Database["public"]["Enums"]["match_winner"] | null;
         };
         Update: {
@@ -557,6 +559,7 @@ export type Database = {
           score_team_a?: number | null;
           score_team_b?: number | null;
           updated_at?: string;
+          video_resumen_url?: string | null;
           winner?: Database["public"]["Enums"]["match_winner"] | null;
         };
         Relationships: [
@@ -1022,6 +1025,7 @@ export type Database = {
           match_id: string;
           resultado: string;
           team_label: string | null;
+          video_resumen_url: string | null;
         }[];
       };
       get_my_player_summary: {
