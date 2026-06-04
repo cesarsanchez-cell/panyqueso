@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AdminPhotoForm } from "./admin-photo-form";
 import { AdminPlayerForm } from "./admin-player-form";
 import { AdminResetPassword } from "./admin-reset-password";
+import { InviteToComplete } from "./invite-to-complete";
 import { PrivateNotesForm } from "./private-notes-form";
 
 type SearchParams = { proposed?: string };
@@ -270,7 +271,17 @@ export default async function JugadorDetallePage({
         </Section>
       ) : null}
 
-      {isAdmin ? <AdminResetPassword playerId={player.id} playerNombre={player.nombre} /> : null}
+      {isAdmin ? (
+        player.auth_user_id ? (
+          <AdminResetPassword playerId={player.id} playerNombre={player.nombre} />
+        ) : (
+          <InviteToComplete
+            playerId={player.id}
+            playerNombre={player.nombre}
+            hasPhone={Boolean(player.phone)}
+          />
+        )
+      ) : null}
 
       <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
