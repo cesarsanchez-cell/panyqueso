@@ -14,6 +14,18 @@ export type ProposeChangeState = null | { error: string } | { fieldErrors: Recor
 
 const CONFIDENCES: readonly RatingConfidence[] = ["baja", "media", "alta"];
 
+// Subcomponentes por dimensión (modelo de puntuación v2). La dimensión
+// técnica/físico/mental es el promedio redondeado de sus 3 subs.
+const SUBS = {
+  physical: ["phys_power", "phys_speed", "phys_stamina"],
+  mental: ["ment_tactical", "ment_resilience", "ment_attitude"],
+  technical: ["tech_passing", "tech_finishing", "tech_linkup"],
+} as const;
+
+const SUB_KEYS = [...SUBS.physical, ...SUBS.mental, ...SUBS.technical] as const;
+type SubKey = (typeof SUB_KEYS)[number];
+type DimKey = keyof typeof SUBS;
+
 function asString(v: FormDataEntryValue | null): string {
   return typeof v === "string" ? v.trim() : "";
 }
@@ -23,6 +35,10 @@ function parseRating(v: FormDataEntryValue | null): number | null {
   const n = Number(v);
   if (!Number.isInteger(n) || n < 1 || n > 10) return null;
   return n;
+}
+
+function avgRound(a: number, b: number, c: number): number {
+  return Math.round((a + b + c) / 3);
 }
 
 export async function proposeChange(
@@ -36,12 +52,13 @@ export async function proposeChange(
 
   const errors: Record<string, string> = {};
 
-  const technical = parseRating(formData.get("technical"));
-  if (technical === null) errors.technical = "Entre 1 y 10";
-  const physical = parseRating(formData.get("physical"));
-  if (physical === null) errors.physical = "Entre 1 y 10";
-  const mental = parseRating(formData.get("mental"));
-  if (mental === null) errors.mental = "Entre 1 y 10";
+  // Parsear los 9 subcomponentes (1–10).
+  const subs = {} as Record<SubKey, number>;
+  for (const key of SUB_KEYS) {
+    const val = parseRating(formData.get(key));
+    if (val === null) errors[key] = "Entre 1 y 10";
+    else subs[key] = val;
+  }
 
   const rating_confidence_raw = asString(formData.get("rating_confidence"));
   const rating_confidence = CONFIDENCES.includes(rating_confidence_raw as RatingConfidence)
@@ -60,7 +77,9 @@ export async function proposeChange(
   const supabase = await createClient();
   const { data: player, error: playerErr } = await supabase
     .from("players")
-    .select("id, technical, physical, mental, rating_confidence")
+    .select(
+      "id, technical, physical, mental, rating_confidence, phys_power, phys_speed, phys_stamina, ment_tactical, ment_resilience, ment_attitude, tech_passing, tech_finishing, tech_linkup",
+    )
     .eq("id", playerId)
     .maybeSingle();
 
@@ -94,26 +113,46 @@ export async function proposeChange(
     };
   }
 
-  // Calcular delta. Solo los campos que cambian van a proposed_values + old_values.
+  // Calcular delta. Solo los campos que cambian van a proposed_values +
+  // old_values. old_values guarda el valor ACTUAL real (los subs pueden estar
+  // en null para jugadores que nunca se editaron) para que el staleness check
+  // del approve no falle.
   const proposed_values: { [k: string]: Json } = {};
   const old_values: { [k: string]: Json } = {};
   const fields_changed: string[] = [];
+  const touchedDims = new Set<DimKey>();
 
-  const compare = <T extends Json>(key: string, oldVal: T, newVal: T) => {
-    if (oldVal !== newVal) {
-      proposed_values[key] = newVal;
-      old_values[key] = oldVal;
-      fields_changed.push(key);
+  for (const dim of Object.keys(SUBS) as DimKey[]) {
+    for (const sub of SUBS[dim]) {
+      const oldVal = player[sub] as number | null;
+      const newVal = subs[sub];
+      if (oldVal !== newVal) {
+        proposed_values[sub] = newVal;
+        old_values[sub] = oldVal;
+        fields_changed.push(sub);
+        touchedDims.add(dim);
+      }
     }
-  };
+  }
 
-  compare("technical", player.technical, technical);
-  compare("physical", player.physical, physical);
-  compare("mental", player.mental, mental);
-  compare("rating_confidence", player.rating_confidence, rating_confidence);
+  // Por cada dimensión tocada, recalcular el promedio y mandar también la
+  // dimensión (técnica/físico/mental) para que el trigger recalcule el score.
+  for (const dim of touchedDims) {
+    const [a, b, c] = SUBS[dim];
+    const newDim = avgRound(subs[a], subs[b], subs[c]);
+    proposed_values[dim] = newDim;
+    old_values[dim] = player[dim];
+    fields_changed.push(dim);
+  }
+
+  if (rating_confidence !== player.rating_confidence) {
+    proposed_values.rating_confidence = rating_confidence;
+    old_values.rating_confidence = player.rating_confidence;
+    fields_changed.push("rating_confidence");
+  }
 
   if (fields_changed.length === 0) {
-    return { error: "No detectamos cambios. Modificá al menos un campo." };
+    return { error: "No detectamos cambios. Modificá al menos un sub-rating." };
   }
 
   const insertRow: ChangeRequestInsert = {
