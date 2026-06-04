@@ -474,7 +474,9 @@ function ActivityPanel({
           Ver mi historial →
         </Link>
       </div>
-      <div className={`mt-3 grid gap-3 ${showFiguras ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
+      <div
+        className={`mt-3 grid gap-3 ${showFiguras ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}
+      >
         <ActivityStat label="Jugados" value={actividad.jugados} />
         <ActivityStat label="Ganados" value={actividad.ganados} />
         <ActivityStat label="Goles" value={actividad.goles} />
