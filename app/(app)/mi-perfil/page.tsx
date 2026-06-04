@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { ClubCrest } from "@/components/club-crest";
 import { computeBadges, type PlayerBadge } from "@/lib/badges/compute";
 import { requireUser } from "@/lib/auth/require-role";
 import { playerLabel } from "@/lib/players/label";
@@ -75,6 +76,7 @@ type ConfirmedTeamMember = {
   isGoalkeeper: boolean;
   isMe: boolean;
   avatarUrl: string | null;
+  clubId: string | null;
 };
 
 type ConfirmedTeams = {
@@ -123,6 +125,7 @@ async function loadConfirmedTeams(
       isGoalkeeper: row.is_goalkeeper,
       isMe: row.player_id === playerId,
       avatarUrl: null,
+      clubId: null,
     };
     allMembers.push(member);
     // team_label NULL = banco (suplentes que no entraron como titulares).
@@ -137,14 +140,16 @@ async function loadConfirmedTeams(
   if (memberIds.length > 0) {
     const { data: avatars } = await supabase
       .from("players_public")
-      .select("id, avatar_url")
+      .select("id, avatar_url, club_id")
       .in("id", memberIds);
-    const avatarById = new Map<string, string | null>();
+    const infoById = new Map<string, { avatarUrl: string | null; clubId: string | null }>();
     for (const a of avatars ?? []) {
-      if (a.id) avatarById.set(a.id, a.avatar_url ?? null);
+      if (a.id) infoById.set(a.id, { avatarUrl: a.avatar_url ?? null, clubId: a.club_id ?? null });
     }
     for (const m of allMembers) {
-      m.avatarUrl = avatarById.get(m.playerId) ?? null;
+      const info = infoById.get(m.playerId);
+      m.avatarUrl = info?.avatarUrl ?? null;
+      m.clubId = info?.clubId ?? null;
     }
   }
   return byGrupo;
@@ -441,8 +446,9 @@ export default async function MiPerfilPage({
       <div className="flex items-center gap-3">
         {player ? <PlayerAvatar url={player.avatar_url} nombre={player.nombre} size="lg" /> : null}
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
-            Hola{player?.nombre ? `, ${player.nombre.split(" ")[0]}` : ""}.
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-neutral-900">
+            {player?.club_id ? <ClubCrest clubId={player.club_id} size={22} /> : null}
+            <span>Hola{player?.nombre ? `, ${player.nombre.split(" ")[0]}` : ""}.</span>
           </h1>
           <p className="mt-1 text-sm text-neutral-600">
             {player?.status === "approved"
@@ -582,6 +588,7 @@ function ConfirmedTeamColumn({
               className={`flex items-center gap-2 text-sm ${m.isMe ? "font-semibold text-emerald-900" : "text-neutral-800"}`}
             >
               <PlayerAvatar url={m.avatarUrl} nombre={m.nombre} />
+              <ClubCrest clubId={m.clubId} size={16} />
               <span className="min-w-0 truncate">
                 {m.isGoalkeeper ? (
                   <span className="mr-1" title="Arquero">
@@ -664,6 +671,7 @@ function ConfirmedMatchCard({ lineup, teams }: { lineup: GrupoLineup; teams: Con
                 className={`flex items-center gap-2 text-sm ${m.isMe ? "font-semibold text-amber-900" : "text-neutral-800"}`}
               >
                 <PlayerAvatar url={m.avatarUrl} nombre={m.nombre} />
+                <ClubCrest clubId={m.clubId} size={16} />
                 <span className="truncate">
                   {playerLabel(m.nombre, m.apodo)}
                   {m.isMe ? <span className="ml-1 text-xs text-amber-700">· vos</span> : null}

@@ -782,6 +782,7 @@ export type Database = {
           apodo: string | null;
           auth_user_id: string | null;
           avatar_url: string | null;
+          club_id: string | null;
           created_at: string;
           created_by: string | null;
           edad: number;
@@ -817,6 +818,7 @@ export type Database = {
           apodo?: string | null;
           auth_user_id?: string | null;
           avatar_url?: string | null;
+          club_id?: string | null;
           created_at?: string;
           created_by?: string | null;
           edad: number;
@@ -852,6 +854,7 @@ export type Database = {
           apodo?: string | null;
           auth_user_id?: string | null;
           avatar_url?: string | null;
+          club_id?: string | null;
           created_at?: string;
           created_by?: string | null;
           edad?: number;
@@ -912,6 +915,7 @@ export type Database = {
         Row: {
           apodo: string | null;
           avatar_url: string | null;
+          club_id: string | null;
           fecha_nacimiento: string | null;
           id: string | null;
           nombre: string | null;
@@ -925,6 +929,7 @@ export type Database = {
         Insert: {
           apodo?: string | null;
           avatar_url?: string | null;
+          club_id?: string | null;
           fecha_nacimiento?: string | null;
           id?: string | null;
           nombre?: string | null;
@@ -938,6 +943,7 @@ export type Database = {
         Update: {
           apodo?: string | null;
           avatar_url?: string | null;
+          club_id?: string | null;
           fecha_nacimiento?: string | null;
           id?: string | null;
           nombre?: string | null;
@@ -1103,6 +1109,7 @@ export type Database = {
         Args: never;
         Returns: {
           apodo: string;
+          club_id: string;
           email: string;
           fecha_nacimiento: string;
           id: string;
@@ -1121,6 +1128,7 @@ export type Database = {
         Returns: {
           apodo: string;
           avatar_url: string;
+          club_id: string;
           id: string;
           nombre: string;
           status: Database["public"]["Enums"]["player_status"];
@@ -1165,6 +1173,7 @@ export type Database = {
       update_my_player_data: {
         Args: {
           p_apodo: string;
+          p_club_id: string;
           p_email: string;
           p_fecha_nacimiento: string;
           p_nombre: string;

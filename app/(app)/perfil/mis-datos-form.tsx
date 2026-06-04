@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 
+import { ClubSelect } from "@/components/club-select";
 import { formatArLocal } from "@/lib/phone";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -22,6 +23,7 @@ export type MisDatosInitial = {
   position_pref: PositionPref;
   positions_possible: PositionPref[];
   ubicacion_maps_url: string | null;
+  club_id: string | null;
 };
 
 const ROLES: { value: PlayerRoleField; label: string }[] = [
@@ -217,6 +219,14 @@ export function MisDatosForm({ initial }: { initial: MisDatosInitial }) {
           })}
         </div>
       </fieldset>
+
+      <Field
+        label="Equipo del que sos hincha (opcional)"
+        htmlFor="club_id"
+        error={fieldErrors.club_id}
+      >
+        <ClubSelect defaultValue={initial.club_id} className={inputClass(fieldErrors.club_id)} />
+      </Field>
 
       <Field
         label="Link de Google Maps a tu zona (opcional)"

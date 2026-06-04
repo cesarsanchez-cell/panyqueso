@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { ClubSelect } from "@/components/club-select";
 import { formatArLocal } from "@/lib/phone";
 
 import { acceptInvite, type AcceptInviteState } from "./actions";
@@ -170,6 +171,14 @@ export function SignupForm({ token, nombreTentativo, phone }: Props) {
           </select>
           <ErrorLine msg={fieldError(state, "pierna_habil")} />
         </div>
+      </div>
+
+      <div>
+        <label htmlFor="club_id" className={labelClass}>
+          Equipo del que sos hincha <span className="text-neutral-500">(opcional)</span>
+        </label>
+        <ClubSelect className={inputClass} />
+        <ErrorLine msg={fieldError(state, "club_id")} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

@@ -2,6 +2,8 @@
 
 import { useActionState } from "react";
 
+import { ClubSelect } from "@/components/club-select";
+
 import { joinGroup, type JoinGroupState } from "./actions";
 
 const labelClass = "block text-sm font-medium text-neutral-800";
@@ -163,6 +165,14 @@ export function JoinForm({ token }: { token: string }) {
           </select>
           <ErrorLine msg={fieldError(state, "pierna_habil")} />
         </div>
+      </div>
+
+      <div>
+        <label htmlFor="club_id" className={labelClass}>
+          Equipo del que sos hincha <span className="text-neutral-500">(opcional)</span>
+        </label>
+        <ClubSelect className={inputClass} />
+        <ErrorLine msg={fieldError(state, "club_id")} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

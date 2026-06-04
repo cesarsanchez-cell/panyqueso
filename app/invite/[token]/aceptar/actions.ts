@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { isValidClubId } from "@/lib/clubs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -80,6 +81,11 @@ export async function acceptInvite(
       pierna_habil = piernaRaw as PiernaHabil;
     }
   }
+
+  // club_id opcional: slug del catálogo (lib/clubs.ts). Si no es válido se
+  // ignora (dato neutro, no bloquea el alta).
+  const clubRaw = String(formData.get("club_id") ?? "").trim();
+  const club_id: string | null = isValidClubId(clubRaw) ? clubRaw : null;
 
   const password = String(formData.get("password") ?? "");
   const passwordConfirm = String(formData.get("password_confirm") ?? "");
@@ -163,12 +169,13 @@ export async function acceptInvite(
 
   // 5. Datos opcionales (email, pierna_habil). Best-effort: si falla, el alta
   // sigue siendo valida y el admin puede editar despues desde el detalle.
-  if (newPlayerId && (emailOptional || pierna_habil)) {
+  if (newPlayerId && (emailOptional || pierna_habil || club_id)) {
     await admin
       .from("players")
       .update({
         ...(emailOptional ? { email: emailOptional } : {}),
         ...(pierna_habil ? { pierna_habil } : {}),
+        ...(club_id ? { club_id } : {}),
       })
       .eq("id", newPlayerId);
   }
