@@ -404,7 +404,13 @@ export default async function MiPerfilPage({
   const player = playerRows && playerRows.length > 0 ? playerRows[0] : null;
 
   let lineups: GrupoLineup[] = [];
-  let actividad: { jugados: number; ganados: number; goles: number; figuras: number } | null = null;
+  let actividad: {
+    jugados: number;
+    ganados: number;
+    goles: number;
+    asistencias: number;
+    figuras: number;
+  } | null = null;
   if (player) {
     lineups = await loadLineups(supabase, player.id);
 
@@ -417,6 +423,7 @@ export default async function MiPerfilPage({
         jugados: histRows.length,
         ganados: histRows.filter((r) => r.resultado === "ganado").length,
         goles: histRows.reduce((acc, r) => acc + (r.goles ?? 0), 0),
+        asistencias: histRows.reduce((acc, r) => acc + (r.asistencias ?? 0), 0),
         figuras: histRows.filter((r) => r.figura_es_mia).length,
       };
     }
@@ -479,11 +486,18 @@ export default async function MiPerfilPage({
 }
 
 // Panel "Tu actividad": el mimo al jugador. Solo datos positivos (jugados,
-// ganados, goles). Enlaza al historial completo. Nunca expone rating interno.
+// ganados, goles, asistencias). Enlaza al historial completo. Nunca expone
+// rating interno.
 function ActivityPanel({
   actividad,
 }: {
-  actividad: { jugados: number; ganados: number; goles: number; figuras: number };
+  actividad: {
+    jugados: number;
+    ganados: number;
+    goles: number;
+    asistencias: number;
+    figuras: number;
+  };
 }) {
   const showFiguras = actividad.figuras > 0;
   return (
@@ -499,12 +513,11 @@ function ActivityPanel({
           Ver mi historial →
         </Link>
       </div>
-      <div
-        className={`mt-3 grid gap-3 ${showFiguras ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}
-      >
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <ActivityStat label="Jugados" value={actividad.jugados} />
         <ActivityStat label="Ganados" value={actividad.ganados} />
         <ActivityStat label="Goles" value={actividad.goles} />
+        <ActivityStat label="Asistencias" value={actividad.asistencias} />
         {showFiguras ? <ActivityStat label="⭐ Figura" value={actividad.figuras} /> : null}
       </div>
     </section>

@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export type SaveGoalsState = null | { error: string } | { success: string };
 
-function parseGoals(raw: FormDataEntryValue | null): number | null {
+function parseStat(raw: FormDataEntryValue | undefined): number | null {
   if (typeof raw !== "string") return null;
   const trimmed = raw.trim();
   if (trimmed.length === 0) return 0;
@@ -17,13 +17,15 @@ function parseGoals(raw: FormDataEntryValue | null): number | null {
 }
 
 const GOALS_PREFIX = "goals_";
+const ASSISTS_PREFIX = "asist_";
 
 /**
- * Guarda los goles por jugador del match asociado a una convocatoria.
+ * Guarda los goles y asistencias (pases de gol) por jugador del match asociado
+ * a una convocatoria.
  * - Admin-only.
  * - Convocatoria en 'cerrada' o 'jugada'.
  * - Upsert por (match_id, player_id). RLS bloquea DELETE, asi que jugadores
- *   sin goles quedan con goals=0 (no se borran rows).
+ *   sin stats quedan con goals=0 / asistencias=0 (no se borran rows).
  */
 export async function saveMatchPlayerGoals(
   _prev: SaveGoalsState,
@@ -87,23 +89,42 @@ export async function saveMatchPlayerGoals(
     return { error: "El partido no tiene jugadores asignados." };
   }
 
-  // Parseamos cada goals_<playerId> del form, validando contra el set.
-  const rows: Array<{ match_id: string; player_id: string; goals: number }> = [];
+  // Juntamos goles y asistencias por jugador (goals_<id> / asist_<id>),
+  // validando cada playerId contra el set del partido.
+  const byPlayer = new Map<string, { goals: number; asistencias: number }>();
   for (const [key, value] of formData.entries()) {
-    if (!key.startsWith(GOALS_PREFIX)) continue;
-    const playerId = key.slice(GOALS_PREFIX.length);
+    let playerId: string | null = null;
+    let field: "goals" | "asistencias" | null = null;
+    if (key.startsWith(GOALS_PREFIX)) {
+      playerId = key.slice(GOALS_PREFIX.length);
+      field = "goals";
+    } else if (key.startsWith(ASSISTS_PREFIX)) {
+      playerId = key.slice(ASSISTS_PREFIX.length);
+      field = "asistencias";
+    }
+    if (!playerId || !field) continue;
+
     if (!validPlayerIds.has(playerId)) {
       return { error: "Jugador no pertenece a este partido." };
     }
-    const goals = parseGoals(value);
-    if (goals === null) {
-      return { error: "Los goles deben ser enteros entre 0 y 99." };
+    const parsed = parseStat(value);
+    if (parsed === null) {
+      return { error: "Goles y asistencias deben ser enteros entre 0 y 99." };
     }
-    rows.push({ match_id: match.id, player_id: playerId, goals });
+    const entry = byPlayer.get(playerId) ?? { goals: 0, asistencias: 0 };
+    entry[field] = parsed;
+    byPlayer.set(playerId, entry);
   }
 
+  const rows = Array.from(byPlayer.entries()).map(([player_id, stats]) => ({
+    match_id: match.id,
+    player_id,
+    goals: stats.goals,
+    asistencias: stats.asistencias,
+  }));
+
   if (rows.length === 0) {
-    return { error: "No hay goles para guardar." };
+    return { error: "No hay stats para guardar." };
   }
 
   const { error: upsertErr } = await supabase
@@ -111,9 +132,9 @@ export async function saveMatchPlayerGoals(
     .upsert(rows, { onConflict: "match_id,player_id" });
 
   if (upsertErr) {
-    return { error: `No se pudieron guardar los goles: ${upsertErr.message}` };
+    return { error: `No se pudieron guardar los goles y asistencias: ${upsertErr.message}` };
   }
 
   revalidatePath(`/convocatorias/${conv.id}`);
-  return { success: "Goles guardados." };
+  return { success: "Goles y asistencias guardados." };
 }

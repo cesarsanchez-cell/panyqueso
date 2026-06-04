@@ -108,6 +108,11 @@ export default async function HistorialPage() {
                       {r.goles} {r.goles === 1 ? "gol" : "goles"} ⚽
                     </span>
                   ) : null}
+                  {r.asistencias > 0 ? (
+                    <span className="text-xs font-medium text-neutral-700">
+                      {r.asistencias} {r.asistencias === 1 ? "asist." : "asist."} 🅰️
+                    </span>
+                  ) : null}
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.className}`}
                   >

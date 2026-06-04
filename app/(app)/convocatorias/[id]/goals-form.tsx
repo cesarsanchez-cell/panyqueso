@@ -23,19 +23,24 @@ type Props = {
   convocatoriaId: string;
   teams: GoalsFormTeam[];
   initialGoalsByPlayerId: Record<string, number>;
+  initialAssistsByPlayerId: Record<string, number>;
 };
 
-const labelClass = "block text-xs font-medium text-neutral-700";
 const inputClass =
-  "mt-1 block w-20 rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900";
+  "mt-1 block w-16 rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900";
 
-export function GoalsForm({ convocatoriaId, teams, initialGoalsByPlayerId }: Props) {
+export function GoalsForm({
+  convocatoriaId,
+  teams,
+  initialGoalsByPlayerId,
+  initialAssistsByPlayerId,
+}: Props) {
   const [state, formAction, pending] = useActionState<SaveGoalsState, FormData>(
     saveMatchPlayerGoals,
     null,
   );
 
-  const initial = useMemo<Record<string, string>>(() => {
+  const initialGoals = useMemo<Record<string, string>>(() => {
     const obj: Record<string, string> = {};
     for (const t of teams) {
       for (const p of t.players) {
@@ -45,11 +50,18 @@ export function GoalsForm({ convocatoriaId, teams, initialGoalsByPlayerId }: Pro
     return obj;
   }, [teams, initialGoalsByPlayerId]);
 
-  const [goals, setGoals] = useState<Record<string, string>>(initial);
+  const initialAssists = useMemo<Record<string, string>>(() => {
+    const obj: Record<string, string> = {};
+    for (const t of teams) {
+      for (const p of t.players) {
+        obj[p.playerId] = String(initialAssistsByPlayerId[p.playerId] ?? 0);
+      }
+    }
+    return obj;
+  }, [teams, initialAssistsByPlayerId]);
 
-  function handleChange(playerId: string, value: string) {
-    setGoals((prev) => ({ ...prev, [playerId]: value }));
-  }
+  const [goals, setGoals] = useState<Record<string, string>>(initialGoals);
+  const [assists, setAssists] = useState<Record<string, string>>(initialAssists);
 
   function teamSum(team: GoalsFormTeam): number {
     let sum = 0;
@@ -91,35 +103,58 @@ export function GoalsForm({ convocatoriaId, teams, initialGoalsByPlayerId }: Pro
                 </p>
               ) : null}
 
-              <ul className="mt-3 space-y-2">
+              <div className="mt-3 grid grid-cols-[1fr_auto_auto] items-end gap-x-3 gap-y-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+                  Jugador
+                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+                  Goles
+                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+                  Asist.
+                </span>
+
                 {team.players.map((p) => (
-                  <li key={p.playerId} className="flex items-center justify-between gap-2">
-                    <label htmlFor={`goals-${p.playerId}`} className={labelClass}>
-                      <span className="flex items-center gap-1.5">
-                        {p.isGoalkeeper ? (
-                          <span className="inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-800">
-                            GK
-                          </span>
-                        ) : null}
-                        <span className="truncate text-neutral-900">
-                          {playerLabel(p.nombre, p.apodo)}
+                  <div key={p.playerId} className="contents">
+                    <span className="flex min-w-0 items-center gap-1.5 self-center">
+                      {p.isGoalkeeper ? (
+                        <span className="inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-800">
+                          GK
                         </span>
+                      ) : null}
+                      <span className="truncate text-sm text-neutral-900">
+                        {playerLabel(p.nombre, p.apodo)}
                       </span>
-                    </label>
+                    </span>
                     <input
-                      id={`goals-${p.playerId}`}
+                      aria-label={`Goles de ${playerLabel(p.nombre, p.apodo)}`}
                       name={`goals_${p.playerId}`}
                       type="number"
                       min={0}
                       max={99}
                       step={1}
                       value={goals[p.playerId] ?? "0"}
-                      onChange={(e) => handleChange(p.playerId, e.target.value)}
+                      onChange={(e) =>
+                        setGoals((prev) => ({ ...prev, [p.playerId]: e.target.value }))
+                      }
                       className={inputClass}
                     />
-                  </li>
+                    <input
+                      aria-label={`Asistencias de ${playerLabel(p.nombre, p.apodo)}`}
+                      name={`asist_${p.playerId}`}
+                      type="number"
+                      min={0}
+                      max={99}
+                      step={1}
+                      value={assists[p.playerId] ?? "0"}
+                      onChange={(e) =>
+                        setAssists((prev) => ({ ...prev, [p.playerId]: e.target.value }))
+                      }
+                      className={inputClass}
+                    />
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           );
         })}
@@ -131,7 +166,7 @@ export function GoalsForm({ convocatoriaId, teams, initialGoalsByPlayerId }: Pro
           disabled={pending}
           className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {pending ? "Guardando…" : "Guardar goles"}
+          {pending ? "Guardando…" : "Guardar goles y asistencias"}
         </button>
         {state && "error" in state ? (
           <p
