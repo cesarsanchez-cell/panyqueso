@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 
 import { formatArLocal } from "@/lib/phone";
 
+import { WhatsAppInviteButton } from "../../../_components/whatsapp-invite-button";
 import { bulkCreateInvitations, type BulkImportState } from "./actions";
 
 const labelClass = "block text-sm font-medium text-neutral-800";
@@ -90,7 +91,13 @@ function ImportResults({
                   <p className="truncate text-sm font-medium text-neutral-900">{row.nombre}</p>
                   <p className="truncate text-xs text-neutral-500">{formatArLocal(row.phone)}</p>
                 </div>
-                <CopyOneButton row={row} />
+                <div className="flex shrink-0 items-center gap-2">
+                  <WhatsAppInviteButton
+                    phone={row.phone}
+                    message={buildMessage(row.nombre, row.link)}
+                  />
+                  <CopyOneButton row={row} />
+                </div>
               </li>
             ))}
           </ul>

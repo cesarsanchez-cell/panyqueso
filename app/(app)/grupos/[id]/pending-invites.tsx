@@ -4,7 +4,12 @@ import { useState } from "react";
 
 import { formatArLocal } from "@/lib/phone";
 
+import { WhatsAppInviteButton } from "../../_components/whatsapp-invite-button";
 import { cancelInvitation } from "../actions";
+
+function buildMessage(nombre: string, link: string): string {
+  return `Hola ${nombre}, te invito al grupo. Confirmá tu lugar y completá tus datos acá:\n${link}`;
+}
 
 export type PendingInvite = {
   id: string;
@@ -26,6 +31,7 @@ export function PendingInvitesList({ invites }: { invites: PendingInvite[] }) {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <WhatsAppInviteButton phone={inv.phone} message={buildMessage(inv.nombre, inv.link)} />
             <CopyLinkButton invite={inv} />
             <form action={cancelInvitation}>
               <input type="hidden" name="invitation_id" value={inv.id} />
@@ -47,7 +53,7 @@ function CopyLinkButton({ invite }: { invite: PendingInvite }) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
-    const message = `Hola ${invite.nombre}, te invito al grupo. Confirmá tu lugar y completá tus datos acá:\n${invite.link}`;
+    const message = buildMessage(invite.nombre, invite.link);
     try {
       await navigator.clipboard.writeText(message);
       setCopied(true);
