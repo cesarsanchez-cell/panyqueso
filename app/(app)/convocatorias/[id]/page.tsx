@@ -7,6 +7,7 @@ import { formatArLocal } from "@/lib/phone";
 import { playerLabel } from "@/lib/players/label";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { ClubCrest } from "@/components/club-crest";
 import { parseTeamDraft, type TeamDraft, type TeamLabel } from "@/lib/teams/draft";
 import { countRegroup } from "@/lib/teams/generate";
 import { loadPreviousComposition } from "@/lib/teams/previous";
@@ -106,7 +107,7 @@ async function loadMatch(supabase: SupabaseLike, convocatoriaId: string) {
          id, team_label, total_score,
          players:match_team_players!match_team_id(
            id, is_goalkeeper, assigned_position,
-           player:players!player_id(id, nombre, apodo, role_field, position_pref, internal_score)
+           player:players!player_id(id, nombre, apodo, role_field, position_pref, internal_score, club_id)
          )
        )`,
     )
@@ -154,7 +155,7 @@ export default async function ConvocatoriaDetallePage({
     .from("convocatoria_players")
     .select(
       `id, added_at, attendance_status, nombre_libre, rol_en_convocatoria, orden_suplente,
-       player:players!player_id(id, nombre, apodo, role_field, position_pref, status, internal_score)`,
+       player:players!player_id(id, nombre, apodo, role_field, position_pref, status, internal_score, club_id)`,
     )
     .eq("convocatoria_id", id)
     .order("added_at", { ascending: true });
@@ -269,6 +270,7 @@ export default async function ConvocatoriaDetallePage({
     role_field: RoleField;
     position_pref: PositionPref;
     internal_score: number;
+    club_id: string | null;
   };
   const playerInfoById = new Map<string, PlayerInfo>();
   for (const cp of convocados) {
@@ -281,6 +283,7 @@ export default async function ConvocatoriaDetallePage({
         role_field: p.role_field,
         position_pref: p.position_pref,
         internal_score: Number(p.internal_score),
+        club_id: p.club_id,
       });
     }
   }
@@ -865,6 +868,7 @@ function MatchTeamColumn({ team }: { team: MatchData["teams"][number] }) {
                     GK
                   </span>
                 ) : null}
+                <ClubCrest clubId={p.club_id} size={16} />
                 <span className="truncate text-neutral-900">{playerLabel(p.nombre, p.apodo)}</span>
               </span>
               <span className="shrink-0 text-xs text-neutral-500">
@@ -887,6 +891,7 @@ type PlayerInfoMap = Map<
     role_field: RoleField;
     position_pref: PositionPref;
     internal_score: number;
+    club_id: string | null;
   }
 >;
 
@@ -1003,6 +1008,7 @@ function DraftTeamColumn({
               <span className="inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-800">
                 GK
               </span>
+              <ClubCrest clubId={gkInfo.club_id} size={16} />
               <span className="truncate text-neutral-900">
                 {playerLabel(gkInfo.nombre, gkInfo.apodo)}
               </span>
@@ -1027,6 +1033,7 @@ function DraftTeamColumn({
           return (
             <li key={id} className="flex items-center justify-between gap-2">
               <span className="flex min-w-0 items-center gap-1.5">
+                <ClubCrest clubId={p.club_id} size={16} />
                 <span className="truncate text-neutral-900">{playerLabel(p.nombre, p.apodo)}</span>
                 <span className="shrink-0 text-xs text-neutral-500">
                   {p.internal_score.toFixed(2)}
