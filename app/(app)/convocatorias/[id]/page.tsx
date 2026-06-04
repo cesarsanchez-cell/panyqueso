@@ -8,6 +8,8 @@ import { playerLabel } from "@/lib/players/label";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { parseTeamDraft, type TeamDraft, type TeamLabel } from "@/lib/teams/draft";
+import { countRegroup } from "@/lib/teams/generate";
+import { loadPreviousComposition } from "@/lib/teams/previous";
 
 import { AddGuestForm } from "./add-guest-form";
 import { AddPlayerForm } from "./add-player-form";
@@ -237,6 +239,27 @@ export default async function ConvocatoriaDetallePage({
   const canGenerateTeams = isAdmin && isOpen && convocados.length >= MIN_CONVOCADOS_PARA_GENERAR;
 
   const teamDraft = parseTeamDraft(convocatoria.team_draft);
+
+  // FUT-88: señal de variedad vs la fecha anterior, recalculada en vivo desde
+  // el draft actual (refleja también los swaps manuales del admin).
+  let varietyInfo: VarietyInfo | null = null;
+  if (teamDraft) {
+    const previous = await loadPreviousComposition(supabase, convocatoria.id);
+    if (!previous) {
+      varietyInfo = { kind: "no_previous" };
+    } else {
+      const aIds = [teamDraft.A.goalkeeperPlayerId, ...teamDraft.A.playerIds].filter(
+        (x): x is string => x !== null,
+      );
+      const bIds = [teamDraft.B.goalkeeperPlayerId, ...teamDraft.B.playerIds].filter(
+        (x): x is string => x !== null,
+      );
+      const { changes, returningPlayers } = countRegroup(aIds, bIds, previous);
+      if (returningPlayers < 2) varietyInfo = { kind: "few_returning" };
+      else if (changes >= 2) varietyInfo = { kind: "ok", changes, returningPlayers };
+      else varietyInfo = { kind: "repeated", changes, returningPlayers };
+    }
+  }
 
   // Mapa playerId -> info para renderizar el draft con scores.
   type PlayerInfo = {
@@ -499,6 +522,8 @@ export default async function ConvocatoriaDetallePage({
               {teamDraft ? <ClearDraftForm convocatoriaId={convocatoria.id} /> : null}
             </div>
           ) : null}
+
+          {teamDraft && varietyInfo ? <VarietyBanner info={varietyInfo} /> : null}
 
           {teamDraft ? (
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -870,6 +895,45 @@ function sumScores(playerIds: string[], gk: string | null, infoById: PlayerInfoM
   if (gk) total += infoById.get(gk)?.internal_score ?? 0;
   for (const id of playerIds) total += infoById.get(id)?.internal_score ?? 0;
   return total;
+}
+
+// FUT-88: estado de la señal de variedad mostrada al admin.
+type VarietyInfo =
+  | { kind: "no_previous" }
+  | { kind: "few_returning" }
+  | { kind: "ok"; changes: number; returningPlayers: number }
+  | { kind: "repeated"; changes: number; returningPlayers: number };
+
+function VarietyBanner({ info }: { info: VarietyInfo }) {
+  const base = "mt-4 rounded-md border px-3 py-2 text-xs";
+  if (info.kind === "no_previous") {
+    return (
+      <div className={`${base} border-neutral-200 bg-neutral-50 text-neutral-600`}>
+        Primera fecha del grupo: no hay equipos previos para comparar variedad.
+      </div>
+    );
+  }
+  if (info.kind === "few_returning") {
+    return (
+      <div className={`${base} border-neutral-200 bg-neutral-50 text-neutral-600`}>
+        Pocos jugadores repetidos respecto de la fecha anterior para evaluar la variedad.
+      </div>
+    );
+  }
+  if (info.kind === "ok") {
+    return (
+      <div className={`${base} border-emerald-200 bg-emerald-50 text-emerald-800`}>
+        Variedad OK: cambian <strong>{info.changes}</strong> de {info.returningPlayers} jugadores
+        repetidos respecto de la fecha anterior.
+      </div>
+    );
+  }
+  return (
+    <div className={`${base} border-amber-200 bg-amber-50 text-amber-900`}>
+      Se repiten casi los mismos equipos: {info.changes === 0 ? "ningún" : `solo ${info.changes}`}{" "}
+      cambio respecto de la fecha anterior. Movés jugadores entre A y B para variar, o regenerás.
+    </div>
+  );
 }
 
 function DraftSummary({

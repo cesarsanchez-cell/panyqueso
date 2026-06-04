@@ -239,7 +239,7 @@ function compIds(comp: TeamComposition): string[] {
  * orientaciones (identidad y espejada) y tomamos el mínimo: ese es el
  * reagrupamiento real. Solo cuentan los jugadores presentes en ambas fechas.
  */
-function countRegroup(
+export function countRegroup(
   aIds: string[],
   bIds: string[],
   prev: PreviousComposition,
