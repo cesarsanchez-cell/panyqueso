@@ -174,18 +174,22 @@ export default async function ConvocatoriaDetallePage({
   // vista oficial del partido (no del draft).
   const match = isClosed || isPlayed ? await loadMatch(supabase, id) : null;
 
-  // Stats de goles por jugador (Fase 7 PR 2). Solo si hay match.
+  // Stats de goles y asistencias por jugador (Fase 7 PR 2 / FUT-79). Solo si hay match.
   let goalsByPlayerId: Record<string, number> = {};
+  let assistsByPlayerId: Record<string, number> = {};
   if (match) {
     const { data: statsRows, error: statsErr } = await supabase
       .from("match_player_stats")
-      .select("player_id, goals")
+      .select("player_id, goals, asistencias")
       .eq("match_id", match.id);
 
     if (statsErr) {
       throw new Error(`No se pudieron cargar los goles: ${statsErr.message}`);
     }
     goalsByPlayerId = Object.fromEntries((statsRows ?? []).map((r) => [r.player_id, r.goals]));
+    assistsByPlayerId = Object.fromEntries(
+      (statsRows ?? []).map((r) => [r.player_id, r.asistencias]),
+    );
   }
 
   // Selector: admin puede editar el roster en abierta, cerrada y jugada.
@@ -476,6 +480,7 @@ export default async function ConvocatoriaDetallePage({
           isAdmin={isAdmin}
           isPlayed={isPlayed}
           goalsByPlayerId={goalsByPlayerId}
+          assistsByPlayerId={assistsByPlayerId}
         />
       ) : null}
 
@@ -573,12 +578,14 @@ function MatchSection({
   isAdmin,
   isPlayed,
   goalsByPlayerId,
+  assistsByPlayerId,
 }: {
   match: MatchData;
   convocatoriaId: string;
   isAdmin: boolean;
   isPlayed: boolean;
   goalsByPlayerId: Record<string, number>;
+  assistsByPlayerId: Record<string, number>;
 }) {
   const hasResult = match.score_team_a !== null && match.score_team_b !== null;
   const teams = [...(match.teams ?? [])].sort((a, b) => a.team_label.localeCompare(b.team_label));
@@ -687,24 +694,29 @@ function MatchSection({
       ) : null}
 
       <div className="mt-5 border-t border-neutral-200 pt-5">
-        <h3 className="text-sm font-semibold text-neutral-900">Goles por jugador</h3>
+        <h3 className="text-sm font-semibold text-neutral-900">Goles y asistencias por jugador</h3>
         {isAdmin ? (
           <>
             <p className="mt-1 text-xs text-neutral-500">
               {isPlayed
-                ? "La suma de goles por team debería coincidir con el resultado."
-                : "Podés precargar goles ahora; el resultado se carga más arriba."}
+                ? "La suma de goles por team debería coincidir con el resultado. La asistencia es el pase que termina en gol."
+                : "Podés precargar goles y asistencias ahora; el resultado se carga más arriba."}
             </p>
             <div className="mt-3">
               <GoalsForm
                 convocatoriaId={convocatoriaId}
                 teams={goalsFormTeams}
                 initialGoalsByPlayerId={goalsByPlayerId}
+                initialAssistsByPlayerId={assistsByPlayerId}
               />
             </div>
           </>
         ) : (
-          <GoalsReadOnly teams={goalsFormTeams} goalsByPlayerId={goalsByPlayerId} />
+          <GoalsReadOnly
+            teams={goalsFormTeams}
+            goalsByPlayerId={goalsByPlayerId}
+            assistsByPlayerId={assistsByPlayerId}
+          />
         )}
       </div>
 
@@ -743,9 +755,11 @@ function MatchSection({
 function GoalsReadOnly({
   teams,
   goalsByPlayerId,
+  assistsByPlayerId,
 }: {
   teams: GoalsFormTeam[];
   goalsByPlayerId: Record<string, number>;
+  assistsByPlayerId: Record<string, number>;
 }) {
   return (
     <div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -769,6 +783,7 @@ function GoalsReadOnly({
             <ul className="mt-3 space-y-1.5 text-sm">
               {team.players.map((p) => {
                 const g = goalsByPlayerId[p.playerId] ?? 0;
+                const a = assistsByPlayerId[p.playerId] ?? 0;
                 return (
                   <li key={p.playerId} className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-1.5">
@@ -781,7 +796,9 @@ function GoalsReadOnly({
                         {playerLabel(p.nombre, p.apodo)}
                       </span>
                     </span>
-                    <span className="shrink-0 text-xs font-medium text-neutral-700">{g}</span>
+                    <span className="shrink-0 text-xs font-medium text-neutral-700">
+                      {g} ⚽ · {a} 🅰️
+                    </span>
                   </li>
                 );
               })}
