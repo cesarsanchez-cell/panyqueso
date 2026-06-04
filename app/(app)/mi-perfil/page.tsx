@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { computeBadges, type PlayerBadge } from "@/lib/badges/compute";
 import { requireUser } from "@/lib/auth/require-role";
 import { playerLabel } from "@/lib/players/label";
 import { createClient } from "@/lib/supabase/server";
@@ -424,6 +425,8 @@ export default async function MiPerfilPage({
 
       {actividad ? <ActivityPanel actividad={actividad} /> : null}
 
+      {actividad ? <BadgesPanel badges={computeBadges(actividad)} /> : null}
+
       {lineups.length === 0 ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
@@ -492,6 +495,35 @@ function ActivityStat({ label, value }: { label: string; value: number }) {
       <p className="text-2xl font-bold tracking-tight text-neutral-900">{value}</p>
       <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</p>
     </div>
+  );
+}
+
+// "Tus insignias" (FUT-78): logros positivos derivados del historial. Solo se
+// muestran las ganadas; nunca expone rating interno ni nada sensible.
+function BadgesPanel({ badges }: { badges: PlayerBadge[] }) {
+  if (badges.length === 0) return null;
+  return (
+    <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+        Tus insignias
+      </h2>
+      <ul className="mt-3 flex flex-wrap gap-3">
+        {badges.map((b) => (
+          <li
+            key={b.id}
+            className="flex items-center gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
+          >
+            <span className="text-2xl leading-none" aria-hidden="true">
+              {b.emoji}
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-amber-900">{b.title}</span>
+              <span className="block text-xs text-amber-700">{b.detail}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
