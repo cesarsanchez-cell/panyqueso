@@ -81,7 +81,7 @@ export default async function JugadoresPage({
   const supabase = await createClient();
   let playersQuery = supabase
     .from("players")
-    .select("id, nombre, apodo, edad, status, role_field, avatar_url")
+    .select("id, nombre, apodo, edad, status, role_field, avatar_url, club_id")
     .order("nombre", { ascending: true });
 
   if (statusFilter) {

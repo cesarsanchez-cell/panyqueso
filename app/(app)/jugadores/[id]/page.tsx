@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ClubCrest } from "@/components/club-crest";
 import { requireRole } from "@/lib/auth/require-role";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -151,8 +152,9 @@ export default async function JugadorDetallePage({
 
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-bold tracking-tight text-neutral-900">
-            {player.nombre}
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-neutral-900">
+            <ClubCrest clubId={player.club_id} size={22} />
+            <span className="truncate">{player.nombre}</span>
           </h1>
           <p className="mt-1 text-sm text-neutral-500">
             {player.edad} años · {ROLE_FIELD_LABEL[player.role_field]}

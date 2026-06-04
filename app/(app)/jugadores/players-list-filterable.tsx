@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { ClubCrest } from "@/components/club-crest";
 import type { Database } from "@/lib/supabase/database.types";
 
 import { PlayerAvatar } from "../player-avatar";
@@ -18,6 +19,7 @@ type Player = {
   status: PlayerStatus;
   role_field: PlayerRoleField;
   avatar_url: string | null;
+  club_id: string | null;
 };
 
 const STATUS_LABEL: Record<PlayerStatus, string> = {
@@ -86,13 +88,16 @@ export function PlayersListFilterable({ players }: { players: Player[] }) {
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <PlayerAvatar url={p.avatar_url} nombre={p.nombre} />
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-neutral-900">
-                      {p.nombre}
-                      {p.apodo ? (
-                        <span className="ml-2 text-xs font-normal text-neutral-500">
-                          ({p.apodo})
-                        </span>
-                      ) : null}
+                    <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-neutral-900">
+                      <ClubCrest clubId={p.club_id} />
+                      <span className="truncate">
+                        {p.nombre}
+                        {p.apodo ? (
+                          <span className="ml-2 text-xs font-normal text-neutral-500">
+                            ({p.apodo})
+                          </span>
+                        ) : null}
+                      </span>
                     </p>
                     <p className="text-xs text-neutral-500">
                       {p.edad} años · {ROLE_FIELD_LABEL[p.role_field]}

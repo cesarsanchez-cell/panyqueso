@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { isValidClubId } from "@/lib/clubs";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -121,6 +122,11 @@ export async function updateMyPlayerData(
       errors.ubicacion_maps_url = "Debe empezar con http(s)://.";
   }
 
+  // club_id opcional: slug del catálogo (lib/clubs.ts). Si no es válido se
+  // manda "" (= ninguno); el RPC lo normaliza a null. Dato neutro, no bloquea.
+  const clubRaw = String(formData.get("club_id") ?? "").trim();
+  const club_id = isValidClubId(clubRaw) ? clubRaw : "";
+
   if (Object.keys(errors).length > 0) return { fieldErrors: errors };
 
   const supabase = await createClient();
@@ -137,6 +143,7 @@ export async function updateMyPlayerData(
     p_position_pref: positionRaw as PositionPref,
     p_positions_possible: positions_possible,
     p_ubicacion_maps_url: mapsRaw,
+    p_club_id: club_id,
   });
 
   if (error) {

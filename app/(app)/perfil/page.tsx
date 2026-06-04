@@ -41,6 +41,7 @@ export default async function PerfilPage() {
         position_pref: row.position_pref,
         positions_possible: row.positions_possible ?? [],
         ubicacion_maps_url: row.ubicacion_maps_url,
+        club_id: row.club_id,
       };
       playerNombre = row.nombre;
     }
