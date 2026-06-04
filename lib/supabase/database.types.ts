@@ -376,6 +376,7 @@ export type Database = {
       };
       match_player_stats: {
         Row: {
+          asistencias: number;
           created_at: string;
           goals: number;
           id: string;
@@ -385,6 +386,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          asistencias?: number;
           created_at?: string;
           goals?: number;
           id?: string;
@@ -394,6 +396,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          asistencias?: number;
           created_at?: string;
           goals?: number;
           id?: string;
@@ -1028,6 +1031,7 @@ export type Database = {
       get_my_match_history: {
         Args: never;
         Returns: {
+          asistencias: number;
           fecha: string;
           figura_es_mia: boolean;
           figura_nombre: string | null;
