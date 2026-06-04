@@ -288,6 +288,7 @@ export type Database = {
           dia_semana: number;
           hora: string;
           id: string;
+          join_token: string | null;
           lugar_id: string;
           nombre: string;
           owner_id: string;
@@ -302,6 +303,7 @@ export type Database = {
           dia_semana: number;
           hora?: string;
           id?: string;
+          join_token?: string | null;
           lugar_id: string;
           nombre: string;
           owner_id: string;
@@ -316,6 +318,7 @@ export type Database = {
           dia_semana?: number;
           hora?: string;
           id?: string;
+          join_token?: string | null;
           lugar_id?: string;
           nombre?: string;
           owner_id?: string;
@@ -931,6 +934,19 @@ export type Database = {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
       };
+      claim_group_join: {
+        Args: {
+          p_auth_user_id: string;
+          p_edad: number;
+          p_fecha_nacimiento: string;
+          p_nombre: string;
+          p_phone: string;
+          p_position_pref: Database["public"]["Enums"]["position_pref"];
+          p_role_field: Database["public"]["Enums"]["player_role_field"];
+          p_token: string;
+        };
+        Returns: string;
+      };
       claim_invite: {
         Args: {
           p_auth_user_id: string;
@@ -977,6 +993,18 @@ export type Database = {
       flag_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
+      };
+      get_group_by_join_token: {
+        Args: { p_token: string };
+        Returns: {
+          grupo_cupo_titulares: number;
+          grupo_dia_semana: number;
+          grupo_hora: string;
+          grupo_id: string;
+          grupo_nombre: string;
+          lugar_google_maps_url: string;
+          lugar_nombre: string;
+        }[];
       };
       get_invite_by_token: {
         Args: { p_token: string };

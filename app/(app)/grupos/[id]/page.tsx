@@ -11,6 +11,7 @@ import { ConvocatoriaCiclo } from "./convocatoria-ciclo";
 import { EditGrupoForm } from "./edit-grupo-form";
 import { MembersSections } from "./members-sections";
 import { AddMemberForm } from "./membership-forms";
+import { GroupJoinLinkSection } from "./group-join-link";
 import { PendingInvitesList, type PendingInvite } from "./pending-invites";
 
 const DIA_LABEL = [
@@ -32,7 +33,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
   const { data: grupo, error: grupoErr } = await supabase
     .from("grupos")
     .select(
-      "id, nombre, lugar_id, dia_semana, hora, cupo_titulares, status, auto_renovar, lugar:lugares!lugar_id(nombre)",
+      "id, nombre, lugar_id, dia_semana, hora, cupo_titulares, status, auto_renovar, join_token, lugar:lugares!lugar_id(nombre)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -244,6 +245,15 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
           )}
         </div>
       </section>
+
+      {isActive ? (
+        <GroupJoinLinkSection
+          grupoId={grupo.id}
+          joinToken={grupo.join_token}
+          origin={origin}
+          grupoNombre={grupo.nombre}
+        />
+      ) : null}
 
       <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-baseline justify-between gap-2">

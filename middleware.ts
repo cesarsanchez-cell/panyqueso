@@ -4,10 +4,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
 // Rutas accesibles sin sesion. Toda otra ruta exige login.
-// /invite/<token> es publico: el token es la capability (Fase 9 PR 7).
+// /invite/<token> y /g/<token> son publicos: el token es la capability
+// (invite por telefono y link unico de grupo, respectivamente).
 // /recuperar, /auth/callback y /auth/confirm son publicos para el flujo de
 // reset de password (el ultimo es cross-device via verifyOtp).
-const PUBLIC_PATHS = ["/login", "/invite", "/recuperar", "/auth/callback", "/auth/confirm"];
+const PUBLIC_PATHS = ["/login", "/invite", "/g", "/recuperar", "/auth/callback", "/auth/confirm"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
