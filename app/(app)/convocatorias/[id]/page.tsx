@@ -15,6 +15,7 @@ import { CancelForm } from "./cancel-form";
 import { ConfirmMatchForm } from "./confirm-match-form";
 import { CupoEditor } from "./cupo-editor";
 import { ClearDraftForm, GenerateDraftForm, PromoteToGKForm, SwapPlayerForm } from "./draft-forms";
+import { FiguraForm, type FiguraOption } from "./figura-form";
 import { GoalsForm, type GoalsFormTeam } from "./goals-form";
 import { InviteSection, type PendingConvocatoriaInvite } from "./invite-section";
 import { RemovePlayerForm } from "./remove-player-form";
@@ -97,7 +98,7 @@ async function loadMatch(supabase: SupabaseLike, convocatoriaId: string) {
     .from("matches")
     .select(
       `id, score_team_a, score_team_b, winner, notas, confirmed_at, confirmed_with_warning,
-       video_resumen_url,
+       video_resumen_url, figura_player_id,
        reviewer:profiles!confirmed_by(nombre),
        teams:match_teams!match_id(
          id, team_label, total_score,
@@ -594,6 +595,15 @@ function MatchSection({
     }),
   }));
 
+  // Figura del partido (FUT-77): jugadores que jugaron, para el selector del
+  // admin y para mostrar quién es la figura actual.
+  const figuraOptions: FiguraOption[] = goalsFormTeams.flatMap((t) =>
+    t.players.map((p) => ({ playerId: p.playerId, nombre: p.nombre, apodo: p.apodo })),
+  );
+  const figura = match.figura_player_id
+    ? (figuraOptions.find((p) => p.playerId === match.figura_player_id) ?? null)
+    : null;
+
   return (
     <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -611,6 +621,17 @@ function MatchSection({
         <p className="mt-2 text-xs text-amber-700">
           Confirmado con avisos (ver balance_snapshot del partido).
         </p>
+      ) : null}
+
+      {figura ? (
+        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+            ⭐ Figura del partido
+          </p>
+          <p className="mt-1 text-sm font-semibold text-amber-900">
+            {playerLabel(figura.nombre, figura.apodo)}
+          </p>
+        </div>
       ) : null}
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -686,6 +707,22 @@ function MatchSection({
           <GoalsReadOnly teams={goalsFormTeams} goalsByPlayerId={goalsByPlayerId} />
         )}
       </div>
+
+      {isAdmin ? (
+        <div className="mt-5 border-t border-neutral-200 pt-5">
+          <h3 className="text-sm font-semibold text-neutral-900">Figura del partido</h3>
+          <p className="mt-1 text-xs text-neutral-500">
+            Elegí al jugador destacado. Lo va a ver en su historial como un reconocimiento.
+          </p>
+          <div className="mt-3">
+            <FiguraForm
+              convocatoriaId={convocatoriaId}
+              players={figuraOptions}
+              initialFiguraId={match.figura_player_id}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {isAdmin ? (
         <div className="mt-5 border-t border-neutral-200 pt-5">
