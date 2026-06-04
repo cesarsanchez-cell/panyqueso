@@ -79,6 +79,13 @@ export default async function HistorialPage() {
                     {r.grupo_nombre ?? "Grupo"}
                   </p>
                   <p className="text-xs text-neutral-500">{formatFecha(r.fecha)}</p>
+                  {r.figura_es_mia ? (
+                    <p className="mt-1 text-xs font-semibold text-amber-700">
+                      ⭐ Fuiste la figura del partido
+                    </p>
+                  ) : r.figura_nombre ? (
+                    <p className="mt-1 text-xs text-neutral-500">⭐ Figura: {r.figura_nombre}</p>
+                  ) : null}
                   {r.video_resumen_url ? (
                     <a
                       href={r.video_resumen_url}
@@ -91,6 +98,11 @@ export default async function HistorialPage() {
                   ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
+                  {r.figura_es_mia ? (
+                    <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
+                      ⭐ Figura
+                    </span>
+                  ) : null}
                   {r.goles > 0 ? (
                     <span className="text-xs font-medium text-neutral-700">
                       {r.goles} {r.goles === 1 ? "gol" : "goles"} ⚽
