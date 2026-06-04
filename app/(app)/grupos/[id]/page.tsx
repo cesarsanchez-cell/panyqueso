@@ -12,6 +12,7 @@ import { EditGrupoForm } from "./edit-grupo-form";
 import { MembersSections } from "./members-sections";
 import { AddMemberForm } from "./membership-forms";
 import { PendingInvitesList, type PendingInvite } from "./pending-invites";
+import { SingleInviteForm } from "./single-invite-form";
 
 const DIA_LABEL = [
   "Domingo",
@@ -244,6 +245,25 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
           )}
         </div>
       </section>
+
+      {isActive ? (
+        <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+            Invitar de a uno
+          </h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Para sumar a alguien que todavía no está registrado, sin armar una lista. Generás el
+            link y se lo mandás por WhatsApp. Para muchos a la vez, usá{" "}
+            <Link href={`/grupos/${grupo.id}/importar`} className="underline">
+              Importar desde WA
+            </Link>
+            .
+          </p>
+          <div className="mt-3">
+            <SingleInviteForm grupoId={grupo.id} />
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-baseline justify-between gap-2">

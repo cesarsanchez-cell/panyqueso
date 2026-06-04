@@ -1,8 +1,11 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 
 import { requireRole } from "@/lib/auth/require-role";
+import { parseArPhone } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 
 type GrupoFormValues = {
@@ -263,6 +266,108 @@ export async function removeMember(formData: FormData): Promise<void> {
     .eq("id", membresia_id);
 
   revalidatePath(`/grupos/${m.grupo_id}`);
+}
+
+// ============================================================================
+// createGroupInvitation: invita de a UNO al grupo (celular + nombre), sin pasar
+// por el import masivo. Reusa el mismo modelo player_invitations. Devuelve el
+// link + telefono + nombre para que el form muestre el boton de WhatsApp al
+// instante (mismo criterio que el resto de las invitaciones).
+// ============================================================================
+export type CreateGroupInviteState =
+  | null
+  | { error: string }
+  | { ok: true; phone: string; nombre: string; link: string };
+
+const INVITE_DAYS_VALID = 30;
+
+export async function createGroupInvitation(
+  _prev: CreateGroupInviteState,
+  formData: FormData,
+): Promise<CreateGroupInviteState> {
+  const ctx = await requireRole("admin");
+
+  const grupoId = String(formData.get("grupo_id") ?? "").trim();
+  if (!grupoId) return { error: "Falta el grupo." };
+
+  const phoneRaw = String(formData.get("phone") ?? "").trim();
+  if (!phoneRaw) return { error: "El celular es obligatorio." };
+  const phone = parseArPhone(phoneRaw);
+  if (!phone) return { error: "Celular inválido. Ingresá los 10 dígitos (ej: 1155551234)." };
+
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  if (!nombre) return { error: "El nombre es obligatorio." };
+  if (nombre.length > MAX_NOMBRE) {
+    return { error: `Nombre demasiado largo (máximo ${MAX_NOMBRE} caracteres).` };
+  }
+
+  const supabase = await createClient();
+
+  const { data: grupo, error: grupoErr } = await supabase
+    .from("grupos")
+    .select("id, status")
+    .eq("id", grupoId)
+    .maybeSingle();
+  if (grupoErr) return { error: `No se pudo cargar el grupo: ${grupoErr.message}` };
+  if (!grupo) return { error: "El grupo no existe o no tenés acceso." };
+  if (grupo.status !== "activo") {
+    return { error: "El grupo está archivado. Reactivalo antes de invitar." };
+  }
+
+  // Skip si el telefono ya es un jugador registrado.
+  const { data: existingPlayer, error: playerErr } = await supabase
+    .from("players")
+    .select("id")
+    .eq("phone", phone)
+    .maybeSingle();
+  if (playerErr) return { error: `No se pudo verificar jugadores: ${playerErr.message}` };
+  if (existingPlayer) {
+    return { error: "Ya hay un jugador registrado con ese teléfono." };
+  }
+
+  // Skip si ya hay una invitacion pendiente para ese telefono en este grupo.
+  const nowIso = new Date().toISOString();
+  const { data: pendingSame, error: pendingErr } = await supabase
+    .from("player_invitations")
+    .select("id")
+    .eq("grupo_id", grupoId)
+    .eq("phone", phone)
+    .is("used_at", null)
+    .is("declined_at", null)
+    .gt("expires_at", nowIso)
+    .maybeSingle();
+  if (pendingErr) return { error: `No se pudo verificar invitaciones: ${pendingErr.message}` };
+  if (pendingSame) {
+    return { error: "Ya existe una invitación pendiente para ese teléfono en este grupo." };
+  }
+
+  const token = randomBytes(24).toString("base64url");
+  const expiresAt = new Date(Date.now() + INVITE_DAYS_VALID * 24 * 60 * 60 * 1000).toISOString();
+
+  const { error: insertErr } = await supabase.from("player_invitations").insert({
+    token,
+    phone,
+    nombre_tentativo: nombre,
+    grupo_id: grupoId,
+    created_by: ctx.userId,
+    expires_at: expiresAt,
+  });
+  if (insertErr) {
+    return { error: `No se pudo crear la invitación: ${insertErr.message}` };
+  }
+
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const origin = host ? `${proto}://${host}` : "";
+
+  revalidatePath(`/grupos/${grupoId}`);
+  return {
+    ok: true,
+    phone,
+    nombre,
+    link: origin ? `${origin}/invite/${token}` : `/invite/${token}`,
+  };
 }
 
 // ============================================================================
