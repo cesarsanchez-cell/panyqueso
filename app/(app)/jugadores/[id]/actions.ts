@@ -332,3 +332,97 @@ export async function resetPlayerPassword(
 
   return { tempPassword, phone: player.phone };
 }
+
+// ============================================================================
+// invitePlayerToComplete: crea una cuenta para un jugador YA cargado (sin
+// cuenta) y la vincula a su ficha existente, para que entre y complete sus
+// datos (club, foto, etc.) desde /perfil. NO duplica la ficha.
+//
+// Requiere que el jugador tenga celular (clave de ingreso). Devuelve una
+// contraseña temporal para pasársela por WhatsApp (igual que el reset).
+// ============================================================================
+export type InvitePlayerState = null | { error: string } | { tempPassword: string; phone: string };
+
+export async function invitePlayerToComplete(
+  _prev: InvitePlayerState,
+  formData: FormData,
+): Promise<InvitePlayerState> {
+  await requireRole("admin");
+
+  const playerId = String(formData.get("player_id") ?? "").trim();
+  if (!playerId) return { error: "Falta el jugador." };
+
+  const supabase = await createClient();
+  const { data: player, error: playerErr } = await supabase
+    .from("players")
+    .select("auth_user_id, phone, nombre")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  if (playerErr) return { error: `No se pudo leer el jugador: ${playerErr.message}` };
+  if (!player) return { error: "El jugador no existe." };
+  if (player.auth_user_id) {
+    return {
+      error: 'Este jugador ya tiene cuenta. Usá "Resetear contraseña" si necesita una nueva clave.',
+    };
+  }
+  if (!player.phone) {
+    return { error: "Cargale primero el celular: es la clave de ingreso del jugador." };
+  }
+
+  const admin = createAdminClient();
+  const email = `${player.phone.toLowerCase()}@phone.fdlm.local`;
+  const tempPassword = generateTempPassword();
+
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+    email,
+    password: tempPassword,
+    email_confirm: true,
+    user_metadata: { phone: player.phone, nombre: player.nombre },
+  });
+
+  if (createErr || !created.user) {
+    if (createErr?.message.toLowerCase().includes("already")) {
+      return {
+        error:
+          "Ya existe una cuenta con ese teléfono. Puede que el jugador ya esté dado de alta con otra ficha.",
+      };
+    }
+    return { error: `No se pudo crear la cuenta: ${createErr?.message ?? "sin detalle"}` };
+  }
+
+  const authUserId = created.user.id;
+
+  // El trigger on_auth_user_created ya creó el profile (sin rol). Le ponemos
+  // role=player + nombre (mismo criterio que claim_group_join).
+  const { error: profErr } = await admin
+    .from("profiles")
+    .update({ role: "player", nombre: player.nombre })
+    .eq("id", authUserId);
+
+  if (profErr) {
+    await admin.auth.admin.deleteUser(authUserId);
+    return { error: `No se pudo configurar el perfil: ${profErr.message}` };
+  }
+
+  // Vincular la ficha existente. El guard is(auth_user_id, null) evita pisar
+  // una vinculación hecha en paralelo.
+  const { data: linked, error: linkErr } = await admin
+    .from("players")
+    .update({ auth_user_id: authUserId })
+    .eq("id", playerId)
+    .is("auth_user_id", null)
+    .select("id");
+
+  if (linkErr || !linked || linked.length === 0) {
+    await admin.auth.admin.deleteUser(authUserId);
+    return {
+      error: linkErr
+        ? `No se pudo vincular la cuenta: ${linkErr.message}`
+        : "No se pudo vincular la cuenta (puede que ya tenga una).",
+    };
+  }
+
+  revalidatePath(`/jugadores/${playerId}`);
+  return { tempPassword, phone: player.phone };
+}
