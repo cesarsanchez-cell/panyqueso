@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth/require-role";
@@ -263,6 +264,44 @@ export async function removeMember(formData: FormData): Promise<void> {
     .eq("id", membresia_id);
 
   revalidatePath(`/grupos/${m.grupo_id}`);
+}
+
+// ============================================================================
+// regenerateGroupJoinLink / disableGroupJoinLink: manejo del link único de
+// auto-inscripción del grupo. Generar/regenerar rota el token (invalida el
+// link viejo). Desactivar lo pone en null. Solo admin, solo grupo activo.
+// ============================================================================
+export async function regenerateGroupJoinLink(formData: FormData): Promise<void> {
+  await requireRole("admin");
+
+  const grupo_id = String(formData.get("grupo_id") ?? "").trim();
+  if (!grupo_id) return;
+
+  const supabase = await createClient();
+
+  const { data: grupo } = await supabase
+    .from("grupos")
+    .select("id, status")
+    .eq("id", grupo_id)
+    .maybeSingle();
+  if (!grupo || grupo.status !== "activo") return;
+
+  const token = randomBytes(24).toString("base64url");
+  await supabase.from("grupos").update({ join_token: token }).eq("id", grupo_id);
+
+  revalidatePath(`/grupos/${grupo_id}`);
+}
+
+export async function disableGroupJoinLink(formData: FormData): Promise<void> {
+  await requireRole("admin");
+
+  const grupo_id = String(formData.get("grupo_id") ?? "").trim();
+  if (!grupo_id) return;
+
+  const supabase = await createClient();
+  await supabase.from("grupos").update({ join_token: null }).eq("id", grupo_id);
+
+  revalidatePath(`/grupos/${grupo_id}`);
 }
 
 // ============================================================================
