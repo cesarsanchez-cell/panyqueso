@@ -491,7 +491,13 @@ export default async function MiPerfilPage({
 function ActivityPanel({
   actividad,
 }: {
-  actividad: { jugados: number; ganados: number; goles: number; asistencias: number; figuras: number };
+  actividad: {
+    jugados: number;
+    ganados: number;
+    goles: number;
+    asistencias: number;
+    figuras: number;
+  };
 }) {
   const showFiguras = actividad.figuras > 0;
   return (
