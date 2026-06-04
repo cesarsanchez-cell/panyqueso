@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 
 import type { Database } from "@/lib/supabase/database.types";
 
+import { PlayerAvatar } from "../player-avatar";
+
 type PlayerStatus = Database["public"]["Enums"]["player_status"];
 type PlayerRoleField = Database["public"]["Enums"]["player_role_field"];
 
@@ -15,6 +17,7 @@ type Player = {
   edad: number;
   status: PlayerStatus;
   role_field: PlayerRoleField;
+  avatar_url: string | null;
 };
 
 const STATUS_LABEL: Record<PlayerStatus, string> = {
@@ -80,16 +83,21 @@ export function PlayersListFilterable({ players }: { players: Player[] }) {
                 href={`/jugadores/${p.id}`}
                 className="flex items-center justify-between gap-4 px-4 py-3 transition hover:bg-neutral-50"
               >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-neutral-900">
-                    {p.nombre}
-                    {p.apodo ? (
-                      <span className="ml-2 text-xs font-normal text-neutral-500">({p.apodo})</span>
-                    ) : null}
-                  </p>
-                  <p className="text-xs text-neutral-500">
-                    {p.edad} años · {ROLE_FIELD_LABEL[p.role_field]}
-                  </p>
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <PlayerAvatar url={p.avatar_url} nombre={p.nombre} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-neutral-900">
+                      {p.nombre}
+                      {p.apodo ? (
+                        <span className="ml-2 text-xs font-normal text-neutral-500">
+                          ({p.apodo})
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="text-xs text-neutral-500">
+                      {p.edad} años · {ROLE_FIELD_LABEL[p.role_field]}
+                    </p>
+                  </div>
                 </div>
                 <span
                   className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[p.status]}`}

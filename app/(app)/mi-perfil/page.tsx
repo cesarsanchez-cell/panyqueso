@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth/require-role";
 import { playerLabel } from "@/lib/players/label";
 import { createClient } from "@/lib/supabase/server";
 
+import { PlayerAvatar } from "../player-avatar";
 import { DeclineButton } from "./decline-button";
 import { JoinConvocatoriaButton } from "./join-convocatoria-button";
 import { JoinQueueButton } from "./join-queue-button";
@@ -73,6 +74,7 @@ type ConfirmedTeamMember = {
   apodo: string | null;
   isGoalkeeper: boolean;
   isMe: boolean;
+  avatarUrl: string | null;
 };
 
 type ConfirmedTeams = {
@@ -106,6 +108,7 @@ async function loadConfirmedTeams(
 ): Promise<Map<string, ConfirmedTeams>> {
   const byGrupo = new Map<string, ConfirmedTeams>();
   const { data } = await supabase.rpc("get_my_confirmed_match_teams");
+  const allMembers: ConfirmedTeamMember[] = [];
   for (const row of data ?? []) {
     if (!row.grupo_id || !row.player_id) continue;
     let entry = byGrupo.get(row.grupo_id);
@@ -119,11 +122,30 @@ async function loadConfirmedTeams(
       apodo: row.apodo,
       isGoalkeeper: row.is_goalkeeper,
       isMe: row.player_id === playerId,
+      avatarUrl: null,
     };
+    allMembers.push(member);
     // team_label NULL = banco (suplentes que no entraron como titulares).
     if (row.team_label === "A") entry.teamA.push(member);
     else if (row.team_label === "B") entry.teamB.push(member);
     else entry.bench.push(member);
+  }
+
+  // Fotos de los compañeros vía la vista publica (el RPC de equipos no las trae).
+  // Mutamos los members ya pusheados a los equipos.
+  const memberIds = Array.from(new Set(allMembers.map((m) => m.playerId)));
+  if (memberIds.length > 0) {
+    const { data: avatars } = await supabase
+      .from("players_public")
+      .select("id, avatar_url")
+      .in("id", memberIds);
+    const avatarById = new Map<string, string | null>();
+    for (const a of avatars ?? []) {
+      if (a.id) avatarById.set(a.id, a.avatar_url ?? null);
+    }
+    for (const m of allMembers) {
+      m.avatarUrl = avatarById.get(m.playerId) ?? null;
+    }
   }
   return byGrupo;
 }
@@ -410,7 +432,9 @@ export default async function MiPerfilPage({
       ) : null}
 
       <div className="flex items-center gap-3">
-        {player ? <GreetingAvatar url={player.avatar_url} nombre={player.nombre} /> : null}
+        {player ? (
+          <PlayerAvatar url={player.avatar_url} nombre={player.nombre} size="lg" />
+        ) : null}
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
             Hola{player?.nombre ? `, ${player.nombre.split(" ")[0]}` : ""}.
@@ -527,28 +551,6 @@ function BadgesPanel({ badges }: { badges: PlayerBadge[] }) {
   );
 }
 
-function GreetingAvatar({ url, nombre }: { url: string | null; nombre: string }) {
-  const init =
-    nombre
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((p) => p[0]?.toUpperCase() ?? "")
-      .join("") || "?";
-  return (
-    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-neutral-100 ring-1 ring-neutral-200">
-      {url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" className="h-full w-full object-cover" />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-neutral-400">
-          {init}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function ConfirmedTeamColumn({
   label,
   members,
@@ -562,19 +564,22 @@ function ConfirmedTeamColumn({
       {members.length === 0 ? (
         <p className="mt-1 text-xs text-neutral-500">Sin jugadores.</p>
       ) : (
-        <ul className="mt-1 space-y-0.5">
+        <ul className="mt-1 space-y-1">
           {members.map((m) => (
             <li
               key={m.playerId}
-              className={`text-sm ${m.isMe ? "font-semibold text-emerald-900" : "text-neutral-800"}`}
+              className={`flex items-center gap-2 text-sm ${m.isMe ? "font-semibold text-emerald-900" : "text-neutral-800"}`}
             >
-              {m.isGoalkeeper ? (
-                <span className="mr-1" title="Arquero">
-                  🧤
-                </span>
-              ) : null}
-              {playerLabel(m.nombre, m.apodo)}
-              {m.isMe ? <span className="ml-1 text-xs text-emerald-700">· vos</span> : null}
+              <PlayerAvatar url={m.avatarUrl} nombre={m.nombre} />
+              <span className="min-w-0 truncate">
+                {m.isGoalkeeper ? (
+                  <span className="mr-1" title="Arquero">
+                    🧤
+                  </span>
+                ) : null}
+                {playerLabel(m.nombre, m.apodo)}
+                {m.isMe ? <span className="ml-1 text-xs text-emerald-700">· vos</span> : null}
+              </span>
             </li>
           ))}
         </ul>
@@ -641,14 +646,17 @@ function ConfirmedMatchCard({ lineup, teams }: { lineup: GrupoLineup; teams: Con
           <p className="mt-0.5 text-xs text-neutral-500">
             Suplentes que no entraron. Juegan solo si baja alguien.
           </p>
-          <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
             {teams.bench.map((m) => (
               <li
                 key={m.playerId}
-                className={`text-sm ${m.isMe ? "font-semibold text-amber-900" : "text-neutral-800"}`}
+                className={`flex items-center gap-2 text-sm ${m.isMe ? "font-semibold text-amber-900" : "text-neutral-800"}`}
               >
-                {playerLabel(m.nombre, m.apodo)}
-                {m.isMe ? <span className="ml-1 text-xs text-amber-700">· vos</span> : null}
+                <PlayerAvatar url={m.avatarUrl} nombre={m.nombre} />
+                <span className="truncate">
+                  {playerLabel(m.nombre, m.apodo)}
+                  {m.isMe ? <span className="ml-1 text-xs text-amber-700">· vos</span> : null}
+                </span>
               </li>
             ))}
           </ul>
