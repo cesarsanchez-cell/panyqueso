@@ -12,6 +12,16 @@ const FIELD_LABEL: Record<string, string> = {
   physical: "Físico",
   mental: "Mental",
   rating_confidence: "Confianza",
+  // Subcomponentes (modelo v2).
+  phys_power: "Físico · Potencia",
+  phys_speed: "Físico · Velocidad",
+  phys_stamina: "Físico · Resistencia",
+  ment_tactical: "Mental · Orden táctico",
+  ment_resilience: "Mental · Resiliencia",
+  ment_attitude: "Mental · Actitud",
+  tech_passing: "Técnica · Pase",
+  tech_finishing: "Técnica · Eficacia",
+  tech_linkup: "Técnica · Asociación",
   // Mantenido para mostrar requests viejas (pre-PR B) que aun esten pending.
   edad: "Edad",
   role_field: "Rol",
@@ -37,7 +47,9 @@ export default async function ProponerCambioPage({ params }: { params: Promise<{
   const supabase = await createClient();
   const { data: player, error } = await supabase
     .from("players")
-    .select("id, nombre, technical, physical, mental, rating_confidence")
+    .select(
+      "id, nombre, technical, physical, mental, rating_confidence, phys_power, phys_speed, phys_stamina, ment_tactical, ment_resilience, ment_attitude, tech_passing, tech_finishing, tech_linkup",
+    )
     .eq("id", id)
     .maybeSingle();
 
@@ -96,10 +108,18 @@ export default async function ProponerCambioPage({ params }: { params: Promise<{
         <EditForm
           initial={{
             id: player.id,
-            technical: player.technical,
-            physical: player.physical,
-            mental: player.mental,
             rating_confidence: player.rating_confidence,
+            // Si un sub está en null (jugador nunca editado con el modelo v2),
+            // mostramos el valor de su dimensión como punto de partida.
+            phys_power: player.phys_power ?? player.physical,
+            phys_speed: player.phys_speed ?? player.physical,
+            phys_stamina: player.phys_stamina ?? player.physical,
+            ment_tactical: player.ment_tactical ?? player.mental,
+            ment_resilience: player.ment_resilience ?? player.mental,
+            ment_attitude: player.ment_attitude ?? player.mental,
+            tech_passing: player.tech_passing ?? player.technical,
+            tech_finishing: player.tech_finishing ?? player.technical,
+            tech_linkup: player.tech_linkup ?? player.technical,
           }}
         />
       )}
