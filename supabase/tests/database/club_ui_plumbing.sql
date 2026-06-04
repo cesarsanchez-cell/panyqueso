@@ -41,8 +41,10 @@ insert into public.players (
    5, 5, 5, 'approved', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000c3');
 
 -- Mismo grupo: P1 y P2 son compañeros activos (para players_public).
-insert into public.grupos (id, nombre, dia_semana, hora, cupo_titulares, owner_id) values
-  ('00000000-0000-0000-0000-0000000000e1', 'Grupo', 2, '20:00', 6, '00000000-0000-0000-0000-0000000000c1');
+insert into public.lugares (id, nombre, created_by) values
+  ('00000000-0000-0000-0000-00000000000a', 'Cancha', '00000000-0000-0000-0000-0000000000c1');
+insert into public.grupos (id, nombre, lugar_id, dia_semana, hora, cupo_titulares, owner_id) values
+  ('00000000-0000-0000-0000-0000000000e1', 'Grupo', '00000000-0000-0000-0000-00000000000a', 2, '20:00', 6, '00000000-0000-0000-0000-0000000000c1');
 insert into public.grupo_membresias (grupo_id, player_id, tipo, orden, status) values
   ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000d1', 'titular', null, 'activo'),
   ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000d2', 'titular', null, 'activo');
