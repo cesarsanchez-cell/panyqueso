@@ -51,6 +51,14 @@ export function arLocalFromE164(e164: string | null | undefined): string {
   return e164.replace(/^\+/, "");
 }
 
+// Numero para wa.me / WhatsApp click-to-chat: digitos en formato internacional
+// sin el "+". Para AR movil queda "549" + 10 digitos, que es lo que espera
+// https://wa.me/<numero>. Devuelve "" si no hay numero.
+export function waNumberFromE164(e164: string | null | undefined): string {
+  if (!e164) return "";
+  return e164.replace(/\D/g, "");
+}
+
 // Formato visual: 11 5555-1234 (CABA/GBA 4-2-4) o 351 555-1234 (interior 3-3-4).
 // Pensado para mostrar en cards y listas, no para inputs.
 export function formatArLocal(e164: string | null | undefined): string {
