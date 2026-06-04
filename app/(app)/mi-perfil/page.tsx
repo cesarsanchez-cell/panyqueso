@@ -432,9 +432,7 @@ export default async function MiPerfilPage({
       ) : null}
 
       <div className="flex items-center gap-3">
-        {player ? (
-          <PlayerAvatar url={player.avatar_url} nombre={player.nombre} size="lg" />
-        ) : null}
+        {player ? <PlayerAvatar url={player.avatar_url} nombre={player.nombre} size="lg" /> : null}
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
             Hola{player?.nombre ? `, ${player.nombre.split(" ")[0]}` : ""}.
