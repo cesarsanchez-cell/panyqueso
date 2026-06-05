@@ -29,6 +29,7 @@ export function AdminPhotoForm({ playerId, currentUrl, nombre }: Props) {
     null,
   );
   const [preview, setPreview] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -62,18 +63,27 @@ export function AdminPhotoForm({ playerId, currentUrl, nombre }: Props) {
         )}
       </div>
 
-      <div className="space-y-2">
-        <input
-          ref={inputRef}
-          type="file"
-          name="foto"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            setPreview(f ? URL.createObjectURL(f) : null);
-          }}
-          className="block text-sm text-neutral-700 file:mr-3 file:rounded-md file:border-0 file:bg-neutral-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-neutral-700"
-        />
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <label className="shrink-0 cursor-pointer rounded-md bg-neutral-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700">
+            Elegir foto
+            <input
+              ref={inputRef}
+              type="file"
+              name="foto"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                setPreview(f ? URL.createObjectURL(f) : null);
+                setFileName(f ? f.name : null);
+              }}
+              className="sr-only"
+            />
+          </label>
+          <span className="min-w-0 flex-1 truncate text-sm text-neutral-600">
+            {fileName ?? "Ningún archivo elegido"}
+          </span>
+        </div>
         <p className="text-xs text-neutral-500">JPG, PNG o WEBP. Se ajusta sola.</p>
 
         <div className="flex flex-wrap items-center gap-3">
