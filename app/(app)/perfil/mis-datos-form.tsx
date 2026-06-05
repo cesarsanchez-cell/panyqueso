@@ -55,12 +55,24 @@ export function MisDatosForm({ initial }: { initial: MisDatosInitial }) {
   const [positions, setPositions] = useState<Set<PositionPref>>(
     () => new Set(initial.positions_possible),
   );
+  const [resetKey, setResetKey] = useState(0);
 
   useEffect(() => {
     if (state && "success" in state) {
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [state]);
+
+  // React 19 resetea el form tras un action; los checkboxes controlados quedan
+  // desincronizados. Al detectar el reset, remontamos el grupo para re-aplicar
+  // el estado al DOM.
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const onReset = () => requestAnimationFrame(() => setResetKey((k) => k + 1));
+    form.addEventListener("reset", onReset);
+    return () => form.removeEventListener("reset", onReset);
+  }, []);
 
   const fieldErrors = state && "fieldErrors" in state ? state.fieldErrors : {};
   const successMsg = state && "success" in state ? state.success : null;
@@ -192,7 +204,7 @@ export function MisDatosForm({ initial }: { initial: MisDatosInitial }) {
         <legend className="block text-sm font-medium text-neutral-800">
           Posiciones que también podés jugar
         </legend>
-        <div className="flex flex-wrap gap-2">
+        <div key={resetKey} className="flex flex-wrap gap-2">
           {POSITIONS.map((p) => {
             const checked = positions.has(p.value);
             return (

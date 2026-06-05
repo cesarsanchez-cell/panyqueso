@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 // Entrada de fecha de nacimiento cómoda en mobile: tres desplegables
 // (Día / Mes / Año) en vez del <input type="date"> nativo, que arranca en hoy
@@ -62,6 +62,19 @@ export function BirthdateInput({
   const [m, setM] = useState(initial.m);
   const [d, setD] = useState(initial.d);
   const dateRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [resetKey, setResetKey] = useState(0);
+
+  // React 19 resetea el form tras un action; los controles controlados quedan
+  // desincronizados (el DOM se vacía aunque el estado tenga la fecha). Al
+  // detectar el reset, remontamos los controles para re-aplicar el estado al DOM.
+  useEffect(() => {
+    const form = rootRef.current?.closest("form");
+    if (!form) return;
+    const onReset = () => requestAnimationFrame(() => setResetKey((k) => k + 1));
+    form.addEventListener("reset", onReset);
+    return () => form.removeEventListener("reset", onReset);
+  }, []);
 
   const currentYear = new Date().getFullYear();
   const years = useMemo(() => {
@@ -97,82 +110,84 @@ export function BirthdateInput({
   }
 
   return (
-    <div className="flex items-stretch gap-2">
-      <div className="grid flex-1 grid-cols-3 gap-2">
-        <select
-          id={id}
-          aria-label="Día"
-          required={required}
-          value={dSafe}
-          onChange={(e) => setD(e.target.value)}
-          className={selectCls}
+    <div ref={rootRef}>
+      <div key={resetKey} className="flex items-stretch gap-2">
+        <div className="grid flex-1 grid-cols-3 gap-2">
+          <select
+            id={id}
+            aria-label="Día"
+            required={required}
+            value={dSafe}
+            onChange={(e) => setD(e.target.value)}
+            className={selectCls}
+          >
+            <option value="">Día</option>
+            {days.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Mes"
+            required={required}
+            value={m}
+            onChange={(e) => setM(e.target.value)}
+            className={selectCls}
+          >
+            <option value="">Mes</option>
+            {MESES.map((nombre, i) => (
+              <option key={nombre} value={i + 1}>
+                {nombre}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Año"
+            required={required}
+            value={y}
+            onChange={(e) => setY(e.target.value)}
+            className={selectCls}
+          >
+            <option value="">Año</option>
+            {years.map((yr) => (
+              <option key={yr} value={yr}>
+                {yr}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button
+          type="button"
+          onClick={openCalendar}
+          aria-label="Abrir calendario"
+          title="Abrir calendario"
+          className="shrink-0 rounded-md border border-neutral-300 bg-white px-3 text-lg leading-none text-neutral-600 transition hover:bg-neutral-50"
         >
-          <option value="">Día</option>
-          {days.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-        <select
-          aria-label="Mes"
-          required={required}
-          value={m}
-          onChange={(e) => setM(e.target.value)}
-          className={selectCls}
-        >
-          <option value="">Mes</option>
-          {MESES.map((nombre, i) => (
-            <option key={nombre} value={i + 1}>
-              {nombre}
-            </option>
-          ))}
-        </select>
-        <select
-          aria-label="Año"
-          required={required}
-          value={y}
-          onChange={(e) => setY(e.target.value)}
-          className={selectCls}
-        >
-          <option value="">Año</option>
-          {years.map((yr) => (
-            <option key={yr} value={yr}>
-              {yr}
-            </option>
-          ))}
-        </select>
+          📅
+        </button>
+
+        {/* Valor real enviado al server. */}
+        <input type="hidden" name={name} value={value} />
+
+        {/* Calendario nativo opcional (oculto pero presente para showPicker). */}
+        <input
+          ref={dateRef}
+          type="date"
+          aria-hidden="true"
+          tabIndex={-1}
+          value={value}
+          max={`${currentYear}-12-31`}
+          onChange={(e) => {
+            const p = parse(e.target.value);
+            setY(p.y);
+            setM(p.m);
+            setD(p.d);
+          }}
+          className="sr-only"
+        />
       </div>
-
-      <button
-        type="button"
-        onClick={openCalendar}
-        aria-label="Abrir calendario"
-        title="Abrir calendario"
-        className="shrink-0 rounded-md border border-neutral-300 bg-white px-3 text-lg leading-none text-neutral-600 transition hover:bg-neutral-50"
-      >
-        📅
-      </button>
-
-      {/* Valor real enviado al server. */}
-      <input type="hidden" name={name} value={value} />
-
-      {/* Calendario nativo opcional (oculto pero presente para showPicker). */}
-      <input
-        ref={dateRef}
-        type="date"
-        aria-hidden="true"
-        tabIndex={-1}
-        value={value}
-        max={`${currentYear}-12-31`}
-        onChange={(e) => {
-          const p = parse(e.target.value);
-          setY(p.y);
-          setM(p.m);
-          setD(p.d);
-        }}
-        className="sr-only"
-      />
     </div>
   );
 }
