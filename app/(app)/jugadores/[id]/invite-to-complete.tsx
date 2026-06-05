@@ -2,6 +2,8 @@
 
 import { useActionState, useState } from "react";
 
+import { formatArLocal } from "@/lib/phone";
+
 import { invitePlayerToComplete, type InvitePlayerState } from "./actions";
 
 type Props = {
@@ -95,7 +97,8 @@ export function InviteToComplete({ playerId, playerNombre, hasPhone }: Props) {
           </div>
 
           {(() => {
-            const message = `Hola ${playerNombre}, te dimos de alta en Futbol de los martes ⚽\n\nEntrá con tu celular y esta contraseña temporal: ${success.tempPassword}\n\nDespués completá tu perfil (foto, equipo del que sos hincha, etc.) y cambiá la clave desde tu perfil.`;
+            const loginUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/login`;
+            const message = `Hola ${playerNombre}, te sumamos a Futbol de los martes ⚽\n\n1) Entrá acá 👉 ${loginUrl}\n2) Usuario: tu celular (${formatArLocal(success.phone)})\n3) Contraseña temporal: ${success.tempPassword}\n\nYa adentro: completá tu perfil (foto, equipo del que sos hincha, etc.) y cambiá la clave desde tu perfil. ¡Cualquier duda avisá! 🙌`;
             const link = buildWhatsAppLink(success.phone, message);
             if (!link) return null;
             return (
