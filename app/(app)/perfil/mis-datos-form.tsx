@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 
+import { BirthdateInput } from "@/components/birthdate-input";
 import { ClubSelect } from "@/components/club-select";
 import { formatArLocal } from "@/lib/phone";
 import type { Database } from "@/lib/supabase/database.types";
@@ -104,12 +105,10 @@ export function MisDatosForm({ initial }: { initial: MisDatosInitial }) {
         htmlFor="fecha_nacimiento"
         error={fieldErrors.fecha_nacimiento}
       >
-        <input
+        <BirthdateInput
           id="fecha_nacimiento"
-          name="fecha_nacimiento"
-          type="date"
           required
-          defaultValue={initial.fecha_nacimiento ?? ""}
+          defaultValue={initial.fecha_nacimiento}
           className={inputClass(fieldErrors.fecha_nacimiento)}
         />
       </Field>

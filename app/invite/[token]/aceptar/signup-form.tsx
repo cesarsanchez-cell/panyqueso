@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { BirthdateInput } from "@/components/birthdate-input";
 import { ClubSelect } from "@/components/club-select";
 import { formatArLocal } from "@/lib/phone";
 
@@ -91,13 +92,7 @@ export function SignupForm({ token, nombreTentativo, phone }: Props) {
         <label htmlFor="fecha_nacimiento" className={labelClass}>
           Fecha de nacimiento
         </label>
-        <input
-          id="fecha_nacimiento"
-          name="fecha_nacimiento"
-          type="date"
-          required
-          className={inputClass}
-        />
+        <BirthdateInput id="fecha_nacimiento" required className={inputClass} />
         <ErrorLine msg={fieldError(state, "fecha_nacimiento")} />
       </div>
 
