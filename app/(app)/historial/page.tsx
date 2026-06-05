@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 
+import { HistorialResumen, type HistorialResumenData } from "./historial-resumen";
+
 function formatFecha(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
@@ -46,6 +48,18 @@ export default async function HistorialPage() {
 
   const rows = data ?? [];
 
+  // Resumen ("carné"): se agrega a partir de las MISMAS filas que ya trajimos
+  // para la lista (sin DB nueva). Muestra la realidad: V/E/D + %.
+  const resumen: HistorialResumenData = {
+    jugados: rows.length,
+    ganados: rows.filter((r) => r.resultado === "ganado").length,
+    empates: rows.filter((r) => r.resultado === "empate").length,
+    perdidos: rows.filter((r) => r.resultado === "perdido").length,
+    goles: rows.reduce((acc, r) => acc + (r.goles ?? 0), 0),
+    asistencias: rows.reduce((acc, r) => acc + (r.asistencias ?? 0), 0),
+    figuras: rows.filter((r) => r.figura_es_mia).length,
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -54,6 +68,8 @@ export default async function HistorialPage() {
           Tus partidos jugados, por grupo. Con el tiempo se van a sumar más estadísticas.
         </p>
       </div>
+
+      {rows.length > 0 ? <HistorialResumen resumen={resumen} /> : null}
 
       {rows.length === 0 ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
