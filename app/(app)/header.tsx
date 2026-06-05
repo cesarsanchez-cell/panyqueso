@@ -28,7 +28,7 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
   ],
   player: [
     { label: "Mi perfil", href: "/mi-perfil" },
-    { label: "Historial", href: "/historial" },
+    { label: "Mi Actividad", href: "/historial" },
     { label: "Mi cuenta", href: "/perfil" },
   ],
 };
