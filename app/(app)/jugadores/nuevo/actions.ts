@@ -18,6 +18,20 @@ const ROLES: readonly PlayerRoleField[] = ["arquero", "jugador_campo", "mixto"];
 const POSITIONS: readonly PositionPref[] = ["arquero", "defensor", "mediocampista", "delantero"];
 const CONFIDENCES: readonly RatingConfidence[] = ["baja", "media", "alta"];
 
+// Subcomponentes por dimensión (modelo de puntuación v2). La dimensión
+// técnica/físico/mental es el promedio redondeado de sus 3 subs.
+const SUBS = {
+  physical: ["phys_power", "phys_speed", "phys_stamina"],
+  mental: ["ment_tactical", "ment_resilience", "ment_attitude"],
+  technical: ["tech_passing", "tech_finishing", "tech_linkup"],
+} as const;
+const SUB_KEYS = [...SUBS.physical, ...SUBS.mental, ...SUBS.technical] as const;
+type SubKey = (typeof SUB_KEYS)[number];
+
+function avgRound(a: number, b: number, c: number): number {
+  return Math.round((a + b + c) / 3);
+}
+
 function asString(v: FormDataEntryValue | null): string {
   return typeof v === "string" ? v.trim() : "";
 }
@@ -86,12 +100,13 @@ export async function createPlayerRequest(
     .filter((v): v is string => typeof v === "string")
     .filter((v): v is PositionPref => POSITIONS.includes(v as PositionPref));
 
-  const technical = parseRating(formData.get("technical"));
-  if (technical === null) errors.technical = "Entre 1 y 10";
-  const physical = parseRating(formData.get("physical"));
-  if (physical === null) errors.physical = "Entre 1 y 10";
-  const mental = parseRating(formData.get("mental"));
-  if (mental === null) errors.mental = "Entre 1 y 10";
+  // Los 9 subcomponentes (modelo v2). La dimensión = promedio de sus 3 subs.
+  const subs = {} as Record<SubKey, number>;
+  for (const key of SUB_KEYS) {
+    const val = parseRating(formData.get(key));
+    if (val === null) errors[key] = "Entre 1 y 10";
+    else subs[key] = val;
+  }
 
   const rating_confidence_raw = asString(formData.get("rating_confidence")) || "baja";
   const rating_confidence = CONFIDENCES.includes(rating_confidence_raw as RatingConfidence)
@@ -115,6 +130,12 @@ export async function createPlayerRequest(
   // Build proposed_values jsonb con los campos finales (sin nulls).
   // edad va derivada (compute_internal_score la sigue usando); fecha_nacimiento
   // queda guardada para futuras pantallas.
+  // La dimensión se guarda como el promedio de sus subs (igual que la edición);
+  // el trigger calcula internal_score v2 desde técnica/físico/mental + edad.
+  const physical = avgRound(subs.phys_power, subs.phys_speed, subs.phys_stamina);
+  const mental = avgRound(subs.ment_tactical, subs.ment_resilience, subs.ment_attitude);
+  const technical = avgRound(subs.tech_passing, subs.tech_finishing, subs.tech_linkup);
+
   const proposed_values: { [key: string]: Json } = {
     nombre,
     edad,
@@ -124,6 +145,7 @@ export async function createPlayerRequest(
     technical,
     physical,
     mental,
+    ...subs,
     rating_confidence,
   };
   if (positions_possible.length > 0) {

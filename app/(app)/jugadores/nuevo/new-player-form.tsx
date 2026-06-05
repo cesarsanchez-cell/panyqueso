@@ -25,6 +25,35 @@ const CONFIDENCE_OPTIONS = [
   { value: "alta", label: "Alta" },
 ] as const;
 
+// Modelo de puntuación v2: 9 subcomponentes agrupados por dimensión. La
+// dimensión técnica/físico/mental se calcula como el promedio de sus 3 subs.
+const DIMENSIONS = [
+  {
+    label: "Físico",
+    subs: [
+      { name: "phys_power", label: "Potencia / fuerza" },
+      { name: "phys_speed", label: "Velocidad" },
+      { name: "phys_stamina", label: "Resistencia" },
+    ],
+  },
+  {
+    label: "Mental",
+    subs: [
+      { name: "ment_tactical", label: "Orden táctico" },
+      { name: "ment_resilience", label: "Resiliencia" },
+      { name: "ment_attitude", label: "Actitud" },
+    ],
+  },
+  {
+    label: "Técnica",
+    subs: [
+      { name: "tech_passing", label: "Pase" },
+      { name: "tech_finishing", label: "Eficacia" },
+      { name: "tech_linkup", label: "Asociación" },
+    ],
+  },
+] as const;
+
 function fieldError(state: NewPlayerState, field: string): string | null {
   if (state && "fieldErrors" in state && state.fieldErrors[field]) {
     return state.fieldErrors[field];
@@ -114,23 +143,34 @@ export function NewPlayerForm() {
       </Section>
 
       <Section title="Ratings (1–10)">
-        <div className="grid gap-4 sm:grid-cols-3">
-          {(["technical", "physical", "mental"] as const).map((field) => (
-            <div key={field}>
-              <label htmlFor={field} className={labelClass}>
-                {field === "technical" ? "Técnica" : field === "physical" ? "Físico" : "Mental"}
-              </label>
-              <input
-                id={field}
-                name={field}
-                type="number"
-                min={1}
-                max={10}
-                required
-                className={inputClass}
-              />
-              <ErrorLine msg={fieldError(state, field)} />
-            </div>
+        <p className="text-xs text-neutral-500">
+          Cargá los 9 subcomponentes. Cada dimensión (Físico / Mental / Técnica) se calcula como el
+          promedio de sus 3.
+        </p>
+        <div className="mt-3 space-y-4">
+          {DIMENSIONS.map((dim) => (
+            <fieldset key={dim.label}>
+              <legend className={labelClass}>{dim.label}</legend>
+              <div className="mt-2 grid gap-4 sm:grid-cols-3">
+                {dim.subs.map((s) => (
+                  <div key={s.name}>
+                    <label htmlFor={s.name} className="block text-xs font-medium text-neutral-600">
+                      {s.label}
+                    </label>
+                    <input
+                      id={s.name}
+                      name={s.name}
+                      type="number"
+                      min={1}
+                      max={10}
+                      required
+                      className={inputClass}
+                    />
+                    <ErrorLine msg={fieldError(state, s.name)} />
+                  </div>
+                ))}
+              </div>
+            </fieldset>
           ))}
         </div>
         <div className="mt-4">
