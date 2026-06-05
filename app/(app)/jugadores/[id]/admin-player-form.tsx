@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { BirthdateInput } from "@/components/birthdate-input";
 import { arLocalFromE164 } from "@/lib/phone";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -107,12 +108,10 @@ export function AdminPlayerForm({ playerId, initial }: { playerId: string; initi
             <label htmlFor="fecha_nacimiento" className={labelClass}>
               Fecha de nacimiento
             </label>
-            <input
+            <BirthdateInput
               id="fecha_nacimiento"
-              name="fecha_nacimiento"
-              type="date"
               required
-              defaultValue={initial.fecha_nacimiento ?? ""}
+              defaultValue={initial.fecha_nacimiento}
               className={inputClass}
             />
             <ErrorLine msg={fieldError(state, "fecha_nacimiento")} />

@@ -2,6 +2,8 @@
 
 import { useActionState } from "react";
 
+import { BirthdateInput } from "@/components/birthdate-input";
+
 import { createPlayerRequest, type NewPlayerState } from "./actions";
 
 const ROLE_OPTIONS = [
@@ -56,13 +58,7 @@ export function NewPlayerForm() {
             <label htmlFor="fecha_nacimiento" className={labelClass}>
               Fecha de nacimiento
             </label>
-            <input
-              id="fecha_nacimiento"
-              name="fecha_nacimiento"
-              type="date"
-              required
-              className={inputClass}
-            />
+            <BirthdateInput id="fecha_nacimiento" required className={inputClass} />
             <ErrorLine msg={fieldError(state, "fecha_nacimiento")} />
           </div>
         </div>
