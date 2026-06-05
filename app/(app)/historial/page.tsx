@@ -63,9 +63,10 @@ export default async function HistorialPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Mi historial</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Mi Actividad</h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Tus partidos jugados, por grupo. Con el tiempo se van a sumar más estadísticas.
+          Tu resumen y tus partidos jugados, por grupo. Con el tiempo se van a sumar más
+          estadísticas.
         </p>
       </div>
 

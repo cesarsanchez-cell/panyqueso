@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ClubCrest } from "@/components/club-crest";
-import { computeBadges, type PlayerBadge } from "@/lib/badges/compute";
 import { requireUser } from "@/lib/auth/require-role";
 import { playerLabel } from "@/lib/players/label";
 import { createClient } from "@/lib/supabase/server";
@@ -409,29 +408,8 @@ export default async function MiPerfilPage({
   const player = playerRows && playerRows.length > 0 ? playerRows[0] : null;
 
   let lineups: GrupoLineup[] = [];
-  let actividad: {
-    jugados: number;
-    ganados: number;
-    goles: number;
-    asistencias: number;
-    figuras: number;
-  } | null = null;
   if (player) {
     lineups = await loadLineups(supabase, player.id);
-
-    // Panel de actividad: números positivos del jugador. Reutiliza el RPC del
-    // historial (partidos pasados). Solo se muestra si ya jugó algún partido.
-    const { data: hist } = await supabase.rpc("get_my_match_history");
-    const histRows = hist ?? [];
-    if (histRows.length > 0) {
-      actividad = {
-        jugados: histRows.length,
-        ganados: histRows.filter((r) => r.resultado === "ganado").length,
-        goles: histRows.reduce((acc, r) => acc + (r.goles ?? 0), 0),
-        asistencias: histRows.reduce((acc, r) => acc + (r.asistencias ?? 0), 0),
-        figuras: histRows.filter((r) => r.figura_es_mia).length,
-      };
-    }
   }
 
   return (
@@ -457,10 +435,6 @@ export default async function MiPerfilPage({
           </p>
         </div>
       </div>
-
-      {actividad ? <ActivityPanel actividad={actividad} /> : null}
-
-      {actividad ? <BadgesPanel badges={computeBadges(actividad)} /> : null}
 
       {lineups.length === 0 ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
@@ -488,83 +462,6 @@ export default async function MiPerfilPage({
         </Link>
       </p>
     </div>
-  );
-}
-
-// Panel "Tu actividad": el mimo al jugador. Solo datos positivos (jugados,
-// ganados, goles, asistencias). Enlaza al historial completo. Nunca expone
-// rating interno.
-function ActivityPanel({
-  actividad,
-}: {
-  actividad: {
-    jugados: number;
-    ganados: number;
-    goles: number;
-    asistencias: number;
-    figuras: number;
-  };
-}) {
-  const showFiguras = actividad.figuras > 0;
-  return (
-    <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-          Tu actividad
-        </h2>
-        <Link
-          href="/historial"
-          className="text-xs font-medium text-emerald-700 transition hover:underline"
-        >
-          Ver mi historial →
-        </Link>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <ActivityStat label="Jugados" value={actividad.jugados} />
-        <ActivityStat label="Ganados" value={actividad.ganados} />
-        <ActivityStat label="Goles" value={actividad.goles} />
-        <ActivityStat label="Asistencias" value={actividad.asistencias} />
-        {showFiguras ? <ActivityStat label="⭐ Figura" value={actividad.figuras} /> : null}
-      </div>
-    </section>
-  );
-}
-
-function ActivityStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-center">
-      <p className="text-2xl font-bold tracking-tight text-neutral-900">{value}</p>
-      <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</p>
-    </div>
-  );
-}
-
-// "Tus insignias" (FUT-78): logros positivos derivados del historial. Solo se
-// muestran las ganadas; nunca expone rating interno ni nada sensible.
-function BadgesPanel({ badges }: { badges: PlayerBadge[] }) {
-  if (badges.length === 0) return null;
-  return (
-    <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-        Tus insignias
-      </h2>
-      <ul className="mt-3 flex flex-wrap gap-3">
-        {badges.map((b) => (
-          <li
-            key={b.id}
-            className="flex items-center gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
-          >
-            <span className="text-2xl leading-none" aria-hidden="true">
-              {b.emoji}
-            </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold text-amber-900">{b.title}</span>
-              <span className="block text-xs text-amber-700">{b.detail}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }
 
