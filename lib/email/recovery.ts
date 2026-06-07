@@ -37,7 +37,7 @@ export async function sendPlayerRecoveryEmail(to: string, link: string): Promise
   const html = `
     <div style="font-family: system-ui, -apple-system, sans-serif; color: #171717; line-height: 1.5;">
       <h2 style="margin: 0 0 12px;">Recuperá tu contraseña</h2>
-      <p>Pediste resetear tu contraseña de Fútbol de los martes. Tocá el botón para elegir una nueva:</p>
+      <p>Pediste resetear tu contraseña de Pan y Queso. Tocá el botón para elegir una nueva:</p>
       <p style="margin: 20px 0;">
         <a href="${safeLink}"
            style="display: inline-block; background: #171717; color: #fff; text-decoration: none;
@@ -62,7 +62,7 @@ export async function sendPlayerRecoveryEmail(to: string, link: string): Promise
       body: JSON.stringify({
         from,
         to,
-        subject: "Recuperá tu contraseña · Fútbol de los martes",
+        subject: "Recuperá tu contraseña · Pan y Queso",
         html,
       }),
     });

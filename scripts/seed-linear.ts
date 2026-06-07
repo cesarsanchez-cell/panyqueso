@@ -1,5 +1,5 @@
 /**
- * Seed Linear con el roadmap del MVP "Futbol de los martes".
+ * Seed Linear con el roadmap del MVP "Pan y Queso".
  *
  * Uso:
  *   1. Crear Personal API Key en Linear: Settings -> API -> Personal API keys.
@@ -7,8 +7,8 @@
  *   3. Ejecutar: pnpm seed:linear
  *
  * Idempotente: si volves a correrlo, no duplica nada.
- * - Team "Futbol de los martes" (key FUT): se crea si no existe.
- * - Project "MVP — Futbol de los martes": se crea si no existe.
+ * - Team "Pan y Queso" (key FUT): se crea si no existe.
+ * - Project "Pan y Queso": se crea si no existe.
  * - 22 labels: se crean las que falten.
  * - ~50 issues: se crean por titulo; si una con ese titulo ya existe en el team, se omite.
  */
@@ -21,9 +21,9 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-const TEAM_NAME = "Futbol de los martes";
+const TEAM_NAME = "Pan y Queso";
 const TEAM_KEY = "FUT";
-const PROJECT_NAME = "MVP — Futbol de los martes";
+const PROJECT_NAME = "Pan y Queso";
 const PROJECT_DESCRIPTION =
   "Web app responsive para organizar partidos de futbol entre amigos con armado balanceado de equipos. Roles MVP: Admin y Veedor. Referencia: plan.txt v4 del repo.";
 

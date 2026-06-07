@@ -1,4 +1,4 @@
-# Tutorial de Linear — paso a paso para Futbol de los martes
+# Tutorial de Linear — paso a paso para Pan y Queso
 
 Pensado para alguien que no usó Linear antes (o muy poco). Te lleva desde
 cero hasta tener el MVP cargado y empezar a trabajar en Fase 1.
@@ -13,7 +13,7 @@ Linear organiza el trabajo en una jerarquía simple:
 
 ```
 Workspace                ← "tu cuenta" / tu compañía
-  └── Team               ← un equipo (ej: "Futbol de los martes")
+  └── Team               ← un equipo (ej: "Pan y Queso")
         ├── Issues       ← unidad de trabajo, equivalente a una tarea
         ├── Cycles       ← sprints semanales/quincenales (opcionales)
         ├── Projects     ← agrupación de issues con un objetivo concreto
@@ -23,8 +23,8 @@ Workspace                ← "tu cuenta" / tu compañía
 Aplicado a nuestro caso:
 
 - **Workspace**: tu cuenta de Linear.
-- **Team**: "Futbol de los martes" (prefijo `FUT`).
-- **Project**: "MVP — Futbol de los martes" agrupa TODAS las issues del MVP.
+- **Team**: "Pan y Queso" (prefijo `FUT`).
+- **Project**: "Pan y Queso" agrupa TODAS las issues del MVP.
 - **Issues**: cada tarea concreta del roadmap (`FUT-1`, `FUT-2`, …).
 - **Labels**: etiquetas para categorizar (fase, área, tipo, gate).
 - **Cycles**: NO los vamos a usar al principio. Los explico abajo y decidimos después.
@@ -142,7 +142,7 @@ workspace: lo que prefieras (puede ser tu nombre, "Personal", etc.).
 
 Sidebar izquierda → click en el ícono de team → **Create team**:
 
-- **Name**: `Futbol de los martes`
+- **Name**: `Pan y Queso`
 - **Identifier** (prefijo): `FUT` ← se usa para los IDs (`FUT-1`, `FUT-2`, …)
 - **Workflow**: dejá el default (Backlog/Todo/In Progress/In Review/Done/Canceled).
 
@@ -190,7 +190,7 @@ Sidebar izquierda → **Projects** (debajo del nombre del team) → **+ New proj
 
 | Campo | Valor |
 |---|---|
-| **Name** | `MVP — Futbol de los martes` |
+| **Name** | `Pan y Queso` |
 | **Description** | Copiá el primer párrafo de `plan.txt` (sección "Product goal" del CLAUDE.md) |
 | **Lead** | Vos |
 | **Status** | `In progress` |
@@ -203,10 +203,10 @@ Sidebar izquierda → **Projects** (debajo del nombre del team) → **+ New proj
 
 1. Autorizar la cuenta de GitHub.
 2. Seleccionar la organización donde está el repo (probablemente tu cuenta personal `cesarsanchez-cell`).
-3. Permitir acceso al repo `Futbol-de-los-martes`.
+3. Permitir acceso al repo `panyqueso`.
 
 Después, en **Settings del team → GitHub → Repositories**, agregar
-`cesarsanchez-cell/Futbol-de-los-martes` como repo del team.
+`cesarsanchez-cell/panyqueso` como repo del team.
 
 ---
 
@@ -229,7 +229,7 @@ Tomemos `Cliente Supabase: server + browser helpers` de Fase 1 como ejemplo.
 5. **Labels**: apretá **L** dentro del form, escribí `fase-1`, Enter. Repetí
    con `area:auth` y `tipo:setup`.
 6. **Project**: apretá **P**, escribí `MVP`, Enter para seleccionar
-   `MVP — Futbol de los martes`.
+   `Pan y Queso`.
 7. **Status**: apretá **S**, elegí `Todo` (porque es la primera de Fase 1
    que vamos a tocar).
 8. **Priority**: apretá **Shift+P**, elegí `High`.
@@ -270,7 +270,7 @@ Las views son filtros guardados. Te ahorran tiempo todos los días.
 ### 8.1 "Fase actual"
 
 Filtro:
-- Project = `MVP — Futbol de los martes`
+- Project = `Pan y Queso`
 - Label = `fase-1` (la fase activa)
 - Status ≠ `Done`, ≠ `Canceled`
 
@@ -362,10 +362,10 @@ palette y desde ahí buscás por texto cualquier acción ("create issue",
 
 Cuando termines, verificá:
 
-- [ ] Team `Futbol de los martes` con prefijo `FUT` existe.
-- [ ] Project `MVP — Futbol de los martes` creado.
+- [ ] Team `Pan y Queso` con prefijo `FUT` existe.
+- [ ] Project `Pan y Queso` creado.
 - [ ] 22 labels creadas (9 fases + 8 áreas + 6 tipos + 2 especiales).
-- [ ] Integración GitHub activa, repo `Futbol-de-los-martes` vinculado.
+- [ ] Integración GitHub activa, repo `panyqueso` vinculado.
 - [ ] Issues de Fase 0 cargadas con status `Done`.
 - [ ] Issues de Fase 1 cargadas con status `Backlog`, salvo "Cliente Supabase…" en `Todo`.
 - [ ] Issues de Fases 2 a 8 cargadas con status `Backlog`.

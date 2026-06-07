@@ -1,4 +1,4 @@
-# Roadmap del MVP en Linear — Futbol de los martes
+# Roadmap del MVP en Linear — Pan y Queso
 
 Guía operativa para cargar el proyecto en Linear. Pegar / crear manualmente.
 Referencia maestra: `plan.txt` v4 (raíz del repo).
@@ -10,13 +10,13 @@ Referencia maestra: `plan.txt` v4 (raíz del repo).
 ## 0. Pre-requisitos en Linear
 
 1. **Workspace** existente.
-2. **Team**: crear team "Futbol de los martes" (prefijo sugerido `FUT`).
+2. **Team**: crear team "Pan y Queso" (prefijo sugerido `FUT`).
 3. **Integración GitHub** → Settings → Integrations → GitHub → autorizar.
-4. **Repo vinculado**: en la config del team, agregar `cesarsanchez-cell/Futbol-de-los-martes` como repo del team. Esto habilita:
+4. **Repo vinculado**: en la config del team, agregar `cesarsanchez-cell/panyqueso` como repo del team. Esto habilita:
    - Cierre automático de issues con `Closes FUT-123` / `Fixes FUT-123` en PRs.
    - Linkeo automático de branches que tengan el ID en el nombre.
    - Cambio de estado al abrir/mergear PRs.
-5. **Project**: crear un Project nuevo en el team: **"MVP — Futbol de los martes"**.
+5. **Project**: crear un Project nuevo en el team: **"Pan y Queso"**.
    - Description: copiar el primer párrafo de `plan.txt`.
    - Target date: a definir.
    - Lead: vos.

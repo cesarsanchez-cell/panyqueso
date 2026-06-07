@@ -98,7 +98,7 @@ export function InviteToComplete({ playerId, playerNombre, hasPhone }: Props) {
 
           {(() => {
             const loginUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/login`;
-            const message = `Hola ${playerNombre}, te sumamos a Futbol de los martes ⚽\n\n1) Entrá acá 👉 ${loginUrl}\n2) Usuario: tu celular (${formatArLocal(success.phone)})\n3) Contraseña temporal: ${success.tempPassword}\n\nYa adentro: completá tu perfil (foto, equipo del que sos hincha, etc.) y cambiá la clave desde tu perfil. ¡Cualquier duda avisá! 🙌`;
+            const message = `Hola ${playerNombre}, te sumamos a Pan y Queso ⚽\n\n1) Entrá acá 👉 ${loginUrl}\n2) Usuario: tu celular (${formatArLocal(success.phone)})\n3) Contraseña temporal: ${success.tempPassword}\n\nYa adentro: completá tu perfil (foto, equipo del que sos hincha, etc.) y cambiá la clave desde tu perfil. ¡Cualquier duda avisá! 🙌`;
             const link = buildWhatsAppLink(success.phone, message);
             if (!link) return null;
             return (

@@ -1,4 +1,4 @@
-# Futbol de los martes - Claude Code working agreement
+# Pan y Queso - Claude Code working agreement
 
 ## Product goal
 

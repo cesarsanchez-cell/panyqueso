@@ -10,7 +10,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
   return (
     <div className="space-y-6">
       <div className="space-y-1 text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Futbol de los martes</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Pan y Queso</h1>
         <p className="text-sm text-neutral-600">Ingresá con tu cuenta para continuar.</p>
       </div>
 
