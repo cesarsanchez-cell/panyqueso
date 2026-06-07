@@ -87,7 +87,7 @@ export function AdminResetPassword({ playerId, playerNombre }: Props) {
 
           {success.phone ? (
             (() => {
-              const message = `Hola ${playerNombre}, tu contraseña temporal para Futbol de los martes es: ${success.tempPassword}\n\nEntrá a la app con tu celular y esa contraseña, después cambiala desde tu perfil.`;
+              const message = `Hola ${playerNombre}, tu contraseña temporal para Pan y Queso es: ${success.tempPassword}\n\nEntrá a la app con tu celular y esa contraseña, después cambiala desde tu perfil.`;
               const link = buildWhatsAppLink(success.phone, message);
               if (!link) return null;
               return (

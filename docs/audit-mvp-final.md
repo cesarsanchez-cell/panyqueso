@@ -1,4 +1,4 @@
-# Audit handoff — MVP Futbol de los martes
+# Audit handoff — MVP Pan y Queso
 
 Documento de cierre del MVP para revisión por auditor externo cuando esté disponible.
 Generado al cerrar Fase 8 (2026-05-23).

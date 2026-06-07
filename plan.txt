@@ -1,4 +1,4 @@
-# Plan técnico y funcional — Futbol de los martes (MVP)
+# Plan técnico y funcional — Pan y Queso (MVP)
 # Versión: v4 (corrige hallazgos mayores de la auditoría #3)
 # Estado: ESPERANDO CUARTA AUDITORÍA / "GO"
 # Encoding: UTF-8 sin BOM

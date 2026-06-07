@@ -4,7 +4,7 @@ Regla principal
 No modifiques archivos, no crees código y no implementes nada hasta que yo apruebe explícitamente el plan con un “GO”.
 
 Proyecto
-Quiero construir una web responsive para organizar partidos de fútbol entre amigos, llamada “Futbol de los martes”.
+Quiero construir una web responsive para organizar partidos de fútbol entre amigos, llamada “Pan y Queso”.
 
 Objetivo
 Crear una herramienta para que los equipos se armen de forma equilibrada, entretenida y leal, combinando jugadores según habilidades técnicas, físicas, mentales, edad, rol y posición.
