@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { ClubCrest } from "@/components/club-crest";
 import { requireRole } from "@/lib/auth/require-role";
+import { playerLabel } from "@/lib/players/label";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -155,7 +156,7 @@ export default async function JugadorDetallePage({
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-neutral-900">
             <ClubCrest clubId={player.club_id} size={22} />
-            <span className="truncate">{player.nombre}</span>
+            <span className="truncate">{playerLabel(player.nombre, player.apodo)}</span>
           </h1>
           <p className="mt-1 text-sm text-neutral-500">
             {player.edad} años · {ROLE_FIELD_LABEL[player.role_field]}
@@ -273,11 +274,14 @@ export default async function JugadorDetallePage({
 
       {isAdmin ? (
         player.auth_user_id ? (
-          <AdminResetPassword playerId={player.id} playerNombre={player.nombre} />
+          <AdminResetPassword
+            playerId={player.id}
+            playerNombre={playerLabel(player.nombre, player.apodo)}
+          />
         ) : (
           <InviteToComplete
             playerId={player.id}
-            playerNombre={player.nombre}
+            playerNombre={playerLabel(player.nombre, player.apodo)}
             hasPhone={Boolean(player.phone)}
           />
         )
