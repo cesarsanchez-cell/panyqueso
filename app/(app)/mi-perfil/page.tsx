@@ -422,11 +422,20 @@ export default async function MiPerfilPage({
       ) : null}
 
       <div className="flex items-center gap-3">
-        {player ? <PlayerAvatar url={player.avatar_url} nombre={player.nombre} size="lg" /> : null}
+        {player ? (
+          <PlayerAvatar
+            url={player.avatar_url}
+            nombre={player.nombre}
+            apodo={player.apodo}
+            size="lg"
+          />
+        ) : null}
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-neutral-900">
             {player?.club_id ? <ClubCrest clubId={player.club_id} size={22} /> : null}
-            <span>Hola{player?.nombre ? `, ${player.nombre.split(" ")[0]}` : ""}.</span>
+            <span>
+              Hola{player ? `, ${player.apodo?.trim() || player.nombre.split(" ")[0]}` : ""}.
+            </span>
           </h1>
           <p className="mt-1 text-sm text-neutral-600">
             {player?.status === "approved"
@@ -484,7 +493,7 @@ function ConfirmedTeamColumn({
               key={m.playerId}
               className={`flex items-center gap-2 text-sm ${m.isMe ? "font-semibold text-emerald-900" : "text-neutral-800"}`}
             >
-              <PlayerAvatar url={m.avatarUrl} nombre={m.nombre} />
+              <PlayerAvatar url={m.avatarUrl} nombre={m.nombre} apodo={m.apodo} />
               <ClubCrest clubId={m.clubId} size={16} />
               <span className="min-w-0 truncate">
                 {m.isGoalkeeper ? (
@@ -567,7 +576,7 @@ function ConfirmedMatchCard({ lineup, teams }: { lineup: GrupoLineup; teams: Con
                 key={m.playerId}
                 className={`flex items-center gap-2 text-sm ${m.isMe ? "font-semibold text-amber-900" : "text-neutral-800"}`}
               >
-                <PlayerAvatar url={m.avatarUrl} nombre={m.nombre} />
+                <PlayerAvatar url={m.avatarUrl} nombre={m.nombre} apodo={m.apodo} />
                 <ClubCrest clubId={m.clubId} size={16} />
                 <span className="truncate">
                   {playerLabel(m.nombre, m.apodo)}

@@ -24,12 +24,16 @@ function initials(nombre: string): string {
 export function PlayerAvatar({
   url,
   nombre,
+  apodo,
   size = "sm",
 }: {
   url: string | null;
   nombre: string;
+  // Si hay apodo, las iniciales salen de ahi (es como se llama al jugador).
+  apodo?: string | null;
   size?: Size;
 }) {
+  const fromName = apodo?.trim() || nombre;
   return (
     <div
       className={`${SIZE_CLASS[size]} shrink-0 overflow-hidden rounded-full bg-neutral-100 ring-1 ring-neutral-200`}
@@ -39,7 +43,7 @@ export function PlayerAvatar({
         <img src={url} alt="" className="h-full w-full object-cover" />
       ) : (
         <div className="flex h-full w-full items-center justify-center font-semibold text-neutral-400">
-          {initials(nombre)}
+          {initials(fromName)}
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { ClubCrest } from "@/components/club-crest";
+import { playerLabel } from "@/lib/players/label";
 import type { Database } from "@/lib/supabase/database.types";
 
 import { PlayerAvatar } from "../player-avatar";
@@ -86,18 +87,11 @@ export function PlayersListFilterable({ players }: { players: Player[] }) {
                 className="flex items-center justify-between gap-4 px-4 py-3 transition hover:bg-neutral-50"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <PlayerAvatar url={p.avatar_url} nombre={p.nombre} />
+                  <PlayerAvatar url={p.avatar_url} nombre={p.nombre} apodo={p.apodo} />
                   <div className="min-w-0">
                     <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-neutral-900">
                       <ClubCrest clubId={p.club_id} />
-                      <span className="truncate">
-                        {p.nombre}
-                        {p.apodo ? (
-                          <span className="ml-2 text-xs font-normal text-neutral-500">
-                            ({p.apodo})
-                          </span>
-                        ) : null}
-                      </span>
+                      <span className="truncate">{playerLabel(p.nombre, p.apodo)}</span>
                     </p>
                     <p className="text-xs text-neutral-500">
                       {p.edad} años · {ROLE_FIELD_LABEL[p.role_field]}
