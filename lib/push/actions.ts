@@ -8,6 +8,10 @@ import { createClient } from "@/lib/supabase/server";
 
 export type PushResult = { ok: true; sent?: number } | { ok: false; error: string };
 
+// Banca de suplentes que queremos mantener: si baja de esto, avisamos al grupo
+// para que alguien se anote como suplente.
+const SUPLENTES_OBJETIVO = 3;
+
 // Formatea una fecha 'yyyy-mm-dd' como 'dd/mm' sin pasar por Date (evita líos
 // de zona horaria con fechas sin hora).
 function fechaCorta(fecha: string): string {
@@ -93,10 +97,17 @@ export async function sendTestPush(): Promise<PushResult> {
   return sent > 0 ? { ok: true, sent } : { ok: false, error: "No se pudo entregar el push." };
 }
 
-// Aviso automático de la Fase 2: cuando un titular se baja y NO había suplente
-// para promover, queda un lugar de titular libre. Notificamos al resto del grupo
-// (los que NO son titulares ahora) para que alguien lo tome, sin que nadie tenga
-// que avisar a mano por WhatsApp.
+// Aviso automático de la Fase 2: cuando alguien se baja, avisamos al grupo para
+// mantener la lista llena, sin que nadie tenga que escribir al WhatsApp. Dos
+// escenarios:
+//   1. Se liberó un lugar de TITULAR (titulares activos < cupo, no había
+//      suplente para promover): "¡Se liberó un lugar! anotate".
+//   2. La banca de SUPLENTES bajó del objetivo (titulares llenos pero suplentes
+//      activos < SUPLENTES_OBJETIVO): "Hay lugar entre los suplentes, anotate".
+//
+// En ambos casos el aviso va a los miembros activos del grupo que hoy NO son ni
+// titular ni suplente en esta convocatoria (incluye a los que se habían bajado:
+// pueden volver), excluyendo al que acaba de bajarse.
 //
 // Es best-effort: nunca lanza. Si las VAPID no están o algo falla, devuelve sin
 // romper la acción de bajarse. Corre con service-role para leer las
@@ -132,19 +143,32 @@ export async function notifyOpenSpot(convocatoriaId: string): Promise<PushResult
       .maybeSingle();
     if (!grupo) return { ok: true, sent: 0 };
 
-    // ¿Quedó realmente un lugar de titular libre? (titulares activos < cupo).
-    // Si no, no hay nada que avisar (p. ej. se bajó un suplente, o ya se
-    // promovió a alguien).
+    // Conteo del estado actual de la convocatoria (sin declinados).
     const { count: titularesCount } = await admin
       .from("convocatoria_players")
       .select("id", { count: "exact", head: true })
       .eq("convocatoria_id", convocatoriaId)
       .eq("rol_en_convocatoria", "titular")
       .neq("attendance_status", "declinado");
-    if ((titularesCount ?? 0) >= grupo.cupo_titulares) return { ok: true, sent: 0 };
+    const { count: suplentesCount } = await admin
+      .from("convocatoria_players")
+      .select("id", { count: "exact", head: true })
+      .eq("convocatoria_id", convocatoriaId)
+      .eq("rol_en_convocatoria", "suplente")
+      .neq("attendance_status", "declinado");
 
-    // Candidatos: miembros activos del grupo que hoy NO son titular activo en
-    // esta convocatoria (incluye a los que se habían bajado: pueden volver).
+    // Decidir qué avisar. Titular tiene prioridad (es el lugar que más urge).
+    let kind: "titular" | "suplente" | null = null;
+    if ((titularesCount ?? 0) < grupo.cupo_titulares) {
+      kind = "titular";
+    } else if ((suplentesCount ?? 0) < SUPLENTES_OBJETIVO) {
+      kind = "suplente";
+    }
+    if (!kind) return { ok: true, sent: 0 };
+
+    // Candidatos: miembros activos del grupo que hoy NO son ni titular ni
+    // suplente activo en esta convocatoria (incluye a los que se habían bajado:
+    // pueden volver). Excluimos al que acaba de bajarse.
     const { data: members } = await admin
       .from("grupo_membresias")
       .select("player_id")
@@ -152,15 +176,15 @@ export async function notifyOpenSpot(convocatoriaId: string): Promise<PushResult
       .eq("status", "activo");
     const memberIds = (members ?? []).map((m) => m.player_id);
 
-    const { data: titulares } = await admin
+    const { data: enConv } = await admin
       .from("convocatoria_players")
       .select("player_id")
       .eq("convocatoria_id", convocatoriaId)
-      .eq("rol_en_convocatoria", "titular")
+      .in("rol_en_convocatoria", ["titular", "suplente"])
       .neq("attendance_status", "declinado");
-    const titularesIds = new Set((titulares ?? []).map((t) => t.player_id));
+    const enConvIds = new Set((enConv ?? []).map((t) => t.player_id));
 
-    const targetIds = memberIds.filter((id) => id !== actorId && !titularesIds.has(id));
+    const targetIds = memberIds.filter((id) => id !== actorId && !enConvIds.has(id));
     if (targetIds.length === 0) return { ok: true, sent: 0 };
 
     const { data: subs } = await admin
@@ -169,12 +193,22 @@ export async function notifyOpenSpot(convocatoriaId: string): Promise<PushResult
       .in("player_id", targetIds);
     if (!subs || subs.length === 0) return { ok: true, sent: 0 };
 
-    const payload = JSON.stringify({
-      title: "¡Se liberó un lugar! ⚽",
-      body: `Hay un lugar para el partido del ${fechaCorta(conv.fecha)}. Entrá y anotate antes de que lo tomen.`,
-      url: "/mi-perfil",
-      tag: `open-spot-${convocatoriaId}`,
-    });
+    const fecha = fechaCorta(conv.fecha);
+    const payload = JSON.stringify(
+      kind === "titular"
+        ? {
+            title: "¡Se liberó un lugar! ⚽",
+            body: `Hay un lugar de titular para el partido del ${fecha}. Entrá y anotate antes de que lo tomen.`,
+            url: "/mi-perfil",
+            tag: `open-titular-${convocatoriaId}`,
+          }
+        : {
+            title: "Hay lugar entre los suplentes ⚽",
+            body: `Se achicó la lista de suplentes para el partido del ${fecha}. Anotate para entrar a la cola.`,
+            url: "/mi-perfil",
+            tag: `open-suplente-${convocatoriaId}`,
+          },
+    );
 
     const results = await Promise.allSettled(
       subs.map(async (s) => {
