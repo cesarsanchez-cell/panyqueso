@@ -23,7 +23,13 @@ export function ShareTeamsButton({ convocatoriaId }: { convocatoriaId: string })
         share?: (data: { files: File[]; title?: string; text?: string }) => Promise<void>;
       };
 
-      if (nav.canShare?.({ files: [file] }) && nav.share) {
+      // En celu (pointer grueso) usamos el share sheet nativo -> WhatsApp va de
+      // una. En compu el "compartir" de Windows solo ofrece "Copiar" (que
+      // WhatsApp Web no pega bien), asi que mejor descargamos el archivo.
+      const isMobile =
+        typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+
+      if (isMobile && nav.canShare?.({ files: [file] }) && nav.share) {
         await nav.share({ files: [file], title: "Equipos", text: "Equipos de Pan y Queso ⚽" });
       } else {
         const url = URL.createObjectURL(blob);
