@@ -56,6 +56,8 @@ type LineupMember = {
   orden: number | null;
   nombre: string;
   apodo: string | null;
+  avatarUrl: string | null;
+  clubId: string | null;
   isMe: boolean;
   esInvitadoLibre: boolean;
 };
@@ -272,15 +274,24 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
   // del grupo + estado vacio (ver fallback abajo). Antes mostrabamos el roster
   // del grupo y parecia una convocatoria fantasma.
 
-  const playerById = new Map<string, { nombre: string; apodo: string | null }>();
+  const playerById = new Map<
+    string,
+    { nombre: string; apodo: string | null; avatarUrl: string | null; clubId: string | null }
+  >();
   const playerIdsList = Array.from(playerIds);
   if (playerIdsList.length > 0) {
     const { data: playersData } = await supabase
       .from("players_public")
-      .select("id, nombre, apodo")
+      .select("id, nombre, apodo, avatar_url, club_id")
       .in("id", playerIdsList);
     for (const p of playersData ?? []) {
-      if (p.id) playerById.set(p.id, { nombre: p.nombre ?? "—", apodo: p.apodo ?? null });
+      if (p.id)
+        playerById.set(p.id, {
+          nombre: p.nombre ?? "—",
+          apodo: p.apodo ?? null,
+          avatarUrl: p.avatar_url ?? null,
+          clubId: p.club_id ?? null,
+        });
     }
   }
 
@@ -308,14 +319,21 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
         .map((r) => {
           const esInvitado = r.player_id === null;
           const info = esInvitado
-            ? { nombre: r.nombre_libre ?? "—", apodo: null }
-            : (playerById.get(r.player_id!) ?? { nombre: "—", apodo: null });
+            ? { nombre: r.nombre_libre ?? "—", apodo: null, avatarUrl: null, clubId: null }
+            : (playerById.get(r.player_id!) ?? {
+                nombre: "—",
+                apodo: null,
+                avatarUrl: null,
+                clubId: null,
+              });
           return {
             playerId: r.player_id,
             rol: "titular" as const,
             orden: null,
             nombre: info.nombre,
             apodo: info.apodo,
+            avatarUrl: info.avatarUrl,
+            clubId: info.clubId,
             isMe: r.player_id !== null && r.player_id === playerId,
             esInvitadoLibre: esInvitado,
           };
@@ -327,14 +345,21 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
         .map((r) => {
           const esInvitado = r.player_id === null;
           const info = esInvitado
-            ? { nombre: r.nombre_libre ?? "—", apodo: null }
-            : (playerById.get(r.player_id!) ?? { nombre: "—", apodo: null });
+            ? { nombre: r.nombre_libre ?? "—", apodo: null, avatarUrl: null, clubId: null }
+            : (playerById.get(r.player_id!) ?? {
+                nombre: "—",
+                apodo: null,
+                avatarUrl: null,
+                clubId: null,
+              });
           return {
             playerId: r.player_id,
             rol: "suplente" as const,
             orden: r.orden_suplente,
             nombre: info.nombre,
             apodo: info.apodo,
+            avatarUrl: info.avatarUrl,
+            clubId: info.clubId,
             isMe: r.player_id !== null && r.player_id === playerId,
             esInvitadoLibre: esInvitado,
           };
@@ -747,10 +772,12 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
                       m.isMe ? "bg-emerald-50 font-semibold text-emerald-900" : "text-neutral-800"
                     }`}
                   >
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-50 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
                       {i + 1}
                     </span>
-                    <span>
+                    <PlayerAvatar url={m.avatarUrl} nombre={m.nombre} apodo={m.apodo} />
+                    <ClubCrest clubId={m.clubId} size={16} />
+                    <span className="min-w-0 truncate">
                       {playerLabel(m.nombre, m.apodo)}
                       {m.esInvitadoLibre ? (
                         <span className="ml-1 text-xs text-neutral-500">(invitado)</span>
@@ -778,10 +805,12 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
                       m.isMe ? "bg-amber-50 font-semibold text-amber-900" : "text-neutral-800"
                     }`}
                   >
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-700">
+                    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-700">
                       {m.orden ?? "?"}
                     </span>
-                    <span>
+                    <PlayerAvatar url={m.avatarUrl} nombre={m.nombre} apodo={m.apodo} />
+                    <ClubCrest clubId={m.clubId} size={16} />
+                    <span className="min-w-0 truncate">
                       {playerLabel(m.nombre, m.apodo)}
                       {m.esInvitadoLibre ? (
                         <span className="ml-1 text-xs text-neutral-500">(invitado)</span>
