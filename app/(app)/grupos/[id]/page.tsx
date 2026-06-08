@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { requireRole } from "@/lib/auth/require-role";
 import { formatArLocal } from "@/lib/phone";
+import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 
 import { ArchiveGrupoForm } from "./archive-form";
@@ -150,6 +151,20 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
 
   const memList = membresias ?? [];
 
+  // Estado de avisos push por miembro (solo admin): quién NO los activó, para
+  // poder pedírselo por privado. Se lee con service-role porque la RLS de
+  // push_subscriptions solo deja ver las propias.
+  const memberPlayerIds = memList.map((m) => m.player?.id).filter(Boolean) as string[];
+  let playerIdsConAvisos: string[] = [];
+  if (memberPlayerIds.length > 0) {
+    const adminClient = createServiceClient();
+    const { data: subs } = await adminClient
+      .from("push_subscriptions")
+      .select("player_id")
+      .in("player_id", memberPlayerIds);
+    playerIdsConAvisos = Array.from(new Set((subs ?? []).map((s) => s.player_id)));
+  }
+
   const ocupados = new Set(memList.map((m) => m.player?.id).filter(Boolean) as string[]);
   const availablePlayers = (players ?? [])
     .filter((p) => !ocupados.has(p.id))
@@ -279,7 +294,11 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
         )}
       </section>
 
-      <MembersSections miembros={memList} cupoTitulares={grupo.cupo_titulares} />
+      <MembersSections
+        miembros={memList}
+        cupoTitulares={grupo.cupo_titulares}
+        playerIdsConAvisos={playerIdsConAvisos}
+      />
     </div>
   );
 }
