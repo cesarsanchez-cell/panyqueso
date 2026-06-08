@@ -778,8 +778,8 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
       {miEstado === "bajado_grupo" ? (
         <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
           <p className="text-xs text-neutral-600">
-            Te bajaste de este grupo. Podés volver ahora: si hay cupo entrás como titular, si no
-            al final de la lista de espera.
+            Te bajaste de este grupo. Podés volver ahora: si hay cupo entrás como titular, si no al
+            final de la lista de espera.
           </p>
           <div className="mt-2">
             <JoinQueueButton grupoId={grupo.id} label="Volver al grupo" />
