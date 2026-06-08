@@ -30,9 +30,11 @@ function matchesQuery(m: Member, q: string): boolean {
 export function MembersSections({
   miembros,
   cupoTitulares,
+  playerIdsConAvisos,
 }: {
   miembros: Member[];
   cupoTitulares: number;
+  playerIdsConAvisos: string[];
 }) {
   const [query, setQuery] = useState("");
   const q = normalize(query.trim());
@@ -41,6 +43,14 @@ export function MembersSections({
   // ya quedo primero por el order by joined_at asc.
   const ordenados = useMemo(() => miembros, [miembros]);
   const filtrados = useMemo(() => ordenados.filter((m) => matchesQuery(m, q)), [ordenados, q]);
+
+  // Quién tiene los avisos push activados (dato solo-admin para pedirle por
+  // privado al que no los tiene).
+  const conAvisos = useMemo(() => new Set(playerIdsConAvisos), [playerIdsConAvisos]);
+  const sinAvisosCount = useMemo(
+    () => ordenados.filter((m) => m.player && !conAvisos.has(m.player.id)).length,
+    [ordenados, conAvisos],
+  );
 
   return (
     <div className="space-y-4">
@@ -65,6 +75,13 @@ export function MembersSections({
           Orden de alta. Los primeros {cupoTitulares} entran como titulares en cada convocatoria; el
           resto a la lista de espera.
         </p>
+        {sinAvisosCount > 0 ? (
+          <p className="mt-1 text-xs text-amber-700">
+            🔕 {sinAvisosCount} {sinAvisosCount === 1 ? "miembro no tiene" : "miembros no tienen"}{" "}
+            los avisos activados. Pedíles por privado que entren a su perfil y toquen “Activar
+            avisos”.
+          </p>
+        ) : null}
         {miembros.length === 0 ? (
           <p className="mt-3 text-sm text-neutral-500">Sin miembros todavía.</p>
         ) : filtrados.length === 0 ? (
@@ -92,6 +109,14 @@ export function MembersSections({
                       {m.player?.apodo ? (
                         <span className="ml-2 text-xs font-normal text-neutral-500">
                           ({m.player.apodo})
+                        </span>
+                      ) : null}
+                      {m.player && !conAvisos.has(m.player.id) ? (
+                        <span
+                          className="ml-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200"
+                          title="No activó las notificaciones push"
+                        >
+                          🔕 sin avisos
                         </span>
                       ) : null}
                     </span>
