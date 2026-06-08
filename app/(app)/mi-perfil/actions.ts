@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/auth/require-role";
+import { notifyOpenSpot } from "@/lib/push/actions";
 import { createClient } from "@/lib/supabase/server";
 
 export type OneClickState = null | { error: string } | { success: string };
@@ -54,6 +55,11 @@ export async function declineConvocatoria(
   }
 
   revalidatePath("/mi-perfil");
+
+  // Best-effort: si se liberó un lugar de titular, avisamos al grupo. Nunca
+  // rompe la baja (notifyOpenSpot no lanza).
+  await notifyOpenSpot(convocatoriaId);
+
   return { success: "Listo, avisaste que no vas." };
 }
 
