@@ -107,26 +107,36 @@ export async function sendTestPush(): Promise<PushResult> {
 //
 // En ambos casos el aviso va a los miembros activos del grupo que hoy NO son ni
 // titular ni suplente en esta convocatoria (incluye a los que se habían bajado:
-// pueden volver), excluyendo al que acaba de bajarse.
+// pueden volver), excluyendo a quien generó la vacante.
+//
+// Se llama desde dos lugares:
+//   - el jugador se baja ("No voy"): excluimos al jugador logueado (sesión).
+//   - el admin saca a alguien: pasamos opts.excludePlayerId con el jugador
+//     sacado, así no le mandamos "anotate" justo al que acaba de quitar.
 //
 // Es best-effort: nunca lanza. Si las VAPID no están o algo falla, devuelve sin
-// romper la acción de bajarse. Corre con service-role para leer las
-// suscripciones de todos los candidatos (RLS solo deja ver las propias) sin
-// exponer secretos al cliente.
-export async function notifyOpenSpot(convocatoriaId: string): Promise<PushResult> {
+// romper la acción. Corre con service-role para leer las suscripciones de todos
+// los candidatos (RLS solo deja ver las propias) sin exponer secretos al cliente.
+export async function notifyOpenSpot(
+  convocatoriaId: string,
+  opts?: { excludePlayerId?: string },
+): Promise<PushResult> {
   try {
     if (!configureVapid()) return { ok: true, sent: 0 };
 
     const ctx = await requireUser();
     const admin = createServiceClient();
 
-    // Jugador que acaba de bajarse: lo excluimos del aviso.
+    // A quién no avisarle: el jugador logueado (cuando se baja él mismo) y/o el
+    // jugador que el admin acaba de sacar.
     const { data: actor } = await admin
       .from("players")
       .select("id")
       .eq("auth_user_id", ctx.userId)
       .maybeSingle();
-    const actorId = actor?.id ?? null;
+    const excludedIds = new Set<string>();
+    if (actor?.id) excludedIds.add(actor.id);
+    if (opts?.excludePlayerId) excludedIds.add(opts.excludePlayerId);
 
     // La convocatoria tiene que estar abierta y ser de un grupo.
     const { data: conv } = await admin
@@ -184,7 +194,7 @@ export async function notifyOpenSpot(convocatoriaId: string): Promise<PushResult
       .neq("attendance_status", "declinado");
     const enConvIds = new Set((enConv ?? []).map((t) => t.player_id));
 
-    const targetIds = memberIds.filter((id) => id !== actorId && !enConvIds.has(id));
+    const targetIds = memberIds.filter((id) => !excludedIds.has(id) && !enConvIds.has(id));
     if (targetIds.length === 0) return { ok: true, sent: 0 };
 
     const { data: subs } = await admin
