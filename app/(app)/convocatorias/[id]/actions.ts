@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireRole } from "@/lib/auth/require-role";
+import { notifyOpenSpot } from "@/lib/push/actions";
 import { createClient } from "@/lib/supabase/server";
 
 export type MutationState = null | { error: string } | { success: string };
@@ -273,6 +274,14 @@ export async function removePlayer(
     return { error: "La convocatoria está cancelada. No se puede editar." };
   }
 
+  // Guardamos a quién saca el admin para no mandarle a esa persona el aviso de
+  // "se liberó un lugar".
+  const { data: removedRow } = await supabase
+    .from("convocatoria_players")
+    .select("player_id")
+    .eq("id", convocatoriaPlayerId)
+    .maybeSingle();
+
   // RPC encapsula: DELETE + promote primer suplente si era titular +
   // compactar cola. Asi evitamos huecos en el cupo de titulares.
   const { error } = await supabase.rpc("admin_remove_from_convocatoria", {
@@ -287,6 +296,11 @@ export async function removePlayer(
   }
 
   revalidatePath(`/convocatorias/${convocatoriaId}`);
+
+  // Best-effort: si quedó un lugar libre (titular o banca de suplentes), avisar
+  // al grupo. No le avisamos al jugador que el admin acaba de sacar.
+  await notifyOpenSpot(convocatoriaId, { excludePlayerId: removedRow?.player_id ?? undefined });
+
   return { success: "Jugador quitado." };
 }
 
