@@ -23,6 +23,7 @@ import { GoalsForm, type GoalsFormTeam } from "./goals-form";
 import { InviteSection, type PendingConvocatoriaInvite } from "./invite-section";
 import { RemovePlayerForm } from "./remove-player-form";
 import { ResultForm } from "./result-form";
+import { ShareTeamsButton } from "./share-teams-button";
 import { VideoForm } from "./video-form";
 
 type Status = Database["public"]["Enums"]["convocatoria_status"];
@@ -651,6 +652,12 @@ function MatchSection({
           <p className="text-xs text-neutral-500">Sin resultado cargado todavía</p>
         )}
       </div>
+
+      {isAdmin ? (
+        <div className="mt-3">
+          <ShareTeamsButton convocatoriaId={convocatoriaId} />
+        </div>
+      ) : null}
 
       {match.confirmed_with_warning ? (
         <p className="mt-2 text-xs text-amber-700">
