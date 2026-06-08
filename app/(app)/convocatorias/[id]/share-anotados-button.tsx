@@ -13,7 +13,9 @@ export function ShareAnotadosButton({ convocatoriaId }: { convocatoriaId: string
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/convocatorias/${convocatoriaId}/anotados`);
+      const res = await fetch(`/convocatorias/${convocatoriaId}/anotados?t=${Date.now()}`, {
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error("No se pudo generar la imagen. Reintentá.");
       const blob = await res.blob();
       const file = new File([blob], "anotados-pan-y-queso.png", { type: "image/png" });
