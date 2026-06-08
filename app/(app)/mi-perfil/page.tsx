@@ -10,6 +10,7 @@ import { PlayerAvatar } from "../player-avatar";
 import { DeclineButton } from "./decline-button";
 import { JoinConvocatoriaButton } from "./join-convocatoria-button";
 import { JoinQueueButton } from "./join-queue-button";
+import { NotificationsCard } from "./notifications-card";
 import { UndoDeclineButton } from "./undo-decline-button";
 
 type SearchParams = { welcome?: string };
@@ -484,6 +485,8 @@ export default async function MiPerfilPage({
           </p>
         </div>
       </div>
+
+      <NotificationsCard />
 
       {lineups.length === 0 ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">

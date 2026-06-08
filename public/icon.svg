@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Pan y Queso">
+  <rect width="512" height="512" rx="96" fill="#047857"/>
+  <circle cx="256" cy="256" r="200" fill="#ffffff" stroke="#0f172a" stroke-width="10"/>
+  <!-- seams desde el pentágono central hacia el borde -->
+  <g stroke="#0f172a" stroke-width="14" stroke-linecap="round">
+    <line x1="256" y1="186" x2="256" y2="64"/>
+    <line x1="322.6" y1="234.4" x2="446.2" y2="194.2"/>
+    <line x1="297.1" y1="312.6" x2="373.6" y2="417.8"/>
+    <line x1="214.9" y1="312.6" x2="138.4" y2="417.8"/>
+    <line x1="189.4" y1="234.4" x2="65.8" y2="194.2"/>
+  </g>
+  <!-- pentágono central -->
+  <polygon points="256,186 322.6,234.4 297.1,312.6 214.9,312.6 189.4,234.4" fill="#0f172a"/>
+</svg>
