@@ -151,7 +151,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           ) : null}
         </div>
         {players.map((p, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                width: 40,
+                fontSize: 26,
+                fontWeight: 700,
+                color: EMERALD,
+              }}
+            >
+              {i + 1}.
+            </div>
             {p.clubId && origin ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={`${origin}/clubs/${p.clubId}.png`} width={28} height={28} alt="" />

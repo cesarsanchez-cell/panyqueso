@@ -111,7 +111,7 @@ export async function joinOpenConvocatoria(
 
   revalidatePath("/mi-perfil");
   return {
-    success: data === "titular" ? "Entraste como titular." : "Entraste a la cola de suplentes.",
+    success: data === "titular" ? "Entraste como titular." : "Entraste a la lista de espera.",
   };
 }
 
@@ -138,6 +138,6 @@ export async function joinSuplenteQueue(
 
   revalidatePath("/mi-perfil");
   return {
-    success: data === "titular" ? "Entraste como titular." : "Entraste a la cola de suplentes.",
+    success: data === "titular" ? "Entraste como titular." : "Entraste a la lista de espera.",
   };
 }

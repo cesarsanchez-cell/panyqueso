@@ -636,7 +636,7 @@ function ConfirmedMatchCard({ lineup, teams }: { lineup: GrupoLineup; teams: Con
             Banco ({teams.bench.length})
           </h3>
           <p className="mt-0.5 text-xs text-neutral-500">
-            Suplentes que no entraron. Juegan solo si baja alguien.
+            Lista de espera: juegan solo si baja alguien.
           </p>
           <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
             {teams.bench.map((m) => (
@@ -668,7 +668,7 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
     miEstado === "titular_convo"
       ? "Sos titular"
       : miEstado === "suplente_convo"
-        ? `Sos suplente #${miOrden ?? "?"}`
+        ? `En lista de espera (#${miOrden ?? "?"})`
         : miEstado === "declinado_convo"
           ? "Te bajaste de este partido"
           : miEstado === "no_anotado_convo"
@@ -755,7 +755,7 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
         <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3">
           <p className="text-xs text-red-800">
             Avisaste que no vas a este partido. Si querés volver, entrás como titular si hay cupo o
-            al final de la cola de suplentes.
+            al final de la lista de espera.
           </p>
           <div className="mt-2">
             <UndoDeclineButton convocatoriaId={openConv.id} label="Volver al partido" />
@@ -767,7 +767,7 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
         <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
           <p className="text-xs text-neutral-700">
             Estás en el grupo pero todavía no te anotaste a este partido. Si querés ir, entrás como
-            titular si hay cupo o al final de la cola de suplentes.
+            titular si hay cupo o al final de la lista de espera.
           </p>
           <div className="mt-2">
             <JoinConvocatoriaButton convocatoriaId={openConv.id} label="Me anoto" />
@@ -778,8 +778,8 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
       {miEstado === "bajado_grupo" ? (
         <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
           <p className="text-xs text-neutral-600">
-            Te bajaste de este grupo. Podés volver ahora: si hay cupo entrás como titular, si no
-            como suplente al final de la cola.
+            Te bajaste de este grupo. Podés volver ahora: si hay cupo entrás como titular, si no al
+            final de la lista de espera.
           </p>
           <div className="mt-2">
             <JoinQueueButton grupoId={grupo.id} label="Volver al grupo" />
@@ -792,7 +792,7 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
           <DeclineButton convocatoriaId={openConv.id} label="No voy a este partido" />
           <p className="mt-2 text-xs text-neutral-500">
             {miEstado === "titular_convo"
-              ? "Si te bajás, el primer suplente sube a titular."
+              ? "Si te bajás, el primero de la lista de espera sube a titular."
               : "Si te bajás, la cola se acomoda. Podés volver más tarde."}
           </p>
         </div>
@@ -835,10 +835,10 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
 
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-              Cola de suplentes ({suplentes.length})
+              Lista de espera ({suplentes.length})
             </h3>
             {suplentes.length === 0 ? (
-              <p className="mt-2 text-xs text-neutral-500">Sin suplentes.</p>
+              <p className="mt-2 text-xs text-neutral-500">Lista de espera vacía.</p>
             ) : (
               <ol className="mt-2 space-y-1">
                 {suplentes.map((m, i) => (

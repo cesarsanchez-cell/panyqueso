@@ -33,7 +33,7 @@ const CARDS: CardLink[] = [
     href: "/grupos",
     title: "Grupos",
     description:
-      "Grupos recurrentes (lugar/día/hora) con titulares y cola FIFO de suplentes persistente.",
+      "Grupos recurrentes (lugar/día/hora) con titulares y lista de espera FIFO persistente.",
     roles: ["admin"],
   },
   {

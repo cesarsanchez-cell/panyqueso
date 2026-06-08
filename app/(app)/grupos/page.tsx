@@ -65,8 +65,8 @@ export default async function GruposPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Grupos</h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Grupos recurrentes (mismo lugar, día y hora). Cada grupo administra titulares y una cola
-          FIFO de suplentes que persiste semana a semana.
+          Grupos recurrentes (mismo lugar, día y hora). Cada grupo administra titulares y una lista
+          de espera FIFO que persiste semana a semana.
         </p>
       </div>
 

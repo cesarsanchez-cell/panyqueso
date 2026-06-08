@@ -158,10 +158,10 @@ function OpenConvocatoriaCard({ grupoId, open }: { grupoId: string; open: OpenCo
 
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-            Cola de suplentes ({open.suplentes.length})
+            Lista de espera ({open.suplentes.length})
           </h3>
           {open.suplentes.length === 0 ? (
-            <p className="mt-2 text-xs text-neutral-500">Sin suplentes.</p>
+            <p className="mt-2 text-xs text-neutral-500">Lista de espera vacía.</p>
           ) : (
             <ol className="mt-2 space-y-1">
               {open.suplentes.map((m, i) => (

@@ -103,25 +103,25 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const INK = "#171717";
   const MUTED = "#525252";
 
-  // Banner principal: qué falta. Titular tiene prioridad sobre suplente.
+  // Banner principal: qué falta. Titular tiene prioridad sobre la lista de espera.
   let banner: { text: string; color: string; bg: string; border: string };
   if (faltanTitulares > 0) {
     banner = {
-      text: `⚠️ Faltan ${faltanTitulares} ${faltanTitulares === 1 ? "jugador" : "jugadores"} — ¡anotate!`,
+      text: `⚠️ Hay ${faltanTitulares} ${faltanTitulares === 1 ? "lugar" : "lugares"} en titulares — ¡sumate!`,
       color: ORANGE,
       bg: ORANGE_BG,
       border: "#fed7aa",
     };
   } else if (faltanSuplentes > 0) {
     banner = {
-      text: "🪑 Buscamos suplentes — ¡sumate a la banca!",
+      text: "🪑 Hay lugar en la lista de espera — ¡sumate!",
       color: AMBER,
       bg: AMBER_BG,
       border: "#fde68a",
     };
   } else {
     banner = {
-      text: "✅ ¡Lista completa! Gracias por anotarse.",
+      text: "✅ ¡Lista completa! Gracias por sumarse.",
       color: EMERALD,
       bg: EMERALD_BG,
       border: "#a7f3d0",
@@ -129,36 +129,64 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
   const hayVacante = faltanTitulares > 0 || faltanSuplentes > 0;
 
+  // Slots numerados: titulares hasta el cupo (los que faltan salen "Libre" con
+  // su número, ej. 10/11/12), lista de espera hasta el objetivo de banca.
+  const titSlots: (Anotado | null)[] = Array.from(
+    { length: Math.max(cupo, titulares.length) },
+    (_, i) => titulares[i] ?? null,
+  );
+  const supSlots: (Anotado | null)[] = Array.from(
+    { length: Math.max(SUPLENTES_OBJETIVO, suplentes.length) },
+    (_, i) => suplentes[i] ?? null,
+  );
+
   // Alto dinámico para no cortar listas largas (2 columnas por sección).
   const PAD = 40;
   const ROW_H = 44;
-  const titRows = Math.max(1, Math.ceil(titulares.length / 2));
-  const supRows = Math.max(1, Math.ceil(Math.max(suplentes.length, 1) / 2));
+  const titRows = Math.max(1, Math.ceil(titSlots.length / 2));
+  const supRows = Math.max(1, Math.ceil(supSlots.length / 2));
   const height = Math.min(
     1500,
     PAD * 2 + 150 + 80 + (44 + titRows * ROW_H) + (44 + supRows * ROW_H) + (hayVacante ? 64 : 24),
   );
 
-  function PlayerChip({ a }: { a: Anotado }) {
+  function SlotChip({ n, a }: { n: number; a: Anotado | null }) {
     return (
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 10,
+          gap: 8,
           width: "48%",
           padding: "6px 0",
         }}
       >
-        {a.clubId && origin ? (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            width: 38,
+            fontSize: 24,
+            fontWeight: 700,
+            color: a ? EMERALD : "#a3a3a3",
+          }}
+        >
+          {n}.
+        </div>
+        {a && a.clubId && origin ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={`${origin}/clubs/${a.clubId}.png`} width={28} height={28} alt="" />
         ) : (
           <div style={{ display: "flex", width: 28, height: 28 }} />
         )}
-        <div style={{ display: "flex", fontSize: 24, color: INK }}>
-          {a.label}
-          {a.invitado ? " (inv.)" : ""}
+        <div
+          style={{
+            display: "flex",
+            fontSize: 24,
+            color: a ? INK : "#a3a3a3",
+          }}
+        >
+          {a ? `${a.label}${a.invitado ? " (inv.)" : ""}` : "Libre"}
         </div>
       </div>
     );
@@ -167,28 +195,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   function Section({
     title,
     color,
-    players,
-    empty,
+    slots,
   }: {
     title: string;
     color: string;
-    players: Anotado[];
-    empty: string;
+    slots: (Anotado | null)[];
   }) {
     return (
       <div style={{ display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", fontSize: 24, fontWeight: 700, color, marginBottom: 6 }}>
           {title}
         </div>
-        {players.length === 0 ? (
-          <div style={{ display: "flex", fontSize: 22, color: MUTED }}>{empty}</div>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", width: "100%" }}>
-            {players.map((a, i) => (
-              <PlayerChip key={i} a={a} />
-            ))}
-          </div>
-        )}
+        <div style={{ display: "flex", flexWrap: "wrap", width: "100%" }}>
+          {slots.map((a, i) => (
+            <SlotChip key={i} n={i + 1} a={a} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -240,16 +262,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
         <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: 1 }}>
           <Section
-            title={`✅ Anotados (${titulares.length}/${cupo})`}
+            title={`✅ Titulares (${titulares.length}/${cupo})`}
             color={EMERALD}
-            players={titulares}
-            empty="Sin anotados todavía."
+            slots={titSlots}
           />
           <Section
-            title={`🪑 Suplentes (${suplentes.length})`}
+            title={`🪑 Lista de espera (${suplentes.length})`}
             color={AMBER}
-            players={suplentes}
-            empty="Sin suplentes."
+            slots={supSlots}
           />
         </div>
 
@@ -264,7 +284,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
               marginTop: 14,
             }}
           >
-            📲 Entrá a {hostLabel} y anotate
+            📲 Entrá a {hostLabel} y sumate
           </div>
         ) : null}
       </div>

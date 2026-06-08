@@ -208,13 +208,13 @@ export async function notifyOpenSpot(
       kind === "titular"
         ? {
             title: "¡Se liberó un lugar! ⚽",
-            body: `Hay un lugar de titular para el partido del ${fecha}. Entrá y anotate antes de que lo tomen.`,
+            body: `Hay un lugar de titular para el partido del ${fecha}. Entrá y sumate antes de que lo tomen.`,
             url: "/mi-perfil",
             tag: `open-titular-${convocatoriaId}`,
           }
         : {
-            title: "Hay lugar entre los suplentes ⚽",
-            body: `Se achicó la lista de suplentes para el partido del ${fecha}. Anotate para entrar a la cola.`,
+            title: "Hay lugar en la lista de espera ⚽",
+            body: `Se liberó un lugar en la lista de espera para el partido del ${fecha}. Entrá y sumate.`,
             url: "/mi-perfil",
             tag: `open-suplente-${convocatoriaId}`,
           },
