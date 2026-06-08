@@ -80,12 +80,17 @@ type ConfirmedTeamMember = {
   clubId: string | null;
 };
 
+// Indicador neutro de balance (sin números): parejos, o qué equipo viene un
+// toque abajo. Sale del RPC, que lo calcula server-side sin exponer ratings.
+type BalanceHint = "parejos" | "equipo_A_abajo" | "equipo_B_abajo";
+
 type ConfirmedTeams = {
   fecha: string;
   teamA: ConfirmedTeamMember[];
   teamB: ConfirmedTeamMember[];
   // Suplentes que no entraron a ningún equipo (entran solo si baja alguien).
   bench: ConfirmedTeamMember[];
+  balanceHint: BalanceHint | null;
 };
 
 type GrupoLineup = {
@@ -116,7 +121,17 @@ async function loadConfirmedTeams(
     if (!row.grupo_id || !row.player_id) continue;
     let entry = byGrupo.get(row.grupo_id);
     if (!entry) {
-      entry = { fecha: row.fecha, teamA: [], teamB: [], bench: [] };
+      const hint = row.balance_hint;
+      entry = {
+        fecha: row.fecha,
+        teamA: [],
+        teamB: [],
+        bench: [],
+        balanceHint:
+          hint === "parejos" || hint === "equipo_A_abajo" || hint === "equipo_B_abajo"
+            ? hint
+            : null,
+      };
       byGrupo.set(row.grupo_id, entry);
     }
     const member: ConfirmedTeamMember = {
@@ -502,13 +517,22 @@ export default async function MiPerfilPage({
 function ConfirmedTeamColumn({
   label,
   members,
+  isUnderdog = false,
 }: {
   label: string;
   members: ConfirmedTeamMember[];
+  isUnderdog?: boolean;
 }) {
   return (
     <div className="rounded bg-white p-2 ring-1 ring-emerald-100">
-      <p className="text-xs font-semibold text-emerald-900">{label}</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <p className="text-xs font-semibold text-emerald-900">{label}</p>
+        {isUnderdog ? (
+          <span className="rounded-full bg-orange-50 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 ring-1 ring-orange-200">
+            💪 ¡a darlo vuelta!
+          </span>
+        ) : null}
+      </div>
       {members.length === 0 ? (
         <p className="mt-1 text-xs text-neutral-500">Sin jugadores.</p>
       ) : (
@@ -583,9 +607,25 @@ function ConfirmedMatchCard({ lineup, teams }: { lineup: GrupoLineup; teams: Con
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <ConfirmedTeamColumn label="Equipo A" members={teams.teamA} />
-        <ConfirmedTeamColumn label="Equipo B" members={teams.teamB} />
+        <ConfirmedTeamColumn
+          label="Equipo A"
+          members={teams.teamA}
+          isUnderdog={teams.balanceHint === "equipo_A_abajo"}
+        />
+        <ConfirmedTeamColumn
+          label="Equipo B"
+          members={teams.teamB}
+          isUnderdog={teams.balanceHint === "equipo_B_abajo"}
+        />
       </div>
+
+      {teams.balanceHint === "parejos" ? (
+        <div className="mt-3 flex justify-center">
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+            ⚖️ Equipos parejos
+          </span>
+        </div>
+      ) : null}
 
       {teams.bench.length > 0 ? (
         <div className="mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-3">

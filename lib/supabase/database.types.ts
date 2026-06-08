@@ -1081,6 +1081,7 @@ export type Database = {
         Args: never;
         Returns: {
           apodo: string;
+          balance_hint: string;
           fecha: string;
           grupo_id: string;
           is_goalkeeper: boolean;
