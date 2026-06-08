@@ -15,6 +15,8 @@ import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
+// La imagen depende del roster en vivo: nunca cachear (ni el navegador ni el CDN).
+export const dynamic = "force-dynamic";
 
 // Objetivo de banca de suplentes: igual que el push (SUPLENTES_OBJETIVO en
 // lib/push/actions.ts). Si baja de esto, mostramos que buscamos suplentes.
@@ -289,6 +291,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         ) : null}
       </div>
     ),
-    { width: 1000, height },
+    {
+      width: 1000,
+      height,
+      headers: { "Cache-Control": "no-store, max-age=0, must-revalidate" },
+    },
   );
 }

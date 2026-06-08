@@ -15,6 +15,8 @@ import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
+// La imagen depende del partido en vivo: nunca cachear (ni el navegador ni el CDN).
+export const dynamic = "force-dynamic";
 
 const BALANCE_PAREJOS_PCT = 0.02; // mismo umbral que el RPC.
 
@@ -225,6 +227,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         </div>
       </div>
     ),
-    { width: 1000, height: 760 },
+    {
+      width: 1000,
+      height: 760,
+      headers: { "Cache-Control": "no-store, max-age=0, must-revalidate" },
+    },
   );
 }
