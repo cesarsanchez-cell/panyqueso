@@ -23,6 +23,7 @@ import { GoalsForm, type GoalsFormTeam } from "./goals-form";
 import { InviteSection, type PendingConvocatoriaInvite } from "./invite-section";
 import { RemovePlayerForm } from "./remove-player-form";
 import { ResultForm } from "./result-form";
+import { ShareAnotadosButton } from "./share-anotados-button";
 import { ShareTeamsButton } from "./share-teams-button";
 import { VideoForm } from "./video-form";
 
@@ -388,6 +389,15 @@ export default async function ConvocatoriaDetallePage({
             mostrarSacar={showSelector}
           />
         )}
+
+        {isAdmin && isOpen ? (
+          <div className="mt-4 border-t border-neutral-200 pt-4">
+            <ShareAnotadosButton convocatoriaId={convocatoria.id} />
+            <p className="mt-1 text-xs text-neutral-500">
+              Compartí la lista por WhatsApp para que se cubran los lugares libres.
+            </p>
+          </div>
+        ) : null}
       </section>
 
       {showSelector ? (
