@@ -23,8 +23,8 @@ export function CupoEditor({
       </h2>
       <p className="mt-1 text-xs text-neutral-500">
         El ideal viene del grupo, pero podés ajustarlo para este partido. Al cambiarlo, los lugares
-        se reacomodan: si subís, entran suplentes; si bajás, los últimos titulares pasan al frente
-        de la cola.
+        se reacomodan: si subís, entran los de la lista de espera; si bajás, los últimos titulares
+        pasan al frente de la lista.
       </p>
       <form action={formAction} className="mt-3 flex flex-wrap items-end gap-3">
         <input type="hidden" name="convocatoria_id" value={convocatoriaId} />

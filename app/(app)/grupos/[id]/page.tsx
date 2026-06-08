@@ -228,8 +228,8 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
         </h2>
         <p className="mt-1 text-xs text-neutral-500">
           El grupo es una bolsa de jugadores candidatos. Cuando se crea una convocatoria, los
-          primeros {grupo.cupo_titulares} por orden de alta entran como titulares, el resto como
-          suplentes.
+          primeros {grupo.cupo_titulares} por orden de alta entran como titulares, el resto a la
+          lista de espera.
         </p>
         <div className="mt-3">
           {availablePlayers.length === 0 ? (

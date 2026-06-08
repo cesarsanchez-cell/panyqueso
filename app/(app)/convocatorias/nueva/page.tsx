@@ -67,7 +67,7 @@ export default async function NuevaConvocatoriaPage({
         <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Nueva convocatoria</h1>
         <p className="mt-1 text-sm text-neutral-600">
           Elegí un grupo y la fecha. Se hereda el roster del grupo en orden de alta: los primeros
-          según el cupo van como titulares, el resto como suplentes.
+          según el cupo van como titulares, el resto a la lista de espera.
         </p>
       </div>
 

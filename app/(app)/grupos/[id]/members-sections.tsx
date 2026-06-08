@@ -63,7 +63,7 @@ export function MembersSections({
         </div>
         <p className="mt-1 text-xs text-neutral-500">
           Orden de alta. Los primeros {cupoTitulares} entran como titulares en cada convocatoria; el
-          resto como suplentes.
+          resto a la lista de espera.
         </p>
         {miembros.length === 0 ? (
           <p className="mt-3 text-sm text-neutral-500">Sin miembros todavía.</p>
@@ -83,7 +83,7 @@ export function MembersSections({
                           ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
                           : "bg-amber-50 text-amber-700 ring-amber-200"
                       }`}
-                      title={esTitular ? "Entraría como titular" : "Entraría como suplente"}
+                      title={esTitular ? "Entraría como titular" : "Entraría a la lista de espera"}
                     >
                       {posicionReal}
                     </span>
