@@ -14,8 +14,12 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#047857",
     lang: "es-AR",
     icons: [
+      // PNG en los tamaños que Android necesita para el ícono de inicio.
+      { src: "/app-icon/192", type: "image/png", sizes: "192x192", purpose: "any" },
+      { src: "/app-icon/512", type: "image/png", sizes: "512x512", purpose: "any" },
+      { src: "/app-icon/512", type: "image/png", sizes: "512x512", purpose: "maskable" },
+      // SVG como fallback escalable (lo usan algunos navegadores de escritorio).
       { src: "/icon.svg", type: "image/svg+xml", sizes: "any", purpose: "any" },
-      { src: "/icon.svg", type: "image/svg+xml", sizes: "any", purpose: "maskable" },
     ],
   };
 }
