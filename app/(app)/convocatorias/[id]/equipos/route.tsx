@@ -209,55 +209,67 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     );
   }
 
-  return new ImageResponse(
-    (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          width: "100%",
-          height: "100%",
-          backgroundColor: EMERALD_BG,
-          padding: 40,
-          fontFamily: "sans-serif",
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", marginBottom: 24 }}>
-          <div style={{ display: "flex", fontSize: 44, fontWeight: 800, color: EMERALD }}>
-            ⚽ Pan y Queso
+  const element = (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
+        height: "100%",
+        backgroundColor: EMERALD_BG,
+        padding: 40,
+        fontFamily: "sans-serif",
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", marginBottom: 24 }}>
+        <div style={{ display: "flex", fontSize: 44, fontWeight: 800, color: EMERALD }}>
+          ⚽ Pan y Queso
+        </div>
+        <div style={{ display: "flex", fontSize: 26, fontWeight: 600, color: INK, marginTop: 4 }}>
+          {grupoNombre}
+        </div>
+        {subtitulo ? (
+          <div style={{ display: "flex", fontSize: 22, color: MUTED, marginTop: 2 }}>
+            {subtitulo}
           </div>
-          <div style={{ display: "flex", fontSize: 26, fontWeight: 600, color: INK, marginTop: 4 }}>
-            {grupoNombre}
-          </div>
-          {subtitulo ? (
-            <div style={{ display: "flex", fontSize: 22, color: MUTED, marginTop: 2 }}>
-              {subtitulo}
-            </div>
-          ) : null}
-        </div>
-
-        <div style={{ display: "flex", gap: 24, flex: 1 }}>
-          <Column teamLabel="A" players={playersA} />
-          <Column teamLabel="B" players={playersB} />
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "center", marginTop: 24 }}>
-          {underdog ? (
-            <div style={{ display: "flex", fontSize: 24, fontWeight: 600, color: ORANGE }}>
-              💪 Equipo {underdog} viene un toque abajo — ¡a darlo vuelta!
-            </div>
-          ) : (
-            <div style={{ display: "flex", fontSize: 24, fontWeight: 600, color: EMERALD }}>
-              ⚖️ Equipos parejos
-            </div>
-          )}
-        </div>
+        ) : null}
       </div>
-    ),
-    {
-      width: 1000,
-      height: 760,
-      headers: { "Cache-Control": "no-store, max-age=0, must-revalidate" },
-    },
+
+      <div style={{ display: "flex", gap: 24, flex: 1 }}>
+        <Column teamLabel="A" players={playersA} />
+        <Column teamLabel="B" players={playersB} />
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "center", marginTop: 24 }}>
+        {underdog ? (
+          <div style={{ display: "flex", fontSize: 24, fontWeight: 600, color: ORANGE }}>
+            💪 Equipo {underdog} viene un toque abajo — ¡a darlo vuelta!
+          </div>
+        ) : (
+          <div style={{ display: "flex", fontSize: 24, fontWeight: 600, color: EMERALD }}>
+            ⚖️ Equipos parejos
+          </div>
+        )}
+      </div>
+    </div>
   );
+
+  // next/og renderiza la imagen de forma perezosa MIENTRAS se transmite la
+  // respuesta, así que un error de Satori salta DESPUÉS de retornar y Next lo
+  // convierte en un 500 opaco. Forzamos el render acá (arrayBuffer) para poder
+  // capturar la causa real y mostrarla en vez del genérico "Reintentá".
+  try {
+    const image = new ImageResponse(element, { width: 1000, height: 760 });
+    const png = await image.arrayBuffer();
+    return new Response(png, {
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": "no-store, max-age=0, must-revalidate",
+      },
+    });
+  } catch (err) {
+    console.error("[equipos/route] fallo generando la imagen:", err);
+    const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    return new Response(`Error generando la imagen — ${msg}`, { status: 500 });
+  }
 }
