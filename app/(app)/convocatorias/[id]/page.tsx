@@ -9,7 +9,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { ClubCrest } from "@/components/club-crest";
 import { parseTeamDraft, type TeamDraft, type TeamLabel } from "@/lib/teams/draft";
-import { countRegroup } from "@/lib/teams/generate";
+import { countRegroup, effectivePhysical } from "@/lib/teams/generate";
 import { loadPreviousComposition } from "@/lib/teams/previous";
 
 import { AddGuestForm } from "./add-guest-form";
@@ -157,7 +157,8 @@ export default async function ConvocatoriaDetallePage({
     .from("convocatoria_players")
     .select(
       `id, added_at, attendance_status, nombre_libre, rol_en_convocatoria, orden_suplente,
-       player:players!player_id(id, nombre, apodo, role_field, position_pref, status, internal_score, club_id)`,
+       player:players!player_id(id, nombre, apodo, role_field, position_pref, status, internal_score, club_id,
+         physical, mental, technical, edad)`,
     )
     .eq("convocatoria_id", id)
     .order("added_at", { ascending: true });
@@ -273,6 +274,10 @@ export default async function ConvocatoriaDetallePage({
     position_pref: PositionPref;
     internal_score: number;
     club_id: string | null;
+    physical: number | null;
+    mental: number | null;
+    technical: number | null;
+    edad: number | null;
   };
   const playerInfoById = new Map<string, PlayerInfo>();
   for (const cp of convocados) {
@@ -286,6 +291,10 @@ export default async function ConvocatoriaDetallePage({
         position_pref: p.position_pref,
         internal_score: Number(p.internal_score),
         club_id: p.club_id,
+        physical: p.physical,
+        mental: p.mental,
+        technical: p.technical,
+        edad: p.edad,
       });
     }
   }
@@ -538,6 +547,8 @@ export default async function ConvocatoriaDetallePage({
           ) : null}
 
           {teamDraft && varietyInfo ? <VarietyBanner info={varietyInfo} /> : null}
+
+          {teamDraft ? <RubrosBalance draft={teamDraft} infoById={playerInfoById} /> : null}
 
           {teamDraft ? (
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -909,6 +920,10 @@ type PlayerInfoMap = Map<
     position_pref: PositionPref;
     internal_score: number;
     club_id: string | null;
+    physical: number | null;
+    mental: number | null;
+    technical: number | null;
+    edad: number | null;
   }
 >;
 
@@ -917,6 +932,67 @@ function sumScores(playerIds: string[], gk: string | null, infoById: PlayerInfoM
   if (gk) total += infoById.get(gk)?.internal_score ?? 0;
   for (const id of playerIds) total += infoById.get(id)?.internal_score ?? 0;
   return total;
+}
+
+// FUT-95: totales por rubro de un lado del draft (físico efectivo + mental +
+// técnica). El físico usa el factor de edad, igual que el score interno.
+function sumRubros(
+  side: TeamDraft["A"],
+  infoById: PlayerInfoMap,
+): { physEff: number; mental: number; technical: number } {
+  const ids = side.goalkeeperPlayerId
+    ? [side.goalkeeperPlayerId, ...side.playerIds]
+    : side.playerIds;
+  const acc = { physEff: 0, mental: 0, technical: 0 };
+  for (const id of ids) {
+    const p = infoById.get(id);
+    if (!p) continue;
+    const phys = p.physical ?? p.internal_score;
+    acc.physEff += effectivePhysical(phys, p.edad);
+    acc.mental += p.mental ?? p.internal_score;
+    acc.technical += p.technical ?? p.internal_score;
+  }
+  return acc;
+}
+
+// FUT-95: muestra el balance rubro por rubro entre A y B. Marca en ámbar el
+// rubro cuya diferencia sea relativamente alta (>10% del promedio del rubro).
+function RubrosBalance({ draft, infoById }: { draft: TeamDraft; infoById: PlayerInfoMap }) {
+  const a = sumRubros(draft.A, infoById);
+  const b = sumRubros(draft.B, infoById);
+
+  const rows: Array<{ label: string; va: number; vb: number }> = [
+    { label: "Físico", va: a.physEff, vb: b.physEff },
+    { label: "Mental", va: a.mental, vb: b.mental },
+    { label: "Técnica", va: a.technical, vb: b.technical },
+  ];
+
+  return (
+    <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+        Balance por rubro (A vs B)
+      </p>
+      <ul className="mt-1.5 space-y-1 text-xs">
+        {rows.map((r) => {
+          const avg = (r.va + r.vb) / 2;
+          const diff = Math.abs(r.va - r.vb);
+          const lopsided = avg > 0 && diff / avg > 0.1;
+          return (
+            <li key={r.label} className="flex items-center justify-between gap-3">
+              <span className="text-neutral-600">{r.label}</span>
+              <span
+                className={
+                  lopsided ? "font-semibold text-amber-700" : "tabular-nums text-neutral-700"
+                }
+              >
+                {r.va.toFixed(1)} <span className="text-neutral-400">/</span> {r.vb.toFixed(1)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }
 
 // FUT-88: estado de la señal de variedad mostrada al admin.

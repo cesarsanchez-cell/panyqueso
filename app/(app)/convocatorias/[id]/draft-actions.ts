@@ -35,9 +35,15 @@ async function loadConvocadosForGenerator(
   // Solo los titulares juegan el partido. Los suplentes están en cola de
   // espera por si baja un titular: NO entran al balance (evita el 7v6).
   // Tampoco entran los que declinaron.
+  // FUT-95: además del score, traemos las dimensiones (físico/mental/técnica),
+  // la edad (para el físico efectivo) y positions_possible (arquero alternativo)
+  // para el balance por rubro.
   const { data } = await supabase
     .from("convocatoria_players")
-    .select(`player:players!player_id(id, nombre, role_field, position_pref, internal_score)`)
+    .select(
+      `player:players!player_id(id, nombre, role_field, position_pref, internal_score,
+         physical, mental, technical, edad, positions_possible)`,
+    )
     .eq("convocatoria_id", convocatoriaId)
     .eq("rol_en_convocatoria", "titular")
     .neq("attendance_status", "declinado");
@@ -55,6 +61,11 @@ async function loadConvocadosForGenerator(
       role_field: p.role_field,
       position_pref: p.position_pref,
       internal_score: Number(p.internal_score),
+      physical: p.physical ?? undefined,
+      mental: p.mental ?? undefined,
+      technical: p.technical ?? undefined,
+      edad: p.edad ?? undefined,
+      positions_possible: p.positions_possible ?? undefined,
     }));
 }
 

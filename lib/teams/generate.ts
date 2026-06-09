@@ -1,19 +1,24 @@
 /**
- * Fase 6 PR 1: generador de teams determinístico.
+ * Generador de teams determinístico.
+ *
+ * FUT-95 — Balance por rubro: además del score total, el reparto busca que
+ * FÍSICO (efectivo, con factor de edad), MENTAL y TÉCNICA queden parejos entre
+ * los dos equipos (los tres pesan igual), y que defensores/mediocampistas/
+ * delanteros se distribuyan en forma proporcional. Así se evita que un equipo
+ * junte todo el físico y el otro toda la técnica (partido desparejo aunque el
+ * score "empate").
  *
  * Algoritmo:
- *   1. Asigna arqueros: prioridad role_field='arquero' por internal_score
- *      desc; si falta uno, completa con el mejor 'mixto'. Si quedan teams
- *      sin GK, warning.
- *   2. Para los demás: greedy por internal_score desc, cada jugador va al
- *      team con score total más bajo (tie-break: menor cantidad).
+ *   1. Arqueros: 1 por equipo. Prioridad role_field='arquero' → quien tenga
+ *      'arquero' en sus posiciones alternativas → mejor 'mixto'. Si falta, warning.
+ *   2. Resto: reparto que minimiza una función de costo = desbalance de los 3
+ *      rubros (físico efectivo + mental + técnica) + desbalance de posiciones
+ *      (secundario). Greedy base + búsqueda local por intercambios (hill-climb).
+ *   3. Variedad (FUT-87): entre los splits balanceados y dentro de la tolerancia
+ *      de score, se prefiere uno que cambie ≥2 jugadores vs la fecha anterior.
  *
- * Determinístico: mismo input -> mismo output. El orden estable se logra
- * sorteando por (internal_score desc, id asc) — id evita variabilidad
- * cuando hay empates.
- *
- * No persiste nada. La transición a `cerrada` + INSERT de matches/
- * match_teams/match_team_players queda para PR 3 (Confirmar match).
+ * Determinístico: mismo input -> mismo output (desempates por id / firma).
+ * No persiste nada.
  */
 
 import type { Database } from "@/lib/supabase/database.types";
@@ -27,6 +32,14 @@ export type GeneratorInput = {
   role_field: RoleField;
   position_pref: PositionPref;
   internal_score: number;
+  // FUT-95: dimensiones para el balance por rubro. Opcionales para no romper
+  // llamadas viejas; si faltan, se asume el valor del score (degradación
+  // elegante: el balance por rubro coincide con el balance por score).
+  physical?: number;
+  mental?: number;
+  technical?: number;
+  edad?: number;
+  positions_possible?: PositionPref[];
 };
 
 export type TeamLabel = "A" | "B";
@@ -37,6 +50,14 @@ export type TeamComposition = {
   totalScore: number;
 };
 
+// FUT-95: totales por rubro de un equipo (incluye al arquero). El físico es
+// "efectivo" = físico × factor de edad, igual que en el score interno v2.
+export type TeamDimensions = {
+  physEff: number;
+  mental: number;
+  technical: number;
+};
+
 export type BalanceSummary = {
   teamA: TeamComposition;
   teamB: TeamComposition;
@@ -44,6 +65,11 @@ export type BalanceSummary = {
   positionDist: {
     A: Record<PositionPref, number>;
     B: Record<PositionPref, number>;
+  };
+  // FUT-95: totales por rubro por equipo (para mostrar el balance al admin).
+  dimensions: {
+    A: TeamDimensions;
+    B: TeamDimensions;
   };
   warnings: string[];
   // FUT-87: metadata de variedad vs la fecha anterior. Solo presente cuando se
@@ -80,8 +106,39 @@ export type VarietyResult = {
   satisfied: boolean;
 };
 
-function emptyComposition(): TeamComposition {
-  return { goalkeeper: null, players: [], totalScore: 0 };
+// Peso del desbalance de posiciones dentro del costo. Los 3 rubros pesan 1 cada
+// uno (suma de diferencias); las posiciones son objetivo secundario.
+const POSITION_WEIGHT = 0.5;
+const EPS = 1e-9;
+
+/**
+ * FUT-85/95: factor de edad sobre el físico (mismos escalones que la DB).
+ * ≤35 1.00 · 36–45 0.90 · 46–55 0.80 · 56–65 0.70 · 66+ 0.60.
+ */
+export function agePhysicalFactor(edad: number | null | undefined): number {
+  if (edad == null) return 1.0;
+  if (edad <= 35) return 1.0;
+  if (edad <= 45) return 0.9;
+  if (edad <= 55) return 0.8;
+  if (edad <= 65) return 0.7;
+  return 0.6;
+}
+
+/** Físico efectivo (con descuento de edad). */
+export function effectivePhysical(physical: number, edad: number | null | undefined): number {
+  return physical * agePhysicalFactor(edad);
+}
+
+// Rubros de un jugador, con fallback al score si no vienen las dimensiones.
+function playerDims(p: GeneratorInput): TeamDimensions {
+  const physical = p.physical ?? p.internal_score;
+  const mental = p.mental ?? p.internal_score;
+  const technical = p.technical ?? p.internal_score;
+  return {
+    physEff: effectivePhysical(physical, p.edad),
+    mental,
+    technical,
+  };
 }
 
 function emptyPositionDist(): Record<PositionPref, number> {
@@ -99,10 +156,61 @@ function sortByScoreDesc(arr: GeneratorInput[]): GeneratorInput[] {
   });
 }
 
+// Suma de rubros de un equipo (incluye al arquero).
+function teamDimensions(comp: TeamComposition): TeamDimensions {
+  const all = comp.goalkeeper ? [comp.goalkeeper, ...comp.players] : comp.players;
+  const acc: TeamDimensions = { physEff: 0, mental: 0, technical: 0 };
+  for (const p of all) {
+    const d = playerDims(p);
+    acc.physEff += d.physEff;
+    acc.mental += d.mental;
+    acc.technical += d.technical;
+  }
+  return acc;
+}
+
+// Conteo de def/medio/del de los jugadores de campo (el GK va aparte).
+function fieldPositionCounts(comp: TeamComposition): {
+  defensor: number;
+  mediocampista: number;
+  delantero: number;
+} {
+  const c = { defensor: 0, mediocampista: 0, delantero: 0 };
+  for (const p of comp.players) {
+    if (p.position_pref === "defensor") c.defensor++;
+    else if (p.position_pref === "mediocampista") c.mediocampista++;
+    else if (p.position_pref === "delantero") c.delantero++;
+  }
+  return c;
+}
+
 /**
- * Asigna 2 arqueros (uno por team) priorizando role_field='arquero' y luego
- * 'mixto'. Devuelve los GKs y los players que quedan disponibles para
- * distribución por campo.
+ * FUT-95: costo de desbalance entre dos equipos. Suma las diferencias de los 3
+ * rubros (físico efectivo, mental, técnica) + la diferencia de distribución de
+ * posiciones (ponderada). Más bajo = más parejo.
+ */
+function balanceCost(a: TeamComposition, b: TeamComposition): number {
+  const da = teamDimensions(a);
+  const db = teamDimensions(b);
+  const dimCost =
+    Math.abs(da.physEff - db.physEff) +
+    Math.abs(da.mental - db.mental) +
+    Math.abs(da.technical - db.technical);
+
+  const pa = fieldPositionCounts(a);
+  const pb = fieldPositionCounts(b);
+  const posCost =
+    Math.abs(pa.defensor - pb.defensor) +
+    Math.abs(pa.mediocampista - pb.mediocampista) +
+    Math.abs(pa.delantero - pb.delantero);
+
+  return dimCost + POSITION_WEIGHT * posCost;
+}
+
+/**
+ * Asigna 2 arqueros (uno por team). Prioridad: arquero puro → quien tenga
+ * 'arquero' entre sus posiciones alternativas (positions_possible) → mixto.
+ * Devuelve los GKs y los players que quedan para distribución de campo.
  */
 function pickGoalkeepers(input: GeneratorInput[]): {
   gkA: GeneratorInput | null;
@@ -113,34 +221,36 @@ function pickGoalkeepers(input: GeneratorInput[]): {
   const warnings: string[] = [];
   const sorted = sortByScoreDesc(input);
 
-  const arqueros = sorted.filter((p) => p.role_field === "arquero");
-  const mixtos = sorted.filter((p) => p.role_field === "mixto");
+  const isPure = (p: GeneratorInput) => p.role_field === "arquero";
+  const canKeep = (p: GeneratorInput) =>
+    !isPure(p) && (p.positions_possible ?? []).includes("arquero");
+  const isMixto = (p: GeneratorInput) => p.role_field === "mixto" && !canKeep(p);
 
-  let gkA: GeneratorInput | null = null;
-  let gkB: GeneratorInput | null = null;
-
-  if (arqueros.length >= 2) {
-    gkA = arqueros[0] ?? null;
-    gkB = arqueros[1] ?? null;
-  } else if (arqueros.length === 1) {
-    gkA = arqueros[0] ?? null;
-    if (mixtos.length >= 1) {
-      gkB = mixtos[0] ?? null;
-      warnings.push("Team B sin arquero puro: se usa al mejor mixto como GK.");
-    } else {
-      warnings.push("Team B sin arquero. Asigná uno manualmente antes de confirmar.");
+  // Pool ordenado por prioridad; cada jugador aparece una sola vez.
+  const seen = new Set<string>();
+  const pool: GeneratorInput[] = [];
+  for (const pred of [isPure, canKeep, isMixto]) {
+    for (const p of sorted) {
+      if (!seen.has(p.id) && pred(p)) {
+        seen.add(p.id);
+        pool.push(p);
+      }
     }
-  } else {
-    // 0 arqueros.
-    if (mixtos.length >= 2) {
-      gkA = mixtos[0] ?? null;
-      gkB = mixtos[1] ?? null;
-      warnings.push("Ningún arquero puro: ambos GKs son mixtos.");
-    } else if (mixtos.length === 1) {
-      gkA = mixtos[0] ?? null;
-      warnings.push("Solo 1 mixto disponible para GK. Team B sin arquero.");
+  }
+
+  const gkA = pool[0] ?? null;
+  const gkB = pool[1] ?? null;
+
+  const pureCount = sorted.filter(isPure).length;
+  if (pureCount < 2) {
+    if (gkA && gkB) {
+      warnings.push(
+        "No hay dos arqueros: se completó con jugadores que pueden atajar. Revisá antes de confirmar.",
+      );
+    } else if (gkA && !gkB) {
+      warnings.push("Solo hay un arquero posible. El otro equipo queda sin arquero.");
     } else {
-      warnings.push("Ningún arquero ni mixto. Ambos teams sin GK.");
+      warnings.push("No hay arqueros ni jugadores que puedan atajar. Asigná arqueros a mano.");
     }
   }
 
@@ -152,47 +262,71 @@ function pickGoalkeepers(input: GeneratorInput[]): {
   return { gkA, gkB, remaining, warnings };
 }
 
+function compTotal(gk: GeneratorInput | null, players: GeneratorInput[]): number {
+  return (gk?.internal_score ?? 0) + players.reduce((acc, p) => acc + p.internal_score, 0);
+}
+
+function makeComp(gk: GeneratorInput | null, players: GeneratorInput[]): TeamComposition {
+  return { goalkeeper: gk, players, totalScore: compTotal(gk, players) };
+}
+
+// Magnitud combinada de un jugador (para ordenar el reparto base). Los 3 rubros
+// pesan igual; desempate por id para determinismo.
+function magnitude(p: GeneratorInput): number {
+  const d = playerDims(p);
+  return d.physEff + d.mental + d.technical;
+}
+
 /**
- * Split balanceado base (greedy determinístico). No arma el BalanceSummary:
- * devuelve las composiciones + los warnings de arquero, para poder reusarse
- * tanto en generateTeams como en el picker de variedad (FUT-87).
+ * Reparto base (greedy determinístico) minimizando el costo de balance por
+ * rubro. Mantiene los equipos parejos en cantidad (±1). Devuelve composiciones
+ * + warnings de arquero, para reusarse en generateTeams y en variedad.
  */
 function generateBaseline(input: GeneratorInput[]): {
   teamA: TeamComposition;
   teamB: TeamComposition;
   gkWarnings: string[];
 } {
-  const teamA = emptyComposition();
-  const teamB = emptyComposition();
-
   const { gkA, gkB, remaining, warnings } = pickGoalkeepers(input);
 
-  teamA.goalkeeper = gkA;
-  if (gkA) teamA.totalScore += gkA.internal_score;
-  teamB.goalkeeper = gkB;
-  if (gkB) teamB.totalScore += gkB.internal_score;
+  let teamA = makeComp(gkA, []);
+  let teamB = makeComp(gkB, []);
 
-  // Greedy: cada jugador va al team con menor score total (tie-break:
-  // menor cantidad). remaining ya viene ordenado desc por sortByScoreDesc.
-  for (const p of remaining) {
-    const goesToA =
-      teamA.totalScore < teamB.totalScore ||
-      (teamA.totalScore === teamB.totalScore && teamCount(teamA) <= teamCount(teamB));
+  // Orden de reparto: de mayor a menor magnitud (los más "pesados" primero),
+  // desempate por id.
+  const ordered = [...remaining].sort((a, b) => {
+    const ma = magnitude(a);
+    const mb = magnitude(b);
+    if (mb !== ma) return mb - ma;
+    return a.id.localeCompare(b.id);
+  });
 
-    if (goesToA) {
-      teamA.players.push(p);
-      teamA.totalScore += p.internal_score;
+  for (const p of ordered) {
+    const sizeA = teamA.players.length;
+    const sizeB = teamB.players.length;
+
+    // Guardia de tamaño: no dejar que un equipo supere al otro por más de 1.
+    let target: TeamLabel | null = null;
+    if (sizeA - sizeB >= 1) target = "B";
+    else if (sizeB - sizeA >= 1) target = "A";
+
+    if (target === null) {
+      // Elegir el equipo que deje el menor costo de balance.
+      const tryA = makeComp(teamA.goalkeeper, [...teamA.players, p]);
+      const tryB = makeComp(teamB.goalkeeper, [...teamB.players, p]);
+      const costA = balanceCost(tryA, teamB);
+      const costB = balanceCost(teamA, tryB);
+      target = costA <= costB ? "A" : "B";
+    }
+
+    if (target === "A") {
+      teamA = makeComp(teamA.goalkeeper, [...teamA.players, p]);
     } else {
-      teamB.players.push(p);
-      teamB.totalScore += p.internal_score;
+      teamB = makeComp(teamB.goalkeeper, [...teamB.players, p]);
     }
   }
 
   return { teamA, teamB, gkWarnings: warnings };
-}
-
-function compTotal(gk: GeneratorInput | null, players: GeneratorInput[]): number {
-  return (gk?.internal_score ?? 0) + players.reduce((acc, p) => acc + p.internal_score, 0);
 }
 
 /** Arma el BalanceSummary final a partir de dos composiciones ya definidas. */
@@ -218,12 +352,14 @@ function assembleSummary(
     warnings.push("Los teams quedaron desbalanceados en cantidad.");
   }
 
-  return { teamA, teamB, totalDiff, positionDist, warnings };
-}
-
-export function generateTeams(input: GeneratorInput[]): BalanceSummary {
-  const { teamA, teamB, gkWarnings } = generateBaseline(input);
-  return assembleSummary(teamA, teamB, gkWarnings);
+  return {
+    teamA,
+    teamB,
+    totalDiff,
+    positionDist,
+    dimensions: { A: teamDimensions(teamA), B: teamDimensions(teamB) },
+    warnings,
+  };
 }
 
 // Ids de todos los jugadores de una composición (incluido el arquero).
@@ -270,15 +406,10 @@ export function countRegroup(
 
 type Candidate = { teamA: TeamComposition; teamB: TeamComposition };
 
-function makeComp(gk: GeneratorInput | null, players: GeneratorInput[]): TeamComposition {
-  return { goalkeeper: gk, players, totalScore: compTotal(gk, players) };
-}
-
 /**
  * Genera candidatos por intercambios de jugadores de campo entre A y B
- * (los arqueros quedan fijos). Primero todos los swaps simples; el baseline
- * va incluido. Orden determinístico (sigue el orden de players, ya ordenado
- * por score desc / id).
+ * (los arqueros quedan fijos). El baseline va incluido (primer elemento).
+ * Orden determinístico (sigue el orden de players).
  */
 function singleSwapCandidates(A0: TeamComposition, B0: TeamComposition): Candidate[] {
   const out: Candidate[] = [{ teamA: A0, teamB: B0 }];
@@ -323,21 +454,54 @@ function doubleSwapCandidates(A0: TeamComposition, B0: TeamComposition): Candida
   return out;
 }
 
-// Firma determinística para desempatar candidatos con igual diff/changes.
+// Firma determinística para desempatar candidatos con igual costo/cambios.
 function candidateSignature(c: Candidate): string {
   return [...compIds(c.teamA)].sort().join(",");
 }
 
 /**
- * FUT-87: genera teams balanceados PERO evitando repetir la composición de la
- * fecha anterior. Determinístico.
+ * Búsqueda local (hill-climb) por intercambios simples: parte del baseline y
+ * aplica el swap que más baja el costo de balance, hasta que no mejora.
+ * Determinístico (desempate por firma).
+ */
+function refineBalance(A0: TeamComposition, B0: TeamComposition): Candidate {
+  let cur: Candidate = { teamA: A0, teamB: B0 };
+  let curCost = balanceCost(cur.teamA, cur.teamB);
+
+  for (let guard = 0; guard < 200; guard++) {
+    let best: { cand: Candidate; cost: number; sig: string } | null = null;
+    for (const c of singleSwapCandidates(cur.teamA, cur.teamB)) {
+      const cost = balanceCost(c.teamA, c.teamB);
+      if (cost >= curCost - EPS) continue; // solo mejoras estrictas
+      const sig = candidateSignature(c);
+      if (!best || cost < best.cost - EPS || (Math.abs(cost - best.cost) < EPS && sig < best.sig)) {
+        best = { cand: c, cost, sig };
+      }
+    }
+    if (!best) break;
+    cur = best.cand;
+    curCost = best.cost;
+  }
+
+  return cur;
+}
+
+export function generateTeams(input: GeneratorInput[]): BalanceSummary {
+  const { teamA, teamB, gkWarnings } = generateBaseline(input);
+  const refined = refineBalance(teamA, teamB);
+  return assembleSummary(refined.teamA, refined.teamB, gkWarnings);
+}
+
+/**
+ * FUT-87 + FUT-95: genera teams balanceados por rubro y, además, evita repetir
+ * la composición de la fecha anterior. Determinístico.
  *
- * - Sin fecha anterior (o <minChanges jugadores repetidos): devuelve el baseline.
- * - Con fecha anterior: busca, entre el baseline y sus variaciones por swaps,
- *   un split con |scoreA−scoreB| dentro de la tolerancia Y ≥minChanges cambios
- *   de grupo; elige el más balanceado.
- * - Si ninguno cumple las dos cosas: fallback al baseline (mejor balance) con
- *   un warning de que no se pudo variar.
+ * - Calcula el split más parejo (baseline + hill-climb por rubro/posiciones).
+ * - Sin fecha anterior (o <minChanges repetidos): devuelve ese split.
+ * - Si ya difiere ≥minChanges de la fecha pasada: lo usa tal cual.
+ * - Si no: busca, entre sus variaciones por swaps dentro de la tolerancia de
+ *   score, una con ≥minChanges cambios, eligiendo la MÁS pareja por rubro.
+ * - Si ninguna cumple: fallback al split más balanceado, con warning.
  */
 export function generateTeamsWithVariety(
   input: GeneratorInput[],
@@ -346,7 +510,11 @@ export function generateTeamsWithVariety(
   const tolerancePct = options.tolerancePct ?? 5;
   const minChanges = options.minChanges ?? 2;
 
-  const { teamA: A0, teamB: B0, gkWarnings } = generateBaseline(input);
+  const base = generateBaseline(input);
+  const refined = refineBalance(base.teamA, base.teamB);
+  const A0 = refined.teamA;
+  const B0 = refined.teamB;
+  const gkWarnings = base.gkWarnings;
   const prev = options.previous ?? null;
 
   const withinTolerance = (a: TeamComposition, b: TeamComposition): boolean => {
@@ -355,49 +523,56 @@ export function generateTeamsWithVariety(
     return Math.abs(a.totalScore - b.totalScore) / avg <= tolerancePct / 100;
   };
 
+  const withVariety = (
+    a: TeamComposition,
+    b: TeamComposition,
+    v: VarietyResult,
+  ): BalanceSummary => {
+    const summary = assembleSummary(a, b, gkWarnings);
+    summary.variety = v;
+    return summary;
+  };
+
   const baselineChanges = prev ? countRegroup(compIds(A0), compIds(B0), prev) : null;
 
   // Sin historial útil: no hay nada que variar.
   if (!prev || !baselineChanges || baselineChanges.returningPlayers < minChanges) {
-    const summary = assembleSummary(A0, B0, gkWarnings);
-    summary.variety = {
+    return withVariety(A0, B0, {
       changes: baselineChanges?.changes ?? 0,
       returningPlayers: baselineChanges?.returningPlayers ?? 0,
       applied: false,
       satisfied: false,
-    };
-    return summary;
+    });
   }
 
-  // El baseline (mejor balance) ya cumple variedad: usarlo tal cual.
+  // El split más balanceado ya cumple variedad: usarlo tal cual.
   if (baselineChanges.changes >= minChanges) {
-    const summary = assembleSummary(A0, B0, gkWarnings);
-    summary.variety = {
+    return withVariety(A0, B0, {
       changes: baselineChanges.changes,
       returningPlayers: baselineChanges.returningPlayers,
       applied: false,
       satisfied: withinTolerance(A0, B0),
-    };
-    return summary;
+    });
   }
 
-  // Buscar un split variado y balanceado. Primero swaps simples; si ninguno
-  // sirve, swaps dobles.
+  // Buscar un split variado y balanceado. Entre los que cumplen tolerancia +
+  // ≥minChanges, se elige el MÁS pareja por rubro (menor costo); desempate por
+  // más cambios y luego firma. Primero swaps simples; si no, dobles.
   const pickBest = (candidates: Candidate[]): { cand: Candidate; changes: number } | null => {
-    let best: { cand: Candidate; changes: number; diff: number; sig: string } | null = null;
+    let best: { cand: Candidate; changes: number; cost: number; sig: string } | null = null;
     for (const c of candidates) {
       if (!withinTolerance(c.teamA, c.teamB)) continue;
       const { changes } = countRegroup(compIds(c.teamA), compIds(c.teamB), prev);
       if (changes < minChanges) continue;
-      const diff = Math.abs(c.teamA.totalScore - c.teamB.totalScore);
+      const cost = balanceCost(c.teamA, c.teamB);
       const sig = candidateSignature(c);
       if (
         !best ||
-        diff < best.diff ||
-        (diff === best.diff && changes > best.changes) ||
-        (diff === best.diff && changes === best.changes && sig < best.sig)
+        cost < best.cost - EPS ||
+        (Math.abs(cost - best.cost) < EPS && changes > best.changes) ||
+        (Math.abs(cost - best.cost) < EPS && changes === best.changes && sig < best.sig)
       ) {
-        best = { cand: c, changes, diff, sig };
+        best = { cand: c, changes, cost, sig };
       }
     }
     return best ? { cand: best.cand, changes: best.changes } : null;
@@ -406,26 +581,23 @@ export function generateTeamsWithVariety(
   const best = pickBest(singleSwapCandidates(A0, B0)) ?? pickBest(doubleSwapCandidates(A0, B0));
 
   if (best) {
-    const summary = assembleSummary(best.cand.teamA, best.cand.teamB, gkWarnings);
-    summary.variety = {
+    return withVariety(best.cand.teamA, best.cand.teamB, {
       changes: best.changes,
       returningPlayers: baselineChanges.returningPlayers,
       applied: true,
       satisfied: true,
-    };
-    return summary;
+    });
   }
 
-  // No se pudo variar manteniendo el balance: fallback al baseline.
-  const summary = assembleSummary(A0, B0, gkWarnings);
-  summary.warnings.push(
-    "No se pudo variar respecto de la fecha anterior sin desbalancear; se usó el mejor balance.",
-  );
-  summary.variety = {
+  // No se pudo variar manteniendo el balance: fallback al split más balanceado.
+  const summary = withVariety(A0, B0, {
     changes: baselineChanges.changes,
     returningPlayers: baselineChanges.returningPlayers,
     applied: false,
     satisfied: false,
-  };
+  });
+  summary.warnings.push(
+    "No se pudo variar respecto de la fecha anterior sin desbalancear; se usó el mejor balance.",
+  );
   return summary;
 }
