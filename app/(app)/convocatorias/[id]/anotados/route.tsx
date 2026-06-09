@@ -34,6 +34,28 @@ function fmtHora(h: string | null): string {
 
 type Anotado = { label: string; clubId: string | null; invitado: boolean };
 
+// Carga los escudos como data URLs (base64) ANTES de renderizar. Así Satori no
+// hace un fetch remoto por cada <img> durante el render: si un escudo falla
+// (slug viejo sin PNG, 404, timeout de red) lo salteamos en vez de tirar abajo
+// toda la imagen con un 500.
+async function loadCrests(origin: string, clubIds: string[]): Promise<Map<string, string>> {
+  const crests = new Map<string, string>();
+  if (!origin) return crests;
+  await Promise.all(
+    [...new Set(clubIds)].map(async (clubId) => {
+      try {
+        const res = await fetch(`${origin}/clubs/${clubId}.png`, { cache: "force-cache" });
+        if (!res.ok) return;
+        const buf = Buffer.from(await res.arrayBuffer());
+        crests.set(clubId, `data:image/png;base64,${buf.toString("base64")}`);
+      } catch {
+        // Escudo opcional: el jugador va sin escudo, la imagen igual se genera.
+      }
+    }),
+  );
+  return crests;
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   await requireRole(["admin"]);
   const { id } = await params;
@@ -89,6 +111,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const origin = host ? `${proto}://${host}` : "";
   const hostLabel = host || "panyqueso.ar";
+
+  const crests = await loadCrests(
+    origin,
+    [...titulares, ...suplentes].flatMap((a) => (a.clubId ? [a.clubId] : [])),
+  );
 
   const grupoNombre = conv.grupo?.nombre ?? "Pan y Queso";
   const lugarNombre = conv.lugar?.nombre ?? "";
@@ -175,9 +202,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         >
           {n}.
         </div>
-        {a && a.clubId && origin ? (
+        {a && a.clubId && crests.has(a.clubId) ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={`${origin}/clubs/${a.clubId}.png`} width={28} height={28} alt="" />
+          <img src={crests.get(a.clubId)} width={28} height={28} alt="" />
         ) : (
           <div style={{ display: "flex", width: 28, height: 28 }} />
         )}
