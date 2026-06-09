@@ -38,6 +38,28 @@ function label(nombre: string | null, apodo: string | null): string {
 
 type TeamPlayer = { label: string; isGoalkeeper: boolean; clubId: string | null };
 
+// Carga los escudos como data URLs (base64) ANTES de renderizar. Así Satori no
+// hace un fetch remoto por cada <img> durante el render: si un escudo falla
+// (slug viejo sin PNG, 404, timeout de red) lo salteamos en vez de tirar abajo
+// toda la imagen con un 500.
+async function loadCrests(origin: string, clubIds: string[]): Promise<Map<string, string>> {
+  const crests = new Map<string, string>();
+  if (!origin) return crests;
+  await Promise.all(
+    [...new Set(clubIds)].map(async (clubId) => {
+      try {
+        const res = await fetch(`${origin}/clubs/${clubId}.png`, { cache: "force-cache" });
+        if (!res.ok) return;
+        const buf = Buffer.from(await res.arrayBuffer());
+        crests.set(clubId, `data:image/png;base64,${buf.toString("base64")}`);
+      } catch {
+        // Escudo opcional: el jugador va sin escudo, la imagen igual se genera.
+      }
+    }),
+  );
+  return crests;
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   await requireRole(["admin"]);
   const { id } = await params;
@@ -106,6 +128,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const proto = h.get("x-forwarded-proto") ?? "https";
   const origin = host ? `${proto}://${host}` : "";
 
+  const crests = await loadCrests(
+    origin,
+    [...playersA, ...playersB].flatMap((p) => (p.clubId ? [p.clubId] : [])),
+  );
+
   const grupoNombre = conv.grupo?.nombre ?? "Pan y Queso";
   const lugarNombre = conv.lugar?.nombre ?? "";
   const subtitulo = [fmtFecha(conv.fecha), fmtHora(conv.hora), lugarNombre]
@@ -166,9 +193,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
             >
               {i + 1}.
             </div>
-            {p.clubId && origin ? (
+            {p.clubId && crests.has(p.clubId) ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={`${origin}/clubs/${p.clubId}.png`} width={28} height={28} alt="" />
+              <img src={crests.get(p.clubId)} width={28} height={28} alt="" />
             ) : (
               <div style={{ display: "flex", width: 28, height: 28 }} />
             )}
