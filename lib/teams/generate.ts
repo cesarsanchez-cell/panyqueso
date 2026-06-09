@@ -208,8 +208,12 @@ function balanceCost(a: TeamComposition, b: TeamComposition): number {
 }
 
 /**
- * Asigna 2 arqueros (uno por team). Prioridad: arquero puro → quien tenga
- * 'arquero' entre sus posiciones alternativas (positions_possible) → mixto.
+ * Asigna 2 arqueros (uno por team). Prioridad en escalones (toma los 2 mejores
+ * por score respetando el orden, sin repetir gente):
+ *   1. Rol = Arquero (arqueros puros).
+ *   2. Posición preferida = Arquero.
+ *   3. Posiciones posibles incluye "Arquero".
+ *   4. Rol = Mixto (último recurso, para no dejar un equipo sin arquero).
  * Devuelve los GKs y los players que quedan para distribución de campo.
  */
 function pickGoalkeepers(input: GeneratorInput[]): {
@@ -222,14 +226,18 @@ function pickGoalkeepers(input: GeneratorInput[]): {
   const sorted = sortByScoreDesc(input);
 
   const isPure = (p: GeneratorInput) => p.role_field === "arquero";
-  const canKeep = (p: GeneratorInput) =>
-    !isPure(p) && (p.positions_possible ?? []).includes("arquero");
-  const isMixto = (p: GeneratorInput) => p.role_field === "mixto" && !canKeep(p);
+  // Escalones de prioridad. El dedup por `seen` garantiza que cada jugador
+  // entre por su escalón más alto (un puro nunca cae al de preferida, etc.).
+  const tiers: Array<(p: GeneratorInput) => boolean> = [
+    (p) => p.role_field === "arquero",
+    (p) => p.position_pref === "arquero",
+    (p) => (p.positions_possible ?? []).includes("arquero"),
+    (p) => p.role_field === "mixto",
+  ];
 
-  // Pool ordenado por prioridad; cada jugador aparece una sola vez.
   const seen = new Set<string>();
   const pool: GeneratorInput[] = [];
-  for (const pred of [isPure, canKeep, isMixto]) {
+  for (const pred of tiers) {
     for (const p of sorted) {
       if (!seen.has(p.id) && pred(p)) {
         seen.add(p.id);
@@ -245,7 +253,7 @@ function pickGoalkeepers(input: GeneratorInput[]): {
   if (pureCount < 2) {
     if (gkA && gkB) {
       warnings.push(
-        "No hay dos arqueros: se completó con jugadores que pueden atajar. Revisá antes de confirmar.",
+        "No hay dos arqueros: se completó con quien puede atajar (preferida/posible/mixto). Revisá antes de confirmar.",
       );
     } else if (gkA && !gkB) {
       warnings.push("Solo hay un arquero posible. El otro equipo queda sin arquero.");
