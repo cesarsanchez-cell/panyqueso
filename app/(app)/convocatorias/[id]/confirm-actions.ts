@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireRole } from "@/lib/auth/require-role";
+import { findUnplayedPreviousConvocatoria } from "@/lib/convocatorias/previous-played-gate";
 import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -17,6 +18,12 @@ import {
 import { parseTeamDraft } from "@/lib/teams/draft";
 
 export type ConfirmMatchState = null | { error: string } | { warnings: string[] };
+
+// "YYYY-MM-DD" -> "DD/MM/YYYY" para los mensajes al admin.
+function fmtFechaCorta(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return d && m && y ? `${d}/${m}/${y}` : iso;
+}
 
 /**
  * Confirma el match a partir del team_draft persistido. Atomico via
@@ -46,6 +53,15 @@ export async function confirmMatch(
   if (convErr || !conv) return { error: "Convocatoria no encontrada." };
   if (conv.status !== "abierta") {
     return { error: "Solo se puede confirmar una convocatoria abierta." };
+  }
+
+  // Regla de secuencia: no cerrar esta si hay una anterior del mismo grupo sin
+  // jugar. Primero hay que cargar el resultado del partido viejo.
+  const blocking = await findUnplayedPreviousConvocatoria(supabase, convocatoriaId);
+  if (blocking) {
+    return {
+      error: `No podés cerrar esta convocatoria todavía: primero jugá y cargá el resultado de la del ${fmtFechaCorta(blocking.fecha)} (mismo grupo).`,
+    };
   }
 
   const draft = parseTeamDraft(conv.team_draft);
