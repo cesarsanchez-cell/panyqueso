@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireRole } from "@/lib/auth/require-role";
+import { applyDirectIfGateOff } from "@/lib/players/veedor-gate";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -165,13 +166,27 @@ export async function proposeChange(
     reason,
   };
 
-  const { error } = await supabase.from("player_change_requests").insert(insertRow);
+  const { data: inserted, error } = await supabase
+    .from("player_change_requests")
+    .insert(insertRow)
+    .select("id")
+    .single();
 
-  if (error) {
-    return { error: `No se pudo crear la solicitud: ${error.message}` };
+  if (error || !inserted) {
+    return { error: `No se pudo crear la solicitud: ${error?.message ?? "desconocido"}` };
+  }
+
+  // Veedor opcional: si el gate está apagado, el admin aplica el cambio directo
+  // (manteniendo la traza: la solicitud queda 'approved' + audit_log). Si está
+  // prendido, queda pendiente del veedor como hasta hoy.
+  const { applied, error: applyError } = await applyDirectIfGateOff(supabase, inserted.id);
+  if (applyError) {
+    return {
+      error: `Se creó la solicitud pero no se pudo aplicar directo: ${applyError}. Quedó pendiente para el veedor.`,
+    };
   }
 
   revalidatePath(`/jugadores/${playerId}`);
   revalidatePath("/auditoria");
-  redirect(`/jugadores/${playerId}?proposed=1`);
+  redirect(`/jugadores/${playerId}?${applied ? "applied" : "proposed"}=1`);
 }

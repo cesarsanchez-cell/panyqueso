@@ -13,7 +13,7 @@ import { AdminResetPassword } from "./admin-reset-password";
 import { InviteToComplete } from "./invite-to-complete";
 import { PrivateNotesForm } from "./private-notes-form";
 
-type SearchParams = { proposed?: string };
+type SearchParams = { proposed?: string; applied?: string };
 
 type PlayerStatus = Database["public"]["Enums"]["player_status"];
 type PlayerRoleField = Database["public"]["Enums"]["player_role_field"];
@@ -105,6 +105,7 @@ export default async function JugadorDetallePage({
   const sp = await searchParams;
   const isAdmin = ctx.profile.role === "admin";
   const showProposedFlash = sp.proposed === "1";
+  const showAppliedFlash = sp.applied === "1";
 
   const supabase = await createClient();
   const { data: player, error } = await supabase
@@ -172,6 +173,12 @@ export default async function JugadorDetallePage({
       {showProposedFlash ? (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Solicitud de ratings creada. Queda pendiente de aprobación por un veedor.
+        </div>
+      ) : null}
+
+      {showAppliedFlash ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          Cambios de ratings aplicados.
         </div>
       ) : null}
 

@@ -33,6 +33,35 @@ export type Database = {
   };
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          id: boolean;
+          requiere_veedor: boolean;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          id?: boolean;
+          requiere_veedor?: boolean;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          id?: boolean;
+          requiere_veedor?: boolean;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "app_settings_updated_by_fkey";
+            columns: ["updated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       push_subscriptions: {
         Row: {
           id: string;
@@ -1025,6 +1054,10 @@ export type Database = {
         Returns: undefined;
       };
       age_physical_factor: { Args: { p_edad: number }; Returns: number };
+      admin_apply_sensitive_change: {
+        Args: { p_comment?: string; p_request_id: string };
+        Returns: undefined;
+      };
       approve_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
@@ -1221,8 +1254,13 @@ export type Database = {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
       };
+      requiere_veedor: { Args: never; Returns: boolean };
       set_convocatoria_cupo: {
         Args: { p_convocatoria_id: string; p_nuevo_cupo: number };
+        Returns: undefined;
+      };
+      set_requiere_veedor: {
+        Args: { p_value: boolean };
         Returns: undefined;
       };
       update_my_player_data: {

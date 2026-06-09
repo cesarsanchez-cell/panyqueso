@@ -69,7 +69,7 @@ function readRoleField(obj: Json): PlayerRoleField | null {
 export default async function JugadoresPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; created?: string }>;
+  searchParams: Promise<{ status?: string; created?: string; requested?: string }>;
 }) {
   const ctx = await requireRole(["admin", "veedor"]);
 
@@ -77,6 +77,7 @@ export default async function JugadoresPage({
   const statusFilter = parseStatus(params.status);
   const isAdmin = ctx.profile.role === "admin";
   const showCreatedFlash = params.created === "1";
+  const showRequestedFlash = params.requested === "1";
 
   const supabase = await createClient();
   let playersQuery = supabase
@@ -133,6 +134,12 @@ export default async function JugadoresPage({
       </div>
 
       {showCreatedFlash ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          Jugador dado de alta.
+        </div>
+      ) : null}
+
+      {showRequestedFlash ? (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Solicitud creada. Queda pendiente de aprobación por un veedor.
         </div>

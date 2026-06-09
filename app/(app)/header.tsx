@@ -19,6 +19,7 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
     { label: "Convocatorias", href: "/convocatorias" },
     { label: "Grupos", href: "/grupos" },
     { label: "Lugares", href: "/lugares" },
+    { label: "Configuración", href: "/configuracion" },
   ],
   veedor: [
     { label: "Inicio", href: "/" },
