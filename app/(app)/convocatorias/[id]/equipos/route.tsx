@@ -161,7 +161,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-          <div style={{ fontSize: 30, fontWeight: 700, color: EMERALD }}>Equipo {teamLabel}</div>
+          <div style={{ display: "flex", fontSize: 30, fontWeight: 700, color: EMERALD }}>
+            Equipo {teamLabel}
+          </div>
           {isUnderdog ? (
             <div
               style={{
