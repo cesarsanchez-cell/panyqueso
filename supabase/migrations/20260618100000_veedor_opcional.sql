@@ -27,6 +27,15 @@
 --   P0013: not_an_admin → set_requiere_veedor / admin_apply por no-admin.
 -- ============================================================================
 
+-- 0. Permitir que el admin aplique su propia solicitud (gate off) ------------
+-- El CHECK reviewer_not_requester (reviewed_by <> requested_by) codifica la
+-- regla del veedor "no aprobás lo propio". Con el gate apagado, el admin SÍ
+-- aplica su propio cambio (es el sentido de la feature), así que lo quitamos.
+-- La regla del veedor sigue garantizada funcionalmente en
+-- approve_player_change_request, que rechaza la auto-aprobación (P0005).
+alter table public.player_change_requests
+  drop constraint if exists reviewer_not_requester;
+
 -- 1. Settings de la app (una sola fila) -------------------------------------
 create table if not exists public.app_settings (
   id              boolean primary key default true check (id),
