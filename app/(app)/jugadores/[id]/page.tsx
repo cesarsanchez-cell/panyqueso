@@ -142,6 +142,9 @@ export default async function JugadorDetallePage({
     (r) => r.action_type === "update_sensitive_fields",
   );
 
+  const { data: gateData } = await supabase.rpc("requiere_veedor");
+  const requiereVeedor = gateData === true;
+
   return (
     <div className="space-y-6">
       <div>
@@ -265,7 +268,7 @@ export default async function JugadorDetallePage({
               href={`/jugadores/${player.id}/proponer-cambio`}
               className="inline-flex items-center rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-sm transition hover:bg-neutral-50"
             >
-              Proponer ratings (requiere veedor)
+              {requiereVeedor ? "Proponer ratings (requiere veedor)" : "Editar ratings"}
             </Link>
           </div>
         ) : null}
