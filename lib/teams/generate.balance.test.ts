@@ -129,6 +129,69 @@ test("arquero alternativo: si no hay 2 arqueros puros, usa quien pueda atajar", 
   assert.ok(s.warnings.some((w) => w.toLowerCase().includes("atajar")));
 });
 
+test("prioridad arquero: preferida=arquero gana sobre posible=arquero", () => {
+  const roster: GeneratorInput[] = [
+    gk("gk1"),
+    mk("prefArq", { physical: 6, mental: 6, technical: 6 }, { position_pref: "arquero" }),
+    mk(
+      "posibleArq",
+      { physical: 6, mental: 6, technical: 6 },
+      {
+        positions_possible: ["arquero", "defensor"],
+      },
+    ),
+    mk("c1", { physical: 6, mental: 6, technical: 6 }),
+    mk("c2", { physical: 6, mental: 6, technical: 6 }),
+    mk("c3", { physical: 6, mental: 6, technical: 6 }),
+  ];
+
+  const s = generateTeams(roster);
+  const gkIds = [s.teamA.goalkeeper!.id, s.teamB.goalkeeper!.id];
+  // El 2º arquero es el de preferida=arquero, no el de posible.
+  assert.ok(gkIds.includes("gk1"));
+  assert.ok(gkIds.includes("prefArq"));
+  assert.ok(!gkIds.includes("posibleArq"));
+});
+
+test("prioridad arquero: posible=arquero gana sobre mixto", () => {
+  const roster: GeneratorInput[] = [
+    gk("gk1"),
+    mk("mixto", { physical: 6, mental: 6, technical: 6 }, { role_field: "mixto" }),
+    mk(
+      "posibleArq",
+      { physical: 6, mental: 6, technical: 6 },
+      {
+        positions_possible: ["arquero"],
+      },
+    ),
+    mk("c1", { physical: 6, mental: 6, technical: 6 }),
+    mk("c2", { physical: 6, mental: 6, technical: 6 }),
+    mk("c3", { physical: 6, mental: 6, technical: 6 }),
+  ];
+
+  const s = generateTeams(roster);
+  const gkIds = [s.teamA.goalkeeper!.id, s.teamB.goalkeeper!.id];
+  assert.ok(gkIds.includes("posibleArq"));
+  assert.ok(!gkIds.includes("mixto"));
+});
+
+test("prioridad arquero: el mixto es el último recurso", () => {
+  const roster: GeneratorInput[] = [
+    gk("gk1"),
+    mk("mixto", { physical: 6, mental: 6, technical: 6 }, { role_field: "mixto" }),
+    mk("c1", { physical: 6, mental: 6, technical: 6 }),
+    mk("c2", { physical: 6, mental: 6, technical: 6 }),
+    mk("c3", { physical: 6, mental: 6, technical: 6 }),
+    mk("c4", { physical: 6, mental: 6, technical: 6 }),
+  ];
+
+  const s = generateTeams(roster);
+  // No hay otro candidato: el mixto termina al arco para no dejar a un equipo sin GK.
+  const gkIds = [s.teamA.goalkeeper!.id, s.teamB.goalkeeper!.id];
+  assert.ok(gkIds.includes("gk1"));
+  assert.ok(gkIds.includes("mixto"));
+});
+
 test("determinístico: mismo input → mismo output", () => {
   const roster: GeneratorInput[] = [
     gk("gk1"),
