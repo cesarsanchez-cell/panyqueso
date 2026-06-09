@@ -16,7 +16,10 @@ export function ShareTeamsButton({ convocatoriaId }: { convocatoriaId: string })
       const res = await fetch(`/convocatorias/${convocatoriaId}/equipos?t=${Date.now()}`, {
         cache: "no-store",
       });
-      if (!res.ok) throw new Error("No se pudo generar la imagen. Reintentá.");
+      if (!res.ok) {
+        const detail = (await res.text().catch(() => "")).trim();
+        throw new Error(detail || "No se pudo generar la imagen. Reintentá.");
+      }
       const blob = await res.blob();
       const file = new File([blob], "equipos-pan-y-queso.png", { type: "image/png" });
 
