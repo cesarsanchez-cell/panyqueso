@@ -4,7 +4,15 @@ import { useActionState } from "react";
 
 import { confirmMatch, type ConfirmMatchState } from "./confirm-actions";
 
-export function ConfirmMatchForm({ convocatoriaId }: { convocatoriaId: string }) {
+export function ConfirmMatchForm({
+  convocatoriaId,
+  unplayedPreviousFecha,
+}: {
+  convocatoriaId: string;
+  // Si hay una convocatoria anterior del mismo grupo sin jugar, su fecha (ya
+  // formateada). En ese caso no se puede cerrar esta todavía.
+  unplayedPreviousFecha?: string | null;
+}) {
   const [state, formAction, pending] = useActionState<ConfirmMatchState, FormData>(
     confirmMatch,
     null,
@@ -13,6 +21,20 @@ export function ConfirmMatchForm({ convocatoriaId }: { convocatoriaId: string })
   // Si volvió con warnings, mostramos un segundo botón para confirmar
   // explícitamente "con warnings".
   const hasWarnings = state && "warnings" in state && state.warnings.length > 0;
+
+  const blocked = Boolean(unplayedPreviousFecha);
+
+  if (blocked) {
+    return (
+      <p
+        role="status"
+        className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+      >
+        No podés cerrar esta convocatoria todavía: primero jugá y cargá el resultado de la del{" "}
+        <span className="font-semibold">{unplayedPreviousFecha}</span> (mismo grupo).
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-3">

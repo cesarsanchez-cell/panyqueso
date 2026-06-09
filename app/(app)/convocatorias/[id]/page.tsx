@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ClubCrest } from "@/components/club-crest";
 import { parseTeamDraft, type TeamDraft, type TeamLabel } from "@/lib/teams/draft";
 import { countRegroup, effectivePhysical } from "@/lib/teams/generate";
+import { findUnplayedPreviousConvocatoria } from "@/lib/convocatorias/previous-played-gate";
 import { loadPreviousComposition } from "@/lib/teams/previous";
 
 import { AddGuestForm } from "./add-guest-form";
@@ -243,6 +244,12 @@ export default async function ConvocatoriaDetallePage({
   const canGenerateTeams = isAdmin && isOpen && convocados.length >= MIN_CONVOCADOS_PARA_GENERAR;
 
   const teamDraft = parseTeamDraft(convocatoria.team_draft);
+
+  // Regla de secuencia: si hay una convocatoria anterior del mismo grupo sin
+  // jugar, no se puede cerrar esta (el admin debe cargar antes el resultado del
+  // partido viejo). Solo importa cuando el admin podría confirmar.
+  const unplayedPrevious =
+    isAdmin && isOpen ? await findUnplayedPreviousConvocatoria(supabase, convocatoria.id) : null;
 
   // FUT-88: señal de variedad vs la fecha anterior, recalculada en vivo desde
   // el draft actual (refleja también los swaps manuales del admin).
@@ -582,7 +589,12 @@ export default async function ConvocatoriaDetallePage({
                 con su snapshot inmutable y no se pueden editar más los teams.
               </p>
               <div className="mt-3">
-                <ConfirmMatchForm convocatoriaId={convocatoria.id} />
+                <ConfirmMatchForm
+                  convocatoriaId={convocatoria.id}
+                  unplayedPreviousFecha={
+                    unplayedPrevious ? formatDate(unplayedPrevious.fecha) : null
+                  }
+                />
               </div>
             </div>
           ) : null}
