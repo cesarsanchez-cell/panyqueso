@@ -16,13 +16,19 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 type State = "loading" | "unsupported" | "needs-install" | "default" | "denied" | "subscribed";
 
+// Recuerda si el jugador tocó "Ahora no", para no insistir en cada visita.
+const DISMISS_KEY = "pq_push_dismissed";
+
 export function NotificationsCard() {
   const [state, setState] = useState<State>("loading");
   const [isIOS, setIsIOS] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
+    setDismissed(localStorage.getItem(DISMISS_KEY) === "1");
+
     const ua = navigator.userAgent;
     const ios = /iphone|ipad|ipod/i.test(ua);
     setIsIOS(ios);
@@ -129,6 +135,32 @@ export function NotificationsCard() {
     setBusy(false);
   }
 
+  function dismiss() {
+    localStorage.setItem(DISMISS_KEY, "1");
+    setDismissed(true);
+  }
+
+  function restore() {
+    localStorage.removeItem(DISMISS_KEY);
+    setDismissed(false);
+  }
+
+  // Mientras carga no mostramos nada (evita parpadeo).
+  if (state === "loading") return null;
+
+  // El que dijo "Ahora no" y todavía no activó: solo un acceso chico, sin insistir.
+  if (state === "default" && dismissed) {
+    return (
+      <button
+        type="button"
+        onClick={restore}
+        className="text-xs font-medium text-emerald-700 underline transition hover:text-emerald-900"
+      >
+        🔔 Activar avisos del partido
+      </button>
+    );
+  }
+
   return (
     <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
@@ -140,8 +172,6 @@ export function NotificationsCard() {
       </p>
 
       <div className="mt-3">
-        {state === "loading" ? <p className="text-sm text-neutral-400">Cargando…</p> : null}
-
         {state === "needs-install" ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
             {isIOS ? (
@@ -181,14 +211,24 @@ export function NotificationsCard() {
         ) : null}
 
         {state === "default" ? (
-          <button
-            type="button"
-            onClick={enable}
-            disabled={busy}
-            className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {busy ? "Activando…" : "🔔 Activar avisos"}
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={enable}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy ? "Activando…" : "🔔 Activar avisos"}
+            </button>
+            <button
+              type="button"
+              onClick={dismiss}
+              disabled={busy}
+              className="rounded-md px-2 py-1.5 text-xs text-neutral-500 underline transition hover:text-neutral-700 disabled:opacity-60"
+            >
+              Ahora no
+            </button>
+          </div>
         ) : null}
 
         {state === "subscribed" ? (
