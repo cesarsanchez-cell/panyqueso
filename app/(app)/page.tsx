@@ -43,6 +43,12 @@ const CARDS: CardLink[] = [
     roles: ["admin"],
   },
   {
+    href: "/configuracion",
+    title: "Configuración",
+    description: "Auditoría del veedor on/off y otros ajustes del grupo.",
+    roles: ["admin"],
+  },
+  {
     href: "/perfil",
     title: "Perfil",
     description: "Cambio de password.",
