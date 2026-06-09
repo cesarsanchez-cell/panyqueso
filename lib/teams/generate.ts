@@ -169,25 +169,52 @@ function teamDimensions(comp: TeamComposition): TeamDimensions {
   return acc;
 }
 
-// Conteo de def/medio/del de los jugadores de campo (el GK va aparte).
-function fieldPositionCounts(comp: TeamComposition): {
-  defensor: number;
-  mediocampista: number;
-  delantero: number;
-} {
-  const c = { defensor: 0, mediocampista: 0, delantero: 0 };
-  for (const p of comp.players) {
-    if (p.position_pref === "defensor") c.defensor++;
-    else if (p.position_pref === "mediocampista") c.mediocampista++;
-    else if (p.position_pref === "delantero") c.delantero++;
+// Líneas de campo (el arquero va aparte).
+const FIELD_LINES = ["defensor", "mediocampista", "delantero"] as const;
+type FieldLine = (typeof FIELD_LINES)[number];
+type LineShares = Record<FieldLine, number>;
+
+/**
+ * FUT-95: "presencia" de un jugador repartida entre las líneas que puede cubrir.
+ * La preferida pesa 1.0; cada posición posible pesa 0.5. Se normaliza para que
+ * cada jugador sume 1 en total (no se doble-cuenta): un jugador flexible reparte
+ * su presencia entre sus líneas, así puede ayudar a tapar el hueco de cualquier
+ * equipo. Un jugador "puro" aporta 1.0 a su única línea. Si solo puede el arco
+ * (sin líneas de campo), no aporta a la distribución de campo.
+ */
+export function fieldPositionShares(p: GeneratorInput): LineShares {
+  const raw: LineShares = { defensor: 0, mediocampista: 0, delantero: 0 };
+  const possible = p.positions_possible ?? [];
+  for (const line of FIELD_LINES) {
+    if (p.position_pref === line) raw[line] = 1.0;
+    else if (possible.includes(line)) raw[line] = 0.5;
   }
-  return c;
+  const sum = raw.defensor + raw.mediocampista + raw.delantero;
+  if (sum === 0) return raw;
+  return {
+    defensor: raw.defensor / sum,
+    mediocampista: raw.mediocampista / sum,
+    delantero: raw.delantero / sum,
+  };
+}
+
+// Forma del equipo: suma de la presencia por línea de sus jugadores de campo.
+function teamShape(comp: TeamComposition): LineShares {
+  const acc: LineShares = { defensor: 0, mediocampista: 0, delantero: 0 };
+  for (const p of comp.players) {
+    const s = fieldPositionShares(p);
+    acc.defensor += s.defensor;
+    acc.mediocampista += s.mediocampista;
+    acc.delantero += s.delantero;
+  }
+  return acc;
 }
 
 /**
  * FUT-95: costo de desbalance entre dos equipos. Suma las diferencias de los 3
- * rubros (físico efectivo, mental, técnica) + la diferencia de distribución de
- * posiciones (ponderada). Más bajo = más parejo.
+ * rubros (físico efectivo, mental, técnica) + la diferencia de "forma" por línea
+ * (def/medio/del), contando la presencia repartida según preferida + posibles.
+ * Más bajo = más parejo. Las posiciones son objetivo secundario (POSITION_WEIGHT).
  */
 function balanceCost(a: TeamComposition, b: TeamComposition): number {
   const da = teamDimensions(a);
@@ -197,8 +224,8 @@ function balanceCost(a: TeamComposition, b: TeamComposition): number {
     Math.abs(da.mental - db.mental) +
     Math.abs(da.technical - db.technical);
 
-  const pa = fieldPositionCounts(a);
-  const pb = fieldPositionCounts(b);
+  const pa = teamShape(a);
+  const pb = teamShape(b);
   const posCost =
     Math.abs(pa.defensor - pb.defensor) +
     Math.abs(pa.mediocampista - pb.mediocampista) +

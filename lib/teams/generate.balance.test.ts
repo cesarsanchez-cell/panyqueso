@@ -7,6 +7,7 @@ import { test } from "node:test";
 import {
   agePhysicalFactor,
   effectivePhysical,
+  fieldPositionShares,
   generateTeams,
   type GeneratorInput,
 } from "./generate.ts";
@@ -190,6 +191,67 @@ test("prioridad arquero: el mixto es el último recurso", () => {
   const gkIds = [s.teamA.goalkeeper!.id, s.teamB.goalkeeper!.id];
   assert.ok(gkIds.includes("gk1"));
   assert.ok(gkIds.includes("mixto"));
+});
+
+test("presencia por línea: preferida 1.0, posible 0.5, normalizada a 1", () => {
+  // Puro: toda su presencia en su línea.
+  const puro = mk("d", { physical: 6, mental: 6, technical: 6 }, { position_pref: "defensor" });
+  const sPuro = fieldPositionShares(puro);
+  assert.equal(sPuro.defensor, 1);
+  assert.equal(sPuro.mediocampista, 0);
+  assert.equal(sPuro.delantero, 0);
+
+  // Preferida defensor + posible medio: 1.0 / 0.5 → normalizado 0.667 / 0.333.
+  const flex = mk(
+    "f",
+    { physical: 6, mental: 6, technical: 6 },
+    {
+      position_pref: "defensor",
+      positions_possible: ["mediocampista"],
+    },
+  );
+  const sFlex = fieldPositionShares(flex);
+  assert.ok(Math.abs(sFlex.defensor - 2 / 3) < 1e-9);
+  assert.ok(Math.abs(sFlex.mediocampista - 1 / 3) < 1e-9);
+  // Suma siempre 1 (no se doble-cuenta).
+  assert.ok(Math.abs(sFlex.defensor + sFlex.mediocampista + sFlex.delantero - 1) < 1e-9);
+
+  // Solo arquero, sin líneas de campo: no aporta a la distribución de campo.
+  const arq = mk("a", { physical: 6, mental: 6, technical: 6 }, { position_pref: "arquero" });
+  const sArq = fieldPositionShares(arq);
+  assert.equal(sArq.defensor + sArq.mediocampista + sArq.delantero, 0);
+});
+
+test("las posiciones posibles ayudan: el flexible tapa la línea más floja", () => {
+  // Rubros iguales (las posiciones mandan el reparto). 3 defensores puros y
+  // 2 delanteros puros + 1 delantero que TAMBIÉN puede defender. El flexible
+  // debe ir al equipo con menos defensa para emparejar la forma.
+  const roster: GeneratorInput[] = [
+    gk("gk1"),
+    gk("gk2"),
+    mk("d1", { physical: 6, mental: 6, technical: 6 }, { position_pref: "defensor" }),
+    mk("d2", { physical: 6, mental: 6, technical: 6 }, { position_pref: "defensor" }),
+    mk("d3", { physical: 6, mental: 6, technical: 6 }, { position_pref: "defensor" }),
+    mk("f1", { physical: 6, mental: 6, technical: 6 }, { position_pref: "delantero" }),
+    mk("f2", { physical: 6, mental: 6, technical: 6 }, { position_pref: "delantero" }),
+    mk(
+      "flex",
+      { physical: 6, mental: 6, technical: 6 },
+      {
+        position_pref: "delantero",
+        positions_possible: ["defensor"],
+      },
+    ),
+  ];
+
+  const s = generateTeams(roster);
+  const teamOf = (id: string) => (teamHas(s.teamA, id) ? "A" : "B");
+  const pureDefs = ["d1", "d2", "d3"];
+  const flexTeam = teamOf("flex");
+  const defsConFlex = pureDefs.filter((d) => teamOf(d) === flexTeam).length;
+  // El flexible (que puede defender) queda con el equipo de menos defensores
+  // puros, no con el que ya tiene 2: usa su flexibilidad para emparejar.
+  assert.ok(defsConFlex <= 1, `el flexible quedó con ${defsConFlex} defensores puros`);
 });
 
 test("determinístico: mismo input → mismo output", () => {
