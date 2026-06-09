@@ -68,7 +68,13 @@ function fieldError(state: ProposeChangeState, field: string): string | null {
   return null;
 }
 
-export function EditForm({ initial }: { initial: Initial }) {
+export function EditForm({
+  initial,
+  requiereVeedor,
+}: {
+  initial: Initial;
+  requiereVeedor: boolean;
+}) {
   const bound = proposeChange.bind(null, initial.id);
   const [state, formAction, pending] = useActionState<ProposeChangeState, FormData>(bound, null);
 
@@ -93,9 +99,12 @@ export function EditForm({ initial }: { initial: Initial }) {
     <form action={formAction} className="space-y-6">
       <Section title="Sub-ratings (1–10)">
         <p className="text-xs text-neutral-500">
-          Cada dimensión es el promedio de sus 3 subcomponentes. Este cambio pasa por el veedor
-          antes de aplicarse. El resto de los datos del jugador (nombre, posición, contacto, etc.)
-          los editás directo desde la pantalla de detalle.
+          Cada dimensión es el promedio de sus 3 subcomponentes.{" "}
+          {requiereVeedor
+            ? "Este cambio pasa por el veedor antes de aplicarse."
+            : "Este cambio se aplica directo (la auditoría del veedor está desactivada)."}{" "}
+          El resto de los datos del jugador (nombre, posición, contacto, etc.) los editás directo
+          desde la pantalla de detalle.
         </p>
 
         <div className="mt-4 space-y-5">
@@ -185,7 +194,7 @@ export function EditForm({ initial }: { initial: Initial }) {
           disabled={pending}
           className="rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {pending ? "Enviando…" : "Proponer ratings"}
+          {pending ? "Enviando…" : requiereVeedor ? "Proponer ratings" : "Guardar ratings"}
         </button>
       </div>
     </form>

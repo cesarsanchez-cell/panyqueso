@@ -76,6 +76,9 @@ export default async function ProponerCambioPage({ params }: { params: Promise<{
     throw new Error(`No se pudieron leer las solicitudes: ${openErr.message}`);
   }
 
+  const { data: gateData } = await supabase.rpc("requiere_veedor");
+  const requiereVeedor = gateData === true;
+
   return (
     <div className="space-y-6">
       <div>
@@ -89,11 +92,12 @@ export default async function ProponerCambioPage({ params }: { params: Promise<{
 
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
-          Proponer ratings — {player.nombre}
+          {requiereVeedor ? "Proponer ratings" : "Editar ratings"} — {player.nombre}
         </h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Los ratings (técnica/físico/mental/confianza) son lo único que el admin no puede cambiar
-          solo: pasan por el veedor antes de aplicarse. Modificá lo que quieras y agregá un motivo.
+          {requiereVeedor
+            ? "Los ratings (técnica/físico/mental/confianza) pasan por el veedor antes de aplicarse. Modificá lo que quieras y agregá un motivo."
+            : "Modificá los ratings (técnica/físico/mental/confianza) y agregá un motivo. Se aplican directo (la auditoría del veedor está desactivada)."}
         </p>
       </div>
 
@@ -106,6 +110,7 @@ export default async function ProponerCambioPage({ params }: { params: Promise<{
         />
       ) : (
         <EditForm
+          requiereVeedor={requiereVeedor}
           initial={{
             id: player.id,
             rating_confidence: player.rating_confidence,
