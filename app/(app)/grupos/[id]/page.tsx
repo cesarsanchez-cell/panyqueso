@@ -14,6 +14,7 @@ import { MembersSections } from "./members-sections";
 import { AddMemberForm } from "./membership-forms";
 import { GroupJoinLinkSection } from "./group-join-link";
 import { PendingInvitesList, type PendingInvite } from "./pending-invites";
+import { ProdeResetForm } from "./prode-reset-form";
 
 const DIA_LABEL = [
   "Domingo",
@@ -299,6 +300,17 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
         cupoTitulares={grupo.cupo_titulares}
         playerIdsConAvisos={playerIdsConAvisos}
       />
+
+      <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">🔮 Prode</h2>
+        <p className="mt-1 text-xs text-neutral-500">
+          La tabla del Prode acumula por año. Si querés empezar de cero la temporada, podés borrar
+          todos los pronósticos de {new Date().getFullYear()} de este grupo.
+        </p>
+        <div className="mt-3">
+          <ProdeResetForm grupoId={grupo.id} year={new Date().getFullYear()} />
+        </div>
+      </section>
     </div>
   );
 }
