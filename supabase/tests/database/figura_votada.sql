@@ -1,14 +1,15 @@
 -- ============================================================================
--- FUT-99: tests de la figura votada (match_figura_votes + RPCs)
+-- FUT-99: tests de la figura votada (ventana 48h + revelar al cerrar)
 -- ============================================================================
 -- Cubre:
---   1. Un jugador que jugo puede votar; el mas votado resuelve la figura.
---   2. Un jugador que NO jugo no puede votar (voter_not_in_match).
---   3. Empate => figura sin resolver (null).
---   4. Override del admin (matches.figura_player_id) gana sobre el voto.
---   5. get_figura_votes: lo ve el admin, no el jugador.
---   6. Ventana cerrada => no se puede votar (voting_closed).
---   7. get_my_match_history refleja la figura resuelta (figura_es_mia).
+--   1. Un jugador que jugo puede votar (ventana abierta).
+--   2. Mientras la votacion esta ABIERTA la figura NO se revela (null).
+--   3. Un jugador que NO jugo no puede votar.
+--   4. Conteo de votos: lo ve el admin, no el jugador.
+--   5. Al CERRAR la votacion se revela el mas votado (lider unico).
+--   6. Con la ventana cerrada no se puede votar.
+--   7. Override del admin gana (y se muestra) sobre el voto.
+--   8. Empate => figura vacante (null) aun cerrada.
 -- ============================================================================
 
 begin;
@@ -52,14 +53,13 @@ insert into public.lugares (id, nombre, created_by) values
 insert into public.grupos (id, nombre, lugar_id, dia_semana, hora, cupo_titulares, owner_id) values
   ('00000000-0000-0000-0000-0000000000e1', 'Grupo e1', '00000000-0000-0000-0000-00000000000a', 2, '20:00', 6, '00000000-0000-0000-0000-0000000000a1');
 
--- c1 = el partido jugado (la votacion abre). c2 = la proxima conv, su cierre_at
--- (futuro) es el limite de la votacion -> ventana ABIERTA.
-insert into public.convocatorias (id, fecha, hora, cupo_maximo, status, grupo_id, cierre_at, created_by) values
-  ('00000000-0000-0000-0000-0000000000c1', current_date - 7, '20:00', 6, 'jugada',  '00000000-0000-0000-0000-0000000000e1', null,                  '00000000-0000-0000-0000-0000000000a1'),
-  ('00000000-0000-0000-0000-0000000000c2', current_date + 3, '20:00', 6, 'abierta', '00000000-0000-0000-0000-0000000000e1', now() + interval '1 day', '00000000-0000-0000-0000-0000000000a1');
+-- c1: el partido. fecha = ayer 20:00 => ventana ABIERTA (abre ayer 20:00, cierra
+-- manana 20:00). Para cerrarla, mas adelante movemos fecha 3 dias atras.
+insert into public.convocatorias (id, fecha, hora, cupo_maximo, status, grupo_id, created_by) values
+  ('00000000-0000-0000-0000-0000000000c1', current_date - 1, '20:00', 6, 'jugada', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000a1');
 
 insert into public.matches (id, convocatoria_id, fecha, score_team_a, score_team_b, winner) values
-  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c1', current_date - 7, 3, 1, 'a');
+  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c1', current_date - 1, 3, 1, 'a');
 
 insert into public.match_teams (id, match_id, team_label) values
   ('00000000-0000-0000-0000-0000000a0001', '00000000-0000-0000-0000-0000000000f1', 'A');
@@ -80,20 +80,20 @@ begin
 end;
 $$;
 
-select plan(10);
+select plan(11);
 
--- 1. b1 (jugo) vota a b2.
+-- 1. (abierta) b1 vota a b2.
 select _as('00000000-0000-0000-0000-0000000000a2');
 select lives_ok(
   $$ select public.cast_figura_vote('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b2') $$,
-  'b1 (jugo) puede votar a b2'
+  'b1 (jugo) puede votar con la ventana abierta'
 );
 
--- 2. con 1 voto, la figura resuelta = b2 (mas votado, sin override).
+-- 2. mientras esta ABIERTA, la figura NO se revela (sin override => null).
 select is(
   public.match_figura_resolved('00000000-0000-0000-0000-0000000000f1'),
-  '00000000-0000-0000-0000-0000000000b2'::uuid,
-  'figura resuelta = el mas votado (b2)'
+  null,
+  'votacion abierta => figura no revelada (null)'
 );
 
 -- 3. b4 (NO jugo) no puede votar.
@@ -105,39 +105,27 @@ select throws_ok(
   'b4 (no jugo) no puede votar'
 );
 
--- 4. b2 vota a b3 => empate 1-1 (b2 y b3).
+-- 4-5. b2 vota a b3 y b3 vota a b2 => b2:2 (b1,b3), b3:1 (b2). Lider unico = b2.
 select _as('00000000-0000-0000-0000-0000000000a3');
 select lives_ok(
   $$ select public.cast_figura_vote('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b3') $$,
   'b2 vota a b3'
 );
-
--- 5. empate => figura sin resolver (null).
-select is(
-  public.match_figura_resolved('00000000-0000-0000-0000-0000000000f1'),
-  null,
-  'empate => figura vacante (null)'
+select _as('00000000-0000-0000-0000-0000000000a4');
+select lives_ok(
+  $$ select public.cast_figura_vote('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b2') $$,
+  'b3 vota a b2'
 );
 
--- 6. override del admin gana sobre el voto.
-select set_config('role', 'postgres', true);
-update public.matches set figura_player_id = '00000000-0000-0000-0000-0000000000b1'
- where id = '00000000-0000-0000-0000-0000000000f1';
-select is(
-  public.match_figura_resolved('00000000-0000-0000-0000-0000000000f1'),
-  '00000000-0000-0000-0000-0000000000b1'::uuid,
-  'override del admin gana sobre el mas votado'
-);
-
--- 7. get_figura_votes: el admin ve el conteo (2 jugadores votados).
+-- 6. el admin ve el conteo (2 jugadores votados: b2 y b3).
 select _as('00000000-0000-0000-0000-0000000000a1');
 select is(
   (select count(*)::int from public.get_figura_votes('00000000-0000-0000-0000-0000000000f1')),
   2,
-  'admin ve el conteo de votos (b2 y b3)'
+  'admin ve el conteo de votos'
 );
 
--- 8. get_figura_votes: un jugador NO ve el conteo (vacio).
+-- 7. un jugador NO ve el conteo (vacio).
 select _as('00000000-0000-0000-0000-0000000000a2');
 select is(
   (select count(*)::int from public.get_figura_votes('00000000-0000-0000-0000-0000000000f1')),
@@ -145,25 +133,47 @@ select is(
   'el jugador no ve el conteo de votos'
 );
 
--- 9. ventana cerrada (cierre_at de la proxima conv ya paso) => no se puede votar.
+-- 8. CERRAMOS la votacion (fecha 3 dias atras => paso el cierre de 48h) y se
+--    revela el mas votado (b2).
 select set_config('role', 'postgres', true);
-update public.convocatorias set cierre_at = now() - interval '1 day'
- where id = '00000000-0000-0000-0000-0000000000c2';
-select _as('00000000-0000-0000-0000-0000000000a4');
+update public.convocatorias set fecha = current_date - 3
+ where id = '00000000-0000-0000-0000-0000000000c1';
+select is(
+  public.match_figura_resolved('00000000-0000-0000-0000-0000000000f1'),
+  '00000000-0000-0000-0000-0000000000b2'::uuid,
+  'al cerrar => se revela el mas votado (b2)'
+);
+
+-- 9. con la ventana cerrada no se puede votar.
+select _as('00000000-0000-0000-0000-0000000000a2');
 select throws_ok(
-  $$ select public.cast_figura_vote('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b2') $$,
+  $$ select public.cast_figura_vote('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b3') $$,
   'P0001',
   'voting_closed',
   'con la ventana cerrada no se puede votar'
 );
 
--- 10. get_my_match_history: para b1 la figura resuelta (override = b1) es suya.
-select _as('00000000-0000-0000-0000-0000000000a2');
+-- 10. override del admin gana (y se muestra) sobre el mas votado.
+select set_config('role', 'postgres', true);
+update public.matches set figura_player_id = '00000000-0000-0000-0000-0000000000b3'
+ where id = '00000000-0000-0000-0000-0000000000f1';
 select is(
-  (select figura_es_mia from public.get_my_match_history()
-    where match_id = '00000000-0000-0000-0000-0000000000f1'),
-  true,
-  'historial: figura_es_mia true cuando la figura resuelta soy yo'
+  public.match_figura_resolved('00000000-0000-0000-0000-0000000000f1'),
+  '00000000-0000-0000-0000-0000000000b3'::uuid,
+  'override del admin gana sobre el voto'
+);
+
+-- 11. sin override y con empate (b2:1, b3:1) => figura vacante (null) aun cerrada.
+select set_config('role', 'postgres', true);
+update public.matches set figura_player_id = null
+ where id = '00000000-0000-0000-0000-0000000000f1';
+delete from public.match_figura_votes
+ where match_id = '00000000-0000-0000-0000-0000000000f1'
+   and voter_player_id = '00000000-0000-0000-0000-0000000000b3';
+select is(
+  public.match_figura_resolved('00000000-0000-0000-0000-0000000000f1'),
+  null,
+  'empate sin override => figura vacante (null)'
 );
 
 select * from finish();
