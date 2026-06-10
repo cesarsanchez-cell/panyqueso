@@ -15,8 +15,60 @@ export type ProdeTablaGrupo = {
   rows: ProdeTablaRow[];
 };
 
-// Tabla anual del Prode 🔮 por grupo. Read-only, la ve todo el grupo. Suma
-// puntos del año (3 exacto / 1 ganador). Resalta al jugador logueado.
+// La tabla en sí (un grupo). Reutilizable: la usa el jugador en /historial y el
+// admin en el detalle del grupo. Resalta la fila de myPlayerId (null = nadie).
+export function ProdeTablaTable({
+  rows,
+  myPlayerId,
+}: {
+  rows: ProdeTablaRow[];
+  myPlayerId: string | null;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-neutral-200 text-left text-xs text-neutral-500">
+            <th className="py-1 pr-2 font-medium">#</th>
+            <th className="py-1 pr-2 font-medium">Jugador</th>
+            <th className="py-1 px-2 text-center font-medium" title="Pronósticos">
+              PJ
+            </th>
+            <th className="py-1 px-2 text-center font-medium" title="Resultados exactos">
+              🎯
+            </th>
+            <th className="py-1 pl-2 text-right font-medium">Pts</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => {
+            const esMio = r.playerId === myPlayerId;
+            return (
+              <tr
+                key={r.playerId}
+                className={`border-b border-neutral-100 ${
+                  esMio ? "bg-indigo-50 font-semibold text-indigo-900" : "text-neutral-800"
+                }`}
+              >
+                <td className="py-1.5 pr-2 tabular-nums text-neutral-500">{i + 1}</td>
+                <td className="py-1.5 pr-2">
+                  {playerLabel(r.nombre, r.apodo)}
+                  {esMio ? <span className="ml-1 text-xs text-indigo-700">· vos</span> : null}
+                </td>
+                <td className="py-1.5 px-2 text-center tabular-nums">{r.pronosticos}</td>
+                <td className="py-1.5 px-2 text-center tabular-nums">{r.aciertosExactos}</td>
+                <td className="py-1.5 pl-2 text-right font-semibold tabular-nums">{r.puntos}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Tabla anual del Prode 🔮 por grupo (vista del jugador en /historial). Read-only,
+// la ve todo el grupo. Oculta los grupos sin pronósticos todavía.
 export function ProdeTablas({
   year,
   grupos,
@@ -42,50 +94,8 @@ export function ProdeTablas({
         {conDatos.map((g) => (
           <div key={g.grupoId}>
             <h3 className="text-xs font-semibold text-neutral-700">{g.grupoNombre}</h3>
-            <div className="mt-2 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-neutral-200 text-left text-xs text-neutral-500">
-                    <th className="py-1 pr-2 font-medium">#</th>
-                    <th className="py-1 pr-2 font-medium">Jugador</th>
-                    <th className="py-1 px-2 text-center font-medium" title="Pronósticos">
-                      PJ
-                    </th>
-                    <th className="py-1 px-2 text-center font-medium" title="Resultados exactos">
-                      🎯
-                    </th>
-                    <th className="py-1 pl-2 text-right font-medium">Pts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {g.rows.map((r, i) => {
-                    const esMio = r.playerId === myPlayerId;
-                    return (
-                      <tr
-                        key={r.playerId}
-                        className={`border-b border-neutral-100 ${
-                          esMio ? "bg-indigo-50 font-semibold text-indigo-900" : "text-neutral-800"
-                        }`}
-                      >
-                        <td className="py-1.5 pr-2 tabular-nums text-neutral-500">{i + 1}</td>
-                        <td className="py-1.5 pr-2">
-                          {playerLabel(r.nombre, r.apodo)}
-                          {esMio ? (
-                            <span className="ml-1 text-xs text-indigo-700">· vos</span>
-                          ) : null}
-                        </td>
-                        <td className="py-1.5 px-2 text-center tabular-nums">{r.pronosticos}</td>
-                        <td className="py-1.5 px-2 text-center tabular-nums">
-                          {r.aciertosExactos}
-                        </td>
-                        <td className="py-1.5 pl-2 text-right font-semibold tabular-nums">
-                          {r.puntos}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="mt-2">
+              <ProdeTablaTable rows={g.rows} myPlayerId={myPlayerId} />
             </div>
           </div>
         ))}

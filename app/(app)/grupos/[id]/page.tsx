@@ -15,6 +15,8 @@ import { AddMemberForm } from "./membership-forms";
 import { GroupJoinLinkSection } from "./group-join-link";
 import { PendingInvitesList, type PendingInvite } from "./pending-invites";
 import { ProdeResetForm } from "./prode-reset-form";
+import { ShareProdeButton } from "./share-prode-button";
+import { ProdeTablaTable, type ProdeTablaRow } from "../../historial/prode-tabla";
 
 const DIA_LABEL = [
   "Domingo",
@@ -173,6 +175,22 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
 
   const isActive = grupo.status === "activo";
 
+  // Tabla del Prode 🔮 del grupo (año en curso). El admin puede verla y
+  // compartirla; el RPC ya autoriza admin además de los miembros.
+  const prodeYear = new Date().getFullYear();
+  const { data: prodeTablaRaw } = await supabase.rpc("get_prode_tabla", {
+    p_grupo_id: id,
+    p_year: prodeYear,
+  });
+  const prodeRows: ProdeTablaRow[] = (prodeTablaRaw ?? []).map((t) => ({
+    playerId: t.player_id,
+    nombre: t.nombre ?? "—",
+    apodo: t.apodo,
+    puntos: t.puntos,
+    aciertosExactos: t.aciertos_exactos,
+    pronosticos: t.pronosticos,
+  }));
+
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
@@ -301,14 +319,37 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
         playerIdsConAvisos={playerIdsConAvisos}
       />
 
-      <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">🔮 Prode</h2>
-        <p className="mt-1 text-xs text-neutral-500">
-          La tabla del Prode acumula por año. Si querés empezar de cero la temporada, podés borrar
-          todos los pronósticos de {new Date().getFullYear()} de este grupo.
-        </p>
-        <div className="mt-3">
-          <ProdeResetForm grupoId={grupo.id} year={new Date().getFullYear()} />
+      <section className="rounded-lg border border-indigo-200 bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-700">
+          🔮 Tabla del Prode {prodeYear}
+        </h2>
+        {prodeRows.length === 0 ? (
+          <p className="mt-3 text-sm text-neutral-500">
+            Todavía nadie sumó puntos en el Prode este año. Cuando se jueguen partidos con
+            pronósticos cargados, el ranking aparece acá.
+          </p>
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-neutral-500">
+              Ranking del año: 3 pts si se clava el resultado, 1 pt si se acierta quién gana.
+            </p>
+            <div className="mt-4">
+              <ProdeTablaTable rows={prodeRows} myPlayerId={null} />
+            </div>
+            <div className="mt-4">
+              <ShareProdeButton grupoId={grupo.id} year={prodeYear} />
+            </div>
+          </>
+        )}
+
+        <div className="mt-5 border-t border-neutral-100 pt-4">
+          <p className="text-xs text-neutral-500">
+            La tabla acumula por año. Para empezar de cero la temporada, podés borrar todos los
+            pronósticos de {prodeYear} de este grupo.
+          </p>
+          <div className="mt-3">
+            <ProdeResetForm grupoId={grupo.id} year={prodeYear} />
+          </div>
         </div>
       </section>
     </div>
