@@ -406,6 +406,69 @@ export type Database = {
           },
         ];
       };
+      match_figura_votes: {
+        Row: {
+          created_at: string;
+          id: string;
+          match_id: string;
+          updated_at: string;
+          voted_player_id: string;
+          voter_player_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          match_id: string;
+          updated_at?: string;
+          voted_player_id: string;
+          voter_player_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          match_id?: string;
+          updated_at?: string;
+          voted_player_id?: string;
+          voter_player_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "match_figura_votes_match_id_fkey";
+            columns: ["match_id"];
+            isOneToOne: false;
+            referencedRelation: "matches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "match_figura_votes_voted_player_id_fkey";
+            columns: ["voted_player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "match_figura_votes_voted_player_id_fkey";
+            columns: ["voted_player_id"];
+            isOneToOne: false;
+            referencedRelation: "players_public";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "match_figura_votes_voter_player_id_fkey";
+            columns: ["voter_player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "match_figura_votes_voter_player_id_fkey";
+            columns: ["voter_player_id"];
+            isOneToOne: false;
+            referencedRelation: "players_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       match_player_stats: {
         Row: {
           asistencias: number;
@@ -1051,6 +1114,8 @@ export type Database = {
         Args: { p_convocatoria_id: string; p_from_orden: number };
         Returns: undefined;
       };
+      _figura_most_voted: { Args: { p_match_id: string }; Returns: string };
+      _figura_voting_open: { Args: { p_match_id: string }; Returns: boolean };
       _next_partido_at: {
         Args: { p_dia_semana: number; p_hora: string };
         Returns: string;
@@ -1066,6 +1131,10 @@ export type Database = {
       age_physical_factor: { Args: { p_edad: number }; Returns: number };
       approve_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
+        Returns: undefined;
+      };
+      cast_figura_vote: {
+        Args: { p_match_id: string; p_voted_player_id: string };
         Returns: undefined;
       };
       claim_group_join: {
@@ -1141,6 +1210,24 @@ export type Database = {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
       };
+      get_figura_candidates: {
+        Args: { p_match_id: string };
+        Returns: {
+          apodo: string;
+          club_id: string;
+          nombre: string;
+          player_id: string;
+        }[];
+      };
+      get_figura_votes: {
+        Args: { p_match_id: string };
+        Returns: {
+          apodo: string;
+          nombre: string;
+          voted_player_id: string;
+          votos: number;
+        }[];
+      };
       get_group_by_join_token: {
         Args: { p_token: string };
         Returns: {
@@ -1194,11 +1281,13 @@ export type Database = {
           fecha: string;
           figura_es_mia: boolean;
           figura_nombre: string;
+          figura_votacion_abierta: boolean;
           goles: number;
           goles_en_contra: number;
           grupo_id: string;
           grupo_nombre: string;
           match_id: string;
+          mi_voto_player_id: string;
           resultado: string;
           team_label: string;
           video_resumen_url: string;
@@ -1245,6 +1334,7 @@ export type Database = {
         Args: { p_convocatoria_id: string };
         Returns: boolean;
       };
+      match_figura_resolved: { Args: { p_match_id: string }; Returns: string };
       player_decline_convocatoria: {
         Args: { p_convocatoria_id: string };
         Returns: undefined;

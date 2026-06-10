@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 
+import { FiguraVoteForm, type VoteCandidate } from "./figura-vote-form";
 import { HistorialResumen, type HistorialResumenData } from "./historial-resumen";
 
 function formatFecha(iso: string): string {
@@ -48,6 +49,24 @@ export default async function HistorialPage() {
 
   const rows = data ?? [];
 
+  // Candidatos a figura (los que jugaron) para los partidos con la votación
+  // abierta. Solo esos matches necesitan el selector; normalmente es 1.
+  const candidatesByMatch: Record<string, VoteCandidate[]> = {};
+  await Promise.all(
+    rows
+      .filter((r) => r.figura_votacion_abierta)
+      .map(async (r) => {
+        const { data: cands } = await supabase.rpc("get_figura_candidates", {
+          p_match_id: r.match_id,
+        });
+        candidatesByMatch[r.match_id] = (cands ?? []).map((c) => ({
+          playerId: c.player_id,
+          nombre: c.nombre,
+          apodo: c.apodo,
+        }));
+      }),
+  );
+
   // Resumen ("carné"): se agrega a partir de las MISMAS filas que ya trajimos
   // para la lista (sin DB nueva). Muestra la realidad: V/E/D + %.
   const resumen: HistorialResumenData = {
@@ -90,58 +109,67 @@ export default async function HistorialPage() {
             return (
               <li
                 key={r.match_id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm"
+                className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-neutral-900">
-                    {r.grupo_nombre ?? "Grupo"}
-                  </p>
-                  <p className="text-xs text-neutral-500">{formatFecha(r.fecha)}</p>
-                  {r.figura_es_mia ? (
-                    <p className="mt-1 text-xs font-semibold text-amber-700">
-                      ⭐ Fuiste la figura del partido
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-neutral-900">
+                      {r.grupo_nombre ?? "Grupo"}
                     </p>
-                  ) : r.figura_nombre ? (
-                    <p className="mt-1 text-xs text-neutral-500">⭐ Figura: {r.figura_nombre}</p>
-                  ) : null}
-                  {r.video_resumen_url ? (
-                    <a
-                      href={r.video_resumen_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:underline"
+                    <p className="text-xs text-neutral-500">{formatFecha(r.fecha)}</p>
+                    {r.figura_es_mia ? (
+                      <p className="mt-1 text-xs font-semibold text-amber-700">
+                        ⭐ Fuiste la figura del partido
+                      </p>
+                    ) : r.figura_nombre ? (
+                      <p className="mt-1 text-xs text-neutral-500">⭐ Figura: {r.figura_nombre}</p>
+                    ) : null}
+                    {r.video_resumen_url ? (
+                      <a
+                        href={r.video_resumen_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:underline"
+                      >
+                        🎥 Ver video
+                      </a>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {r.figura_es_mia ? (
+                      <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
+                        ⭐ Figura
+                      </span>
+                    ) : null}
+                    {r.goles > 0 ? (
+                      <span className="text-xs font-medium text-neutral-700">
+                        {r.goles} {r.goles === 1 ? "gol" : "goles"} ⚽
+                      </span>
+                    ) : null}
+                    {r.asistencias > 0 ? (
+                      <span className="text-xs font-medium text-neutral-700">
+                        {r.asistencias} {r.asistencias === 1 ? "asist." : "asist."} 🅰️
+                      </span>
+                    ) : null}
+                    {r.goles_en_contra > 0 ? (
+                      <span className="text-xs font-medium text-neutral-700">
+                        {r.goles_en_contra} en contra 🙈
+                      </span>
+                    ) : null}
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.className}`}
                     >
-                      🎥 Ver video
-                    </a>
-                  ) : null}
+                      {meta.label}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {r.figura_es_mia ? (
-                    <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
-                      ⭐ Figura
-                    </span>
-                  ) : null}
-                  {r.goles > 0 ? (
-                    <span className="text-xs font-medium text-neutral-700">
-                      {r.goles} {r.goles === 1 ? "gol" : "goles"} ⚽
-                    </span>
-                  ) : null}
-                  {r.asistencias > 0 ? (
-                    <span className="text-xs font-medium text-neutral-700">
-                      {r.asistencias} {r.asistencias === 1 ? "asist." : "asist."} 🅰️
-                    </span>
-                  ) : null}
-                  {r.goles_en_contra > 0 ? (
-                    <span className="text-xs font-medium text-neutral-700">
-                      {r.goles_en_contra} en contra 🙈
-                    </span>
-                  ) : null}
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.className}`}
-                  >
-                    {meta.label}
-                  </span>
-                </div>
+                {r.figura_votacion_abierta && (candidatesByMatch[r.match_id]?.length ?? 0) > 0 ? (
+                  <FiguraVoteForm
+                    matchId={r.match_id}
+                    candidates={candidatesByMatch[r.match_id] ?? []}
+                    currentVote={r.mi_voto_player_id}
+                  />
+                ) : null}
               </li>
             );
           })}

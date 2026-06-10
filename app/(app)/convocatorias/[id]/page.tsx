@@ -204,6 +204,19 @@ export default async function ConvocatoriaDetallePage({
     );
   }
 
+  // Conteo de votos de la figura (FUT-99): SOLO admin. La RPC ya devuelve vacío
+  // para no-admin, pero evitamos la llamada salvo que sea admin.
+  let figuraVotes: { playerId: string; nombre: string; apodo: string | null; votos: number }[] = [];
+  if (match && isAdmin) {
+    const { data: votesData } = await supabase.rpc("get_figura_votes", { p_match_id: match.id });
+    figuraVotes = (votesData ?? []).map((v) => ({
+      playerId: v.voted_player_id,
+      nombre: v.nombre,
+      apodo: v.apodo,
+      votos: Number(v.votos),
+    }));
+  }
+
   // Selector: admin puede editar el roster en abierta, cerrada y jugada.
   // En cerrada/jugada es "ultimo recurso" para registrar eventualidades
   // (faltazos, invitados que cubrieron, etc).
@@ -540,6 +553,7 @@ export default async function ConvocatoriaDetallePage({
           goalsByPlayerId={goalsByPlayerId}
           assistsByPlayerId={assistsByPlayerId}
           ownGoalsByPlayerId={ownGoalsByPlayerId}
+          figuraVotes={figuraVotes}
         />
       ) : null}
 
@@ -648,6 +662,7 @@ function MatchSection({
   goalsByPlayerId,
   assistsByPlayerId,
   ownGoalsByPlayerId,
+  figuraVotes,
 }: {
   match: MatchData;
   convocatoriaId: string;
@@ -656,6 +671,7 @@ function MatchSection({
   goalsByPlayerId: Record<string, number>;
   assistsByPlayerId: Record<string, number>;
   ownGoalsByPlayerId: Record<string, number>;
+  figuraVotes: { playerId: string; nombre: string; apodo: string | null; votos: number }[];
 }) {
   const hasResult = match.score_team_a !== null && match.score_team_b !== null;
   const teams = [...(match.teams ?? [])].sort((a, b) => a.team_label.localeCompare(b.team_label));
@@ -677,8 +693,14 @@ function MatchSection({
   const figuraOptions: FiguraOption[] = goalsFormTeams.flatMap((t) =>
     t.players.map((p) => ({ playerId: p.playerId, nombre: p.nombre, apodo: p.apodo })),
   );
-  const figura = match.figura_player_id
-    ? (figuraOptions.find((p) => p.playerId === match.figura_player_id) ?? null)
+  // Figura resuelta = override del admin ?? más votado (líder único). El líder
+  // se calcula del conteo (solo lo tiene el admin); el veedor cae al override.
+  const [topVote, secondVote] = figuraVotes;
+  const figuraLeaderId =
+    topVote && (!secondVote || topVote.votos > secondVote.votos) ? topVote.playerId : null;
+  const resolvedFiguraId = match.figura_player_id ?? figuraLeaderId;
+  const figura = resolvedFiguraId
+    ? (figuraOptions.find((p) => p.playerId === resolvedFiguraId) ?? null)
     : null;
 
   return (
@@ -802,13 +824,15 @@ function MatchSection({
         <div className="mt-5 border-t border-neutral-200 pt-5">
           <h3 className="text-sm font-semibold text-neutral-900">Figura del partido</h3>
           <p className="mt-1 text-xs text-neutral-500">
-            Elegí al jugador destacado. Lo va a ver en su historial como un reconocimiento.
+            La votan los que jugaron (desde su historial). Gana el más votado; vos desempatás o la
+            cambiás acá. Puede quedar sin figura.
           </p>
           <div className="mt-3">
             <FiguraForm
               convocatoriaId={convocatoriaId}
               players={figuraOptions}
               initialFiguraId={match.figura_player_id}
+              votes={figuraVotes}
             />
           </div>
         </div>
