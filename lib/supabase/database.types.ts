@@ -1132,6 +1132,10 @@ export type Database = {
         Args: { p_convocatoria_player_id: string };
         Returns: undefined;
       };
+      admin_reset_prode: {
+        Args: { p_grupo_id: string; p_year: number };
+        Returns: number;
+      };
       age_physical_factor: { Args: { p_edad: number }; Returns: number };
       approve_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
@@ -1139,6 +1143,10 @@ export type Database = {
       };
       cast_figura_vote: {
         Args: { p_match_id: string; p_voted_player_id: string };
+        Returns: undefined;
+      };
+      cast_prode_prediction: {
+        Args: { p_match_id: string; p_score_a: number; p_score_b: number };
         Returns: undefined;
       };
       claim_group_join: {
@@ -1230,6 +1238,54 @@ export type Database = {
           nombre: string;
           voted_player_id: string;
           votos: number;
+        }[];
+      };
+      get_my_prode: {
+        Args: never;
+        Returns: {
+          grupo_id: string;
+          match_id: string;
+          fecha: string;
+          kickoff: string;
+          abierto: boolean;
+          result_a: number | null;
+          result_b: number | null;
+          mi_pred_a: number | null;
+          mi_pred_b: number | null;
+        }[];
+      };
+      get_prode_predictions: {
+        Args: { p_match_id: string };
+        Returns: {
+          player_id: string;
+          nombre: string;
+          apodo: string | null;
+          pred_a: number;
+          pred_b: number;
+          puntos: number | null;
+          es_mio: boolean;
+        }[];
+      };
+      get_prode_state: {
+        Args: { p_match_id: string };
+        Returns: {
+          abierto: boolean;
+          kickoff: string;
+          result_a: number | null;
+          result_b: number | null;
+          mi_pred_a: number | null;
+          mi_pred_b: number | null;
+        }[];
+      };
+      get_prode_tabla: {
+        Args: { p_grupo_id: string; p_year: number };
+        Returns: {
+          player_id: string;
+          nombre: string;
+          apodo: string | null;
+          puntos: number;
+          aciertos_exactos: number;
+          pronosticos: number;
         }[];
       };
       get_group_by_join_token: {
