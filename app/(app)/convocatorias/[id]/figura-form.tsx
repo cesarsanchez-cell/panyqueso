@@ -12,28 +12,83 @@ export type FiguraOption = {
   apodo: string | null;
 };
 
+export type FiguraVote = {
+  playerId: string;
+  nombre: string;
+  apodo: string | null;
+  votos: number;
+};
+
 type Props = {
   convocatoriaId: string;
   players: FiguraOption[];
   initialFiguraId: string | null;
+  votes: FiguraVote[];
 };
 
 const selectClass =
   "mt-1 block w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900";
 
-export function FiguraForm({ convocatoriaId, players, initialFiguraId }: Props) {
+export function FiguraForm({ convocatoriaId, players, initialFiguraId, votes }: Props) {
   const [state, formAction, pending] = useActionState<SaveFiguraState, FormData>(
     saveMatchFigura,
     null,
   );
 
+  // votes viene ordenado por votos desc (RPC get_figura_votes). El líder es
+  // único si hay votos y el primero supera al segundo; si empatan, no hay líder
+  // y el admin tiene que desempatar.
+  const totalVotos = votes.reduce((acc, v) => acc + v.votos, 0);
+  const [first, second] = votes;
+  const leader = first && (!second || first.votos > second.votos) ? first : null;
+  const hayEmpate = Boolean(first && second && first.votos === second.votos);
+
   return (
     <form action={formAction} className="space-y-3">
       <input type="hidden" name="convocatoria_id" value={convocatoriaId} />
 
+      {totalVotos > 0 ? (
+        <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+          <p className="text-xs font-semibold text-neutral-700">
+            Votos de los jugadores ({totalVotos})
+          </p>
+          <ul className="mt-1.5 space-y-1 text-sm">
+            {votes.map((v) => {
+              const isLeader = leader?.playerId === v.playerId;
+              return (
+                <li key={v.playerId} className="flex items-center justify-between gap-2">
+                  <span className={isLeader ? "font-semibold text-amber-800" : "text-neutral-800"}>
+                    {isLeader ? "⭐ " : ""}
+                    {playerLabel(v.nombre, v.apodo)}
+                  </span>
+                  <span className="text-xs text-neutral-500">
+                    {v.votos} {v.votos === 1 ? "voto" : "votos"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          {hayEmpate ? (
+            <p className="mt-2 text-xs text-amber-700">
+              Hay empate en el primer puesto: elegí abajo para desempatar.
+            </p>
+          ) : leader && !initialFiguraId ? (
+            <p className="mt-2 text-xs text-neutral-500">
+              Sin override, la figura es el más votado ({playerLabel(leader.nombre, leader.apodo)}).
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-xs text-neutral-500">
+          Todavía no hay votos. Gana el más votado cuando voten; si no, elegila a mano acá.
+        </p>
+      )}
+
       <div>
         <label htmlFor="figura_player_id" className="block text-xs font-medium text-neutral-700">
-          Elegí la figura del partido (o dejala sin asignar).
+          {totalVotos > 0
+            ? "Override / desempate (dejá sin asignar para respetar el voto)."
+            : "Elegí la figura del partido (o dejala sin asignar)."}
         </label>
         <select
           id="figura_player_id"
