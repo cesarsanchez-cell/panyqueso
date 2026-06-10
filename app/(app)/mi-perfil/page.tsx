@@ -11,6 +11,7 @@ import { DeclineButton } from "./decline-button";
 import { JoinConvocatoriaButton } from "./join-convocatoria-button";
 import { JoinQueueButton } from "./join-queue-button";
 import { NotificationsCard } from "./notifications-card";
+import { ProdeForm, type ProdeInfo } from "./prode-form";
 import { UndoDeclineButton } from "./undo-decline-button";
 
 type SearchParams = { welcome?: string };
@@ -108,7 +109,45 @@ type GrupoLineup = {
   titulares: LineupMember[];
   suplentes: LineupMember[];
   confirmedTeams: ConfirmedTeams | null;
+  prode: ProdeInfo | null;
 };
+
+// El Prode del próximo match confirmado por grupo (RPC neutral). Para los que ya
+// cerraron, además trae el reveal de todos los pronósticos.
+async function loadProde(supabase: SupabaseLike): Promise<Map<string, ProdeInfo>> {
+  const byGrupo = new Map<string, ProdeInfo>();
+  const { data } = await supabase.rpc("get_my_prode");
+  for (const row of data ?? []) {
+    if (!row.grupo_id || !row.match_id) continue;
+    byGrupo.set(row.grupo_id, {
+      matchId: row.match_id,
+      abierto: row.abierto,
+      kickoff: row.kickoff,
+      miPredA: row.mi_pred_a,
+      miPredB: row.mi_pred_b,
+      resultA: row.result_a,
+      resultB: row.result_b,
+      predicciones: [],
+    });
+  }
+  // Reveal: para los matches con prode ya cerrado, traer todos los pronósticos.
+  for (const info of byGrupo.values()) {
+    if (info.abierto) continue;
+    const { data: preds } = await supabase.rpc("get_prode_predictions", {
+      p_match_id: info.matchId,
+    });
+    info.predicciones = (preds ?? []).map((p) => ({
+      playerId: p.player_id,
+      nombre: p.nombre ?? "—",
+      apodo: p.apodo,
+      predA: p.pred_a,
+      predB: p.pred_b,
+      puntos: p.puntos,
+      esMio: p.es_mio,
+    }));
+  }
+  return byGrupo;
+}
 
 // Equipos confirmados del próximo match por grupo (RPC neutral, sin scores).
 async function loadConfirmedTeams(
@@ -184,6 +223,9 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
 
   // Equipos confirmados del próximo partido (Bug 7), por grupo.
   const confirmedByGrupo = await loadConfirmedTeams(supabase, playerId);
+
+  // El Prode del próximo partido confirmado, por grupo.
+  const prodeByGrupo = await loadProde(supabase);
 
   // Por grupo, recordamos el estado de membresia en el grupo.
   const grupoMembership = new Map<string, "activo" | "inactivo">();
@@ -414,6 +456,7 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
       titulares,
       suplentes,
       confirmedTeams: confirmedByGrupo.get(grupoId) ?? null,
+      prode: prodeByGrupo.get(grupoId) ?? null,
     });
   }
 
@@ -655,6 +698,8 @@ function ConfirmedMatchCard({ lineup, teams }: { lineup: GrupoLineup; teams: Con
           </ul>
         </div>
       ) : null}
+
+      {lineup.prode ? <ProdeForm info={lineup.prode} /> : null}
     </section>
   );
 }
