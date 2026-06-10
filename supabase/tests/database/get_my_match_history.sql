@@ -64,9 +64,9 @@ insert into public.match_team_players (match_team_id, player_id, is_goalkeeper) 
   ('00000000-0000-0000-0000-0000000a0002', '00000000-0000-0000-0000-0000000000b1', false),
   ('00000000-0000-0000-0000-0000000a0003', '00000000-0000-0000-0000-0000000000b1', false);
 
--- Goles de P1 en f1.
-insert into public.match_player_stats (match_id, player_id, goals) values
-  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b1', 2);
+-- Goles de P1 en f1: 2 a favor + 1 en contra (autogol).
+insert into public.match_player_stats (match_id, player_id, goals, own_goals) values
+  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b1', 2, 1);
 
 -- Link de video resumen en f1 (f2 queda sin link).
 update public.matches
@@ -83,7 +83,7 @@ begin
 end;
 $$;
 
-select plan(7);
+select plan(8);
 
 select _as('00000000-0000-0000-0000-0000000000a2');
 
@@ -106,6 +106,13 @@ select is(
   (select goles from public.get_my_match_history() where match_id = '00000000-0000-0000-0000-0000000000f1'),
   2,
   'f1: goles del jugador = 2'
+);
+
+-- 3b. f1: goles en contra cargados = 1.
+select is(
+  (select goles_en_contra from public.get_my_match_history() where match_id = '00000000-0000-0000-0000-0000000000f1'),
+  1,
+  'f1: goles en contra del jugador = 1'
 );
 
 -- 4. f2: perdido + goles 0 (sin stats).
