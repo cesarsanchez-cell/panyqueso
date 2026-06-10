@@ -1115,6 +1115,10 @@ export type Database = {
         Returns: undefined;
       };
       _figura_most_voted: { Args: { p_match_id: string }; Returns: string };
+      _figura_voting_closes_at: {
+        Args: { p_match_id: string };
+        Returns: string;
+      };
       _figura_voting_open: { Args: { p_match_id: string }; Returns: boolean };
       _next_partido_at: {
         Args: { p_dia_semana: number; p_hora: string };
@@ -1282,6 +1286,7 @@ export type Database = {
           figura_es_mia: boolean;
           figura_nombre: string;
           figura_votacion_abierta: boolean;
+          figura_votacion_cierra: string;
           goles: number;
           goles_en_contra: number;
           grupo_id: string;

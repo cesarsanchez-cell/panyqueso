@@ -168,6 +168,7 @@ export default async function HistorialPage() {
                     matchId={r.match_id}
                     candidates={candidatesByMatch[r.match_id] ?? []}
                     currentVote={r.mi_voto_player_id}
+                    closesAt={r.figura_votacion_cierra}
                   />
                 ) : null}
               </li>
