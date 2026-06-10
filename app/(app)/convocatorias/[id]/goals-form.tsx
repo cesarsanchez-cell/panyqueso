@@ -24,6 +24,7 @@ type Props = {
   teams: GoalsFormTeam[];
   initialGoalsByPlayerId: Record<string, number>;
   initialAssistsByPlayerId: Record<string, number>;
+  initialOwnGoalsByPlayerId: Record<string, number>;
 };
 
 const inputClass =
@@ -34,6 +35,7 @@ export function GoalsForm({
   teams,
   initialGoalsByPlayerId,
   initialAssistsByPlayerId,
+  initialOwnGoalsByPlayerId,
 }: Props) {
   const [state, formAction, pending] = useActionState<SaveGoalsState, FormData>(
     saveMatchPlayerGoals,
@@ -60,17 +62,35 @@ export function GoalsForm({
     return obj;
   }, [teams, initialAssistsByPlayerId]);
 
+  const initialOwnGoals = useMemo<Record<string, string>>(() => {
+    const obj: Record<string, string> = {};
+    for (const t of teams) {
+      for (const p of t.players) {
+        obj[p.playerId] = String(initialOwnGoalsByPlayerId[p.playerId] ?? 0);
+      }
+    }
+    return obj;
+  }, [teams, initialOwnGoalsByPlayerId]);
+
   const [goals, setGoals] = useState<Record<string, string>>(initialGoals);
   const [assists, setAssists] = useState<Record<string, string>>(initialAssists);
+  const [ownGoals, setOwnGoals] = useState<Record<string, string>>(initialOwnGoals);
 
+  function intOf(map: Record<string, string>, playerId: string): number {
+    const n = Number(map[playerId] ?? "0");
+    return Number.isInteger(n) && n >= 0 ? n : 0;
+  }
+
+  // Marcador efectivo de un equipo = goles a favor de sus jugadores + goles en
+  // contra (autogoles) de los jugadores del rival (esos suman para este equipo).
   function teamSum(team: GoalsFormTeam): number {
-    let sum = 0;
-    for (const p of team.players) {
-      const raw = goals[p.playerId] ?? "0";
-      const n = Number(raw);
-      if (Number.isInteger(n) && n >= 0) sum += n;
-    }
-    return sum;
+    const goalsFor = team.players.reduce((acc, p) => acc + intOf(goals, p.playerId), 0);
+    const rival = teams.find((t) => t.label !== team.label);
+    const rivalOwnGoals = (rival?.players ?? []).reduce(
+      (acc, p) => acc + intOf(ownGoals, p.playerId),
+      0,
+    );
+    return goalsFor + rivalOwnGoals;
   }
 
   return (
@@ -103,7 +123,7 @@ export function GoalsForm({
                 </p>
               ) : null}
 
-              <div className="mt-3 grid grid-cols-[1fr_auto_auto] items-end gap-x-3 gap-y-2">
+              <div className="mt-3 grid grid-cols-[1fr_auto_auto_auto] items-end gap-x-3 gap-y-2">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
                   Jugador
                 </span>
@@ -112,6 +132,9 @@ export function GoalsForm({
                 </span>
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
                   Asist.
+                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+                  En contra
                 </span>
 
                 {team.players.map((p) => (
@@ -152,6 +175,19 @@ export function GoalsForm({
                       }
                       className={inputClass}
                     />
+                    <input
+                      aria-label={`Goles en contra de ${playerLabel(p.nombre, p.apodo)}`}
+                      name={`contra_${p.playerId}`}
+                      type="number"
+                      min={0}
+                      max={99}
+                      step={1}
+                      value={ownGoals[p.playerId] ?? "0"}
+                      onChange={(e) =>
+                        setOwnGoals((prev) => ({ ...prev, [p.playerId]: e.target.value }))
+                      }
+                      className={inputClass}
+                    />
                   </div>
                 ))}
               </div>
@@ -166,7 +202,7 @@ export function GoalsForm({
           disabled={pending}
           className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {pending ? "Guardando…" : "Guardar goles y asistencias"}
+          {pending ? "Guardando…" : "Guardar estadísticas"}
         </button>
         {state && "error" in state ? (
           <p

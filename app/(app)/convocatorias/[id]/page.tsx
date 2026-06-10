@@ -181,13 +181,15 @@ export default async function ConvocatoriaDetallePage({
   // vista oficial del partido (no del draft).
   const match = isClosed || isPlayed ? await loadMatch(supabase, id) : null;
 
-  // Stats de goles y asistencias por jugador (Fase 7 PR 2 / FUT-79). Solo si hay match.
+  // Stats de goles, asistencias y goles en contra por jugador (FUT-79 / FUT-98).
+  // Solo si hay match.
   let goalsByPlayerId: Record<string, number> = {};
   let assistsByPlayerId: Record<string, number> = {};
+  let ownGoalsByPlayerId: Record<string, number> = {};
   if (match) {
     const { data: statsRows, error: statsErr } = await supabase
       .from("match_player_stats")
-      .select("player_id, goals, asistencias")
+      .select("player_id, goals, asistencias, own_goals")
       .eq("match_id", match.id);
 
     if (statsErr) {
@@ -196,6 +198,9 @@ export default async function ConvocatoriaDetallePage({
     goalsByPlayerId = Object.fromEntries((statsRows ?? []).map((r) => [r.player_id, r.goals]));
     assistsByPlayerId = Object.fromEntries(
       (statsRows ?? []).map((r) => [r.player_id, r.asistencias]),
+    );
+    ownGoalsByPlayerId = Object.fromEntries(
+      (statsRows ?? []).map((r) => [r.player_id, r.own_goals]),
     );
   }
 
@@ -534,6 +539,7 @@ export default async function ConvocatoriaDetallePage({
           isPlayed={isPlayed}
           goalsByPlayerId={goalsByPlayerId}
           assistsByPlayerId={assistsByPlayerId}
+          ownGoalsByPlayerId={ownGoalsByPlayerId}
         />
       ) : null}
 
@@ -641,6 +647,7 @@ function MatchSection({
   isPlayed,
   goalsByPlayerId,
   assistsByPlayerId,
+  ownGoalsByPlayerId,
 }: {
   match: MatchData;
   convocatoriaId: string;
@@ -648,6 +655,7 @@ function MatchSection({
   isPlayed: boolean;
   goalsByPlayerId: Record<string, number>;
   assistsByPlayerId: Record<string, number>;
+  ownGoalsByPlayerId: Record<string, number>;
 }) {
   const hasResult = match.score_team_a !== null && match.score_team_b !== null;
   const teams = [...(match.teams ?? [])].sort((a, b) => a.team_label.localeCompare(b.team_label));
@@ -776,6 +784,7 @@ function MatchSection({
                 teams={goalsFormTeams}
                 initialGoalsByPlayerId={goalsByPlayerId}
                 initialAssistsByPlayerId={assistsByPlayerId}
+                initialOwnGoalsByPlayerId={ownGoalsByPlayerId}
               />
             </div>
           </>
@@ -784,6 +793,7 @@ function MatchSection({
             teams={goalsFormTeams}
             goalsByPlayerId={goalsByPlayerId}
             assistsByPlayerId={assistsByPlayerId}
+            ownGoalsByPlayerId={ownGoalsByPlayerId}
           />
         )}
       </div>
@@ -824,15 +834,27 @@ function GoalsReadOnly({
   teams,
   goalsByPlayerId,
   assistsByPlayerId,
+  ownGoalsByPlayerId,
 }: {
   teams: GoalsFormTeam[];
   goalsByPlayerId: Record<string, number>;
   assistsByPlayerId: Record<string, number>;
+  ownGoalsByPlayerId: Record<string, number>;
 }) {
   return (
     <div className="mt-3 grid gap-4 sm:grid-cols-2">
       {teams.map((team) => {
-        const sum = team.players.reduce((acc, p) => acc + (goalsByPlayerId[p.playerId] ?? 0), 0);
+        // Marcador efectivo = goles a favor + autogoles del rival (suman acá).
+        const goalsFor = team.players.reduce(
+          (acc, p) => acc + (goalsByPlayerId[p.playerId] ?? 0),
+          0,
+        );
+        const rival = teams.find((t) => t.label !== team.label);
+        const rivalOwnGoals = (rival?.players ?? []).reduce(
+          (acc, p) => acc + (ownGoalsByPlayerId[p.playerId] ?? 0),
+          0,
+        );
+        const sum = goalsFor + rivalOwnGoals;
         const mismatch = team.score !== null && sum !== team.score;
         return (
           <div key={team.label} className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
@@ -852,6 +874,7 @@ function GoalsReadOnly({
               {team.players.map((p) => {
                 const g = goalsByPlayerId[p.playerId] ?? 0;
                 const a = assistsByPlayerId[p.playerId] ?? 0;
+                const oself = ownGoalsByPlayerId[p.playerId] ?? 0;
                 return (
                   <li key={p.playerId} className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-1.5">
@@ -865,7 +888,7 @@ function GoalsReadOnly({
                       </span>
                     </span>
                     <span className="shrink-0 text-xs font-medium text-neutral-700">
-                      {g} ⚽ · {a} 🅰️
+                      {g} ⚽ · {a} 🅰️{oself > 0 ? ` · ${oself} 🙈` : ""}
                     </span>
                   </li>
                 );

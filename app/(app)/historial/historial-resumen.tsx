@@ -13,6 +13,7 @@ export type HistorialResumenData = {
   perdidos: number;
   goles: number;
   asistencias: number;
+  golesEnContra: number;
   figuras: number;
 };
 
@@ -42,7 +43,8 @@ function StatTile({
 }
 
 export function HistorialResumen({ resumen }: { resumen: HistorialResumenData }) {
-  const { jugados, ganados, empates, perdidos, goles, asistencias, figuras } = resumen;
+  const { jugados, ganados, empates, perdidos, goles, asistencias, golesEnContra, figuras } =
+    resumen;
   const conResultado = ganados + empates + perdidos;
   const winPct = conResultado > 0 ? Math.round((ganados / conResultado) * 100) : null;
   const badges = computeBadges({ ganados, goles, figuras });
@@ -72,6 +74,7 @@ export function HistorialResumen({ resumen }: { resumen: HistorialResumenData })
           <StatTile label="Goles" value={goles} />
           <StatTile label="Asistencias" value={asistencias} />
           {figuras > 0 ? <StatTile label="⭐ Figura" value={figuras} /> : null}
+          {golesEnContra > 0 ? <StatTile label="🙈 En contra" value={golesEnContra} /> : null}
         </div>
       </section>
 

@@ -18,10 +18,11 @@ function parseStat(raw: FormDataEntryValue | undefined): number | null {
 
 const GOALS_PREFIX = "goals_";
 const ASSISTS_PREFIX = "asist_";
+const OWN_GOALS_PREFIX = "contra_";
 
 /**
- * Guarda los goles y asistencias (pases de gol) por jugador del match asociado
- * a una convocatoria.
+ * Guarda los goles, asistencias (pases de gol) y goles en contra (autogoles)
+ * por jugador del match asociado a una convocatoria.
  * - Admin-only.
  * - Convocatoria en 'cerrada' o 'jugada'.
  * - Upsert por (match_id, player_id). RLS bloquea DELETE, asi que jugadores
@@ -89,18 +90,22 @@ export async function saveMatchPlayerGoals(
     return { error: "El partido no tiene jugadores asignados." };
   }
 
-  // Juntamos goles y asistencias por jugador (goals_<id> / asist_<id>),
-  // validando cada playerId contra el set del partido.
-  const byPlayer = new Map<string, { goals: number; asistencias: number }>();
+  // Juntamos goles, asistencias y goles en contra por jugador
+  // (goals_<id> / asist_<id> / contra_<id>), validando cada playerId contra el
+  // set del partido.
+  const byPlayer = new Map<string, { goals: number; asistencias: number; own_goals: number }>();
   for (const [key, value] of formData.entries()) {
     let playerId: string | null = null;
-    let field: "goals" | "asistencias" | null = null;
+    let field: "goals" | "asistencias" | "own_goals" | null = null;
     if (key.startsWith(GOALS_PREFIX)) {
       playerId = key.slice(GOALS_PREFIX.length);
       field = "goals";
     } else if (key.startsWith(ASSISTS_PREFIX)) {
       playerId = key.slice(ASSISTS_PREFIX.length);
       field = "asistencias";
+    } else if (key.startsWith(OWN_GOALS_PREFIX)) {
+      playerId = key.slice(OWN_GOALS_PREFIX.length);
+      field = "own_goals";
     }
     if (!playerId || !field) continue;
 
@@ -109,9 +114,9 @@ export async function saveMatchPlayerGoals(
     }
     const parsed = parseStat(value);
     if (parsed === null) {
-      return { error: "Goles y asistencias deben ser enteros entre 0 y 99." };
+      return { error: "Goles, asistencias y goles en contra deben ser enteros entre 0 y 99." };
     }
-    const entry = byPlayer.get(playerId) ?? { goals: 0, asistencias: 0 };
+    const entry = byPlayer.get(playerId) ?? { goals: 0, asistencias: 0, own_goals: 0 };
     entry[field] = parsed;
     byPlayer.set(playerId, entry);
   }
@@ -121,6 +126,7 @@ export async function saveMatchPlayerGoals(
     player_id,
     goals: stats.goals,
     asistencias: stats.asistencias,
+    own_goals: stats.own_goals,
   }));
 
   if (rows.length === 0) {
