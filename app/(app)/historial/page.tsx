@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { FiguraVoteForm, type VoteCandidate } from "./figura-vote-form";
 import { HistorialResumen, type HistorialResumenData } from "./historial-resumen";
+import { ProdeTablas, type ProdeTablaGrupo } from "./prode-tabla";
 
 function formatFecha(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
@@ -80,6 +81,35 @@ export default async function HistorialPage() {
     figuras: rows.filter((r) => r.figura_es_mia).length,
   };
 
+  // Tabla anual del Prode 🔮 por grupo. Reutiliza los grupos que ya aparecen en
+  // el historial (la tabla cuenta solo partidos con resultado: mismo conjunto).
+  const year = new Date().getFullYear();
+  const { data: myPid } = await supabase.rpc("current_player_id");
+  const gruposEnHistorial = new Map<string, string>();
+  for (const r of rows) {
+    if (r.grupo_id) gruposEnHistorial.set(r.grupo_id, r.grupo_nombre ?? "Grupo");
+  }
+  const prodeGrupos: ProdeTablaGrupo[] = await Promise.all(
+    Array.from(gruposEnHistorial.entries()).map(async ([grupoId, grupoNombre]) => {
+      const { data: tabla } = await supabase.rpc("get_prode_tabla", {
+        p_grupo_id: grupoId,
+        p_year: year,
+      });
+      return {
+        grupoId,
+        grupoNombre,
+        rows: (tabla ?? []).map((t) => ({
+          playerId: t.player_id,
+          nombre: t.nombre ?? "—",
+          apodo: t.apodo,
+          puntos: t.puntos,
+          aciertosExactos: t.aciertos_exactos,
+          pronosticos: t.pronosticos,
+        })),
+      };
+    }),
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -91,6 +121,8 @@ export default async function HistorialPage() {
       </div>
 
       {rows.length > 0 ? <HistorialResumen resumen={resumen} /> : null}
+
+      <ProdeTablas year={year} grupos={prodeGrupos} myPlayerId={myPid ?? null} />
 
       {rows.length === 0 ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
