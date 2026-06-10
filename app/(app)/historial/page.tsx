@@ -57,6 +57,7 @@ export default async function HistorialPage() {
     perdidos: rows.filter((r) => r.resultado === "perdido").length,
     goles: rows.reduce((acc, r) => acc + (r.goles ?? 0), 0),
     asistencias: rows.reduce((acc, r) => acc + (r.asistencias ?? 0), 0),
+    golesEnContra: rows.reduce((acc, r) => acc + (r.goles_en_contra ?? 0), 0),
     figuras: rows.filter((r) => r.figura_es_mia).length,
   };
 
@@ -128,6 +129,11 @@ export default async function HistorialPage() {
                   {r.asistencias > 0 ? (
                     <span className="text-xs font-medium text-neutral-700">
                       {r.asistencias} {r.asistencias === 1 ? "asist." : "asist."} 🅰️
+                    </span>
+                  ) : null}
+                  {r.goles_en_contra > 0 ? (
+                    <span className="text-xs font-medium text-neutral-700">
+                      {r.goles_en_contra} en contra 🙈
                     </span>
                   ) : null}
                   <span

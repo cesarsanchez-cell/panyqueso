@@ -62,47 +62,6 @@ export type Database = {
           },
         ];
       };
-      push_subscriptions: {
-        Row: {
-          id: string;
-          player_id: string;
-          endpoint: string;
-          p256dh: string;
-          auth: string;
-          user_agent: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          player_id: string;
-          endpoint: string;
-          p256dh: string;
-          auth: string;
-          user_agent?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          player_id?: string;
-          endpoint?: string;
-          p256dh?: string;
-          auth?: string;
-          user_agent?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "push_subscriptions_player_id_fkey";
-            columns: ["player_id"];
-            isOneToOne: false;
-            referencedRelation: "players";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       audit_log: {
         Row: {
           action: string;
@@ -455,6 +414,7 @@ export type Database = {
           id: string;
           match_id: string;
           notas: string | null;
+          own_goals: number;
           player_id: string;
           updated_at: string;
         };
@@ -465,6 +425,7 @@ export type Database = {
           id?: string;
           match_id: string;
           notas?: string | null;
+          own_goals?: number;
           player_id: string;
           updated_at?: string;
         };
@@ -475,6 +436,7 @@ export type Database = {
           id?: string;
           match_id?: string;
           notas?: string | null;
+          own_goals?: number;
           player_id?: string;
           updated_at?: string;
         };
@@ -979,6 +941,54 @@ export type Database = {
         };
         Relationships: [];
       };
+      push_subscriptions: {
+        Row: {
+          auth: string;
+          created_at: string;
+          endpoint: string;
+          id: string;
+          p256dh: string;
+          player_id: string;
+          updated_at: string;
+          user_agent: string | null;
+        };
+        Insert: {
+          auth: string;
+          created_at?: string;
+          endpoint: string;
+          id?: string;
+          p256dh: string;
+          player_id: string;
+          updated_at?: string;
+          user_agent?: string | null;
+        };
+        Update: {
+          auth?: string;
+          created_at?: string;
+          endpoint?: string;
+          id?: string;
+          p256dh?: string;
+          player_id?: string;
+          updated_at?: string;
+          user_agent?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "push_subscriptions_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       players_public: {
@@ -1028,17 +1038,13 @@ export type Database = {
       };
     };
     Functions: {
-      save_push_subscription: {
+      _apply_change_request: {
         Args: {
-          p_endpoint: string;
-          p_p256dh: string;
-          p_auth: string;
-          p_user_agent?: string | null;
+          p_action: string;
+          p_actor_id: string;
+          p_comment: string;
+          p_request_id: string;
         };
-        Returns: undefined;
-      };
-      delete_push_subscription: {
-        Args: { p_endpoint: string };
         Returns: undefined;
       };
       _conv_compactar_cola: {
@@ -1049,15 +1055,15 @@ export type Database = {
         Args: { p_dia_semana: number; p_hora: string };
         Returns: string;
       };
+      admin_apply_sensitive_change: {
+        Args: { p_comment?: string; p_request_id: string };
+        Returns: undefined;
+      };
       admin_remove_from_convocatoria: {
         Args: { p_convocatoria_player_id: string };
         Returns: undefined;
       };
       age_physical_factor: { Args: { p_edad: number }; Returns: number };
-      admin_apply_sensitive_change: {
-        Args: { p_comment?: string; p_request_id: string };
-        Returns: undefined;
-      };
       approve_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
@@ -1127,6 +1133,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"];
       };
       decline_invite_by_token: { Args: { p_token: string }; Returns: boolean };
+      delete_push_subscription: {
+        Args: { p_endpoint: string };
+        Returns: undefined;
+      };
       flag_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
@@ -1185,6 +1195,7 @@ export type Database = {
           figura_es_mia: boolean;
           figura_nombre: string;
           goles: number;
+          goles_en_contra: number;
           grupo_id: string;
           grupo_nombre: string;
           match_id: string;
@@ -1255,14 +1266,20 @@ export type Database = {
         Returns: undefined;
       };
       requiere_veedor: { Args: never; Returns: boolean };
+      save_push_subscription: {
+        Args: {
+          p_auth: string;
+          p_endpoint: string;
+          p_p256dh: string;
+          p_user_agent?: string;
+        };
+        Returns: undefined;
+      };
       set_convocatoria_cupo: {
         Args: { p_convocatoria_id: string; p_nuevo_cupo: number };
         Returns: undefined;
       };
-      set_requiere_veedor: {
-        Args: { p_value: boolean };
-        Returns: undefined;
-      };
+      set_requiere_veedor: { Args: { p_value: boolean }; Returns: undefined };
       update_my_player_data: {
         Args: {
           p_apodo: string;

@@ -42,7 +42,7 @@ export async function savePushSubscription(sub: {
     p_endpoint: sub.endpoint,
     p_p256dh: sub.p256dh,
     p_auth: sub.auth,
-    p_user_agent: sub.userAgent ?? null,
+    p_user_agent: sub.userAgent,
   });
   if (error) return { ok: false, error: error.message };
   return { ok: true };
