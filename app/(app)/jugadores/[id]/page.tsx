@@ -312,9 +312,9 @@ export default async function JugadorDetallePage({
           </h2>
           <p className="mt-1 text-xs text-neutral-500">
             Cada grupo puede calificar distinto al jugador (rinde distinto según el fútbol). Editás
-            los 9 sub-ratings y el rol/posición de <strong>ese</strong> grupo; la técnica/físico/mental
-            y el score se recalculan solos. La edad es global. Los equipos de cada grupo se arman con
-            su propio rating.
+            los 9 sub-ratings y el rol/posición de <strong>ese</strong> grupo; la
+            técnica/físico/mental y el score se recalculan solos. La edad es global. Los equipos de
+            cada grupo se arman con su propio rating.
           </p>
           <div className="mt-4 space-y-4">
             {gruposDelJugador.map(({ grupo, rating }) => (

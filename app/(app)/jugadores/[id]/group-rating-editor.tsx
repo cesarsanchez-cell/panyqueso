@@ -86,14 +86,18 @@ export function GroupRatingEditor({
   );
 
   return (
-    <form action={formAction} className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+    <form
+      action={formAction}
+      className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm"
+    >
       <input type="hidden" name="player_id" value={playerId} />
       <input type="hidden" name="grupo_id" value={grupoId} />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-neutral-900">{grupoNombre}</h3>
         <span className="text-xs text-neutral-500">
-          Score actual: <span className="font-semibold">{Number(initial.internal_score).toFixed(2)}</span>
+          Score actual:{" "}
+          <span className="font-semibold">{Number(initial.internal_score).toFixed(2)}</span>
         </span>
       </div>
       <p className="mt-0.5 text-xs text-neutral-500">

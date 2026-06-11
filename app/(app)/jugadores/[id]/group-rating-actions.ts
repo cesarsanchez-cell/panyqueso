@@ -6,10 +6,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
-export type GroupRatingState =
-  | null
-  | { error: string }
-  | { success: string; pending: boolean };
+export type GroupRatingState = null | { error: string } | { success: string; pending: boolean };
 
 const SUB_KEYS = [
   "phys_power",
