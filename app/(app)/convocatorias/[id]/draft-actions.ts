@@ -12,6 +12,7 @@ import {
   type TeamDraft,
 } from "@/lib/teams/draft";
 import { generateTeamsWithVariety, type GeneratorInput } from "@/lib/teams/generate";
+import { loadGroupRatings } from "@/lib/teams/group-ratings";
 import { loadPreviousComposition } from "@/lib/teams/previous";
 
 export type DraftMutationState = null | { error: string } | { success: string };
@@ -38,6 +39,16 @@ async function loadConvocadosForGenerator(
   // FUT-95: además del score, traemos las dimensiones (físico/mental/técnica),
   // la edad (para el físico efectivo) y positions_possible (arquero alternativo)
   // para el balance por rubro.
+  // FUT-103/105: si la convocatoria es de un grupo, el rating (score + dims +
+  // rol/posición) sale del rating POR GRUPO; la base de players queda como
+  // semilla. La edad es global (no difiere por grupo).
+  const { data: conv } = await supabase
+    .from("convocatorias")
+    .select("grupo_id")
+    .eq("id", convocatoriaId)
+    .maybeSingle();
+  const grupoId = conv?.grupo_id ?? null;
+
   const { data } = await supabase
     .from("convocatoria_players")
     .select(
@@ -49,24 +60,35 @@ async function loadConvocadosForGenerator(
     .neq("attendance_status", "declinado");
 
   if (!data) return [];
-  return data
+
+  const base = data
     .map((cp) => cp.player)
     .filter(
       (p): p is NonNullable<typeof p> & { internal_score: number } =>
         p !== null && p.internal_score !== null,
-    )
-    .map((p) => ({
+    );
+
+  const overrides = await loadGroupRatings(
+    supabase,
+    grupoId,
+    base.map((p) => p.id),
+  );
+
+  return base.map((p) => {
+    const g = overrides.get(p.id);
+    return {
       id: p.id,
       nombre: p.nombre,
-      role_field: p.role_field,
-      position_pref: p.position_pref,
-      internal_score: Number(p.internal_score),
-      physical: p.physical ?? undefined,
-      mental: p.mental ?? undefined,
-      technical: p.technical ?? undefined,
+      role_field: g?.role_field ?? p.role_field,
+      position_pref: g?.position_pref ?? p.position_pref,
+      internal_score: g ? g.internal_score : Number(p.internal_score),
+      physical: g?.physical ?? p.physical ?? undefined,
+      mental: g?.mental ?? p.mental ?? undefined,
+      technical: g?.technical ?? p.technical ?? undefined,
       edad: p.edad ?? undefined,
-      positions_possible: p.positions_possible ?? undefined,
-    }));
+      positions_possible: g?.positions_possible ?? p.positions_possible ?? undefined,
+    };
+  });
 }
 
 /**

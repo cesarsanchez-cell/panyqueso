@@ -16,6 +16,7 @@ import {
   sumScores,
 } from "@/lib/teams/confirm";
 import { parseTeamDraft } from "@/lib/teams/draft";
+import { loadGroupRatings } from "@/lib/teams/group-ratings";
 
 export type ConfirmMatchState = null | { error: string } | { warnings: string[] };
 
@@ -46,7 +47,7 @@ export async function confirmMatch(
   // Cargar convocatoria + draft.
   const { data: conv, error: convErr } = await supabase
     .from("convocatorias")
-    .select("id, fecha, status, team_draft")
+    .select("id, fecha, status, team_draft, grupo_id")
     .eq("id", convocatoriaId)
     .maybeSingle();
 
@@ -81,16 +82,25 @@ export async function confirmMatch(
 
   if (convocadosErr) return { error: `No se pudieron leer convocados: ${convocadosErr.message}` };
 
+  // FUT-103/105: si la convocatoria es de un grupo, el snapshot usa el rating
+  // POR GRUPO (mismo override que la generación y el display), para que lo que se
+  // guarda coincida con lo que se vio y se armó.
+  const playerIds = (convocados ?? [])
+    .map((cp) => cp.player?.id)
+    .filter((id): id is string => Boolean(id));
+  const overrides = await loadGroupRatings(supabase, conv.grupo_id, playerIds);
+
   const byId = new Map<string, PlayerCore>();
   for (const cp of convocados ?? []) {
     const p = cp.player;
     if (p && p.internal_score !== null) {
+      const g = overrides.get(p.id);
       byId.set(p.id, {
         id: p.id,
         nombre: p.nombre,
-        role_field: p.role_field,
-        position_pref: p.position_pref,
-        internal_score: Number(p.internal_score),
+        role_field: g?.role_field ?? p.role_field,
+        position_pref: g?.position_pref ?? p.position_pref,
+        internal_score: g ? g.internal_score : Number(p.internal_score),
       });
     }
   }
