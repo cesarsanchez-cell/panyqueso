@@ -102,7 +102,7 @@ select is(
 -- 5. coordinador puede crear convocatoria en su grupo.
 select lives_ok(
   $$ insert into public.convocatorias (fecha, hora, cupo_maximo, status, grupo_id, created_by)
-     values (current_date, '20:00', 10, 'abierta',
+     values (current_date + 7, '20:00', 10, 'abierta',
        '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000a2') $$,
   'coordinador crea convocatoria en su grupo'
 );
@@ -110,7 +110,7 @@ select lives_ok(
 -- 6. coordinador NO puede crear convocatoria en otro grupo (RLS).
 select throws_ok(
   $$ insert into public.convocatorias (fecha, hora, cupo_maximo, status, grupo_id, created_by)
-     values (current_date, '21:00', 10, 'abierta',
+     values (current_date + 7, '21:00', 10, 'abierta',
        '00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000a2') $$,
   '42501',
   NULL,
