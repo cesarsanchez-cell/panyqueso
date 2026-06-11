@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AdminPhotoForm } from "./admin-photo-form";
 import { AdminPlayerForm } from "./admin-player-form";
 import { AdminResetPassword } from "./admin-reset-password";
-import { GroupRatingEditor } from "./group-rating-editor";
+import { GroupRatingSection } from "./group-rating-section";
 import { InviteToComplete } from "./invite-to-complete";
 import { PrivateNotesForm } from "./private-notes-form";
 
@@ -316,17 +316,16 @@ export default async function JugadorDetallePage({
             técnica/físico/mental y el score se recalculan solos. La edad es global. Los equipos de
             cada grupo se arman con su propio rating.
           </p>
-          <div className="mt-4 space-y-4">
-            {gruposDelJugador.map(({ grupo, rating }) => (
-              <GroupRatingEditor
-                key={grupo.id}
-                playerId={player.id}
-                grupoId={grupo.id}
-                grupoNombre={grupo.nombre}
-                veedorActivo={grupo.veedor_activo}
-                initial={rating}
-              />
-            ))}
+          <div className="mt-4">
+            <GroupRatingSection
+              playerId={player.id}
+              groups={gruposDelJugador.map(({ grupo, rating }) => ({
+                grupoId: grupo.id,
+                grupoNombre: grupo.nombre,
+                veedorActivo: grupo.veedor_activo,
+                initial: rating,
+              }))}
+            />
           </div>
         </section>
       ) : null}
