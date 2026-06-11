@@ -173,6 +173,11 @@ export default async function JugadorDetallePage({
     (r) => r.action_type === "update_sensitive_fields" && !r.grupo_id,
   );
 
+  // Con rating por grupo, el card global "Ratings" sobra para el admin cuando el
+  // jugador ya está en grupos (lo rige el rating por grupo). Se muestra solo si
+  // no está en ningún grupo (ahí el base es lo único) o para el veedor.
+  const showBaseRatings = !(isAdmin && gruposDelJugador.length > 0);
+
   const { data: gateData } = await supabase.rpc("requiere_veedor");
   const requiereVeedor = gateData === true;
 
@@ -284,26 +289,28 @@ export default async function JugadorDetallePage({
         </>
       )}
 
-      <Section title="Ratings">
-        <Field label="Técnica" value={`${player.technical} / 10`} />
-        <Field label="Físico" value={`${player.physical} / 10`} />
-        <Field label="Mental" value={`${player.mental} / 10`} />
-        <Field
-          label="Score interno"
-          value={player.internal_score === null ? "—" : Number(player.internal_score).toFixed(2)}
-        />
-        <Field label="Confianza" value={CONFIDENCE_LABEL[player.rating_confidence]} />
-        {isAdmin && !hasPendingSensitive ? (
-          <div className="pt-2">
-            <Link
-              href={`/jugadores/${player.id}/proponer-cambio`}
-              className="inline-flex items-center rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-sm transition hover:bg-neutral-50"
-            >
-              {requiereVeedor ? "Proponer ratings (requiere veedor)" : "Editar ratings"}
-            </Link>
-          </div>
-        ) : null}
-      </Section>
+      {showBaseRatings ? (
+        <Section title="Ratings">
+          <Field label="Técnica" value={`${player.technical} / 10`} />
+          <Field label="Físico" value={`${player.physical} / 10`} />
+          <Field label="Mental" value={`${player.mental} / 10`} />
+          <Field
+            label="Score interno"
+            value={player.internal_score === null ? "—" : Number(player.internal_score).toFixed(2)}
+          />
+          <Field label="Confianza" value={CONFIDENCE_LABEL[player.rating_confidence]} />
+          {isAdmin && !hasPendingSensitive ? (
+            <div className="pt-2">
+              <Link
+                href={`/jugadores/${player.id}/proponer-cambio`}
+                className="inline-flex items-center rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-sm transition hover:bg-neutral-50"
+              >
+                {requiereVeedor ? "Proponer ratings (requiere veedor)" : "Editar ratings"}
+              </Link>
+            </div>
+          ) : null}
+        </Section>
+      ) : null}
 
       {isAdmin && gruposDelJugador.length > 0 ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
