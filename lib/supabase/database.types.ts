@@ -881,6 +881,81 @@ export type Database = {
           },
         ];
       };
+      player_group_ratings: {
+        Row: {
+          created_at: string;
+          grupo_id: string;
+          id: string;
+          internal_score: number;
+          ment_attitude: number;
+          ment_resilience: number;
+          ment_tactical: number;
+          mental: number;
+          phys_power: number;
+          phys_speed: number;
+          phys_stamina: number;
+          physical: number;
+          player_id: string;
+          position_pref: Database["public"]["Enums"]["position_pref"];
+          positions_possible: Database["public"]["Enums"]["position_pref"][];
+          rating_confidence: Database["public"]["Enums"]["rating_confidence"];
+          role_field: Database["public"]["Enums"]["player_role_field"];
+          tech_finishing: number;
+          tech_linkup: number;
+          tech_passing: number;
+          technical: number;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          grupo_id: string;
+          id?: string;
+          internal_score?: number;
+          ment_attitude: number;
+          ment_resilience: number;
+          ment_tactical: number;
+          mental?: number;
+          phys_power: number;
+          phys_speed: number;
+          phys_stamina: number;
+          physical?: number;
+          player_id: string;
+          position_pref: Database["public"]["Enums"]["position_pref"];
+          positions_possible?: Database["public"]["Enums"]["position_pref"][];
+          rating_confidence?: Database["public"]["Enums"]["rating_confidence"];
+          role_field: Database["public"]["Enums"]["player_role_field"];
+          tech_finishing: number;
+          tech_linkup: number;
+          tech_passing: number;
+          technical?: number;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          grupo_id?: string;
+          id?: string;
+          internal_score?: number;
+          ment_attitude?: number;
+          ment_resilience?: number;
+          ment_tactical?: number;
+          mental?: number;
+          phys_power?: number;
+          phys_speed?: number;
+          phys_stamina?: number;
+          physical?: number;
+          player_id?: string;
+          position_pref?: Database["public"]["Enums"]["position_pref"];
+          positions_possible?: Database["public"]["Enums"]["position_pref"][];
+          rating_confidence?: Database["public"]["Enums"]["rating_confidence"];
+          role_field?: Database["public"]["Enums"]["player_role_field"];
+          tech_finishing?: number;
+          tech_linkup?: number;
+          tech_passing?: number;
+          technical?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       players: {
         Row: {
           apodo: string | null;

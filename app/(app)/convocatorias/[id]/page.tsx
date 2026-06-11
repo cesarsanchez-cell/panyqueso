@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ClubCrest } from "@/components/club-crest";
 import { parseTeamDraft, type TeamDraft, type TeamLabel } from "@/lib/teams/draft";
 import { countRegroup, effectivePhysical } from "@/lib/teams/generate";
+import { loadGroupRatings } from "@/lib/teams/group-ratings";
 import { findUnplayedPreviousConvocatoria } from "@/lib/convocatorias/previous-played-gate";
 import { loadPreviousComposition } from "@/lib/teams/previous";
 
@@ -336,21 +337,31 @@ export default async function ConvocatoriaDetallePage({
     technical: number | null;
     edad: number | null;
   };
+  // FUT-103/105: el balance que se muestra usa el rating POR GRUPO (mismo
+  // override que la generación y el snapshot), así lo que se ve coincide con lo
+  // que se arma. La edad/club/apodo siguen de players (globales).
+  const groupRatingOverrides = await loadGroupRatings(
+    supabase,
+    convocatoria.grupo_id,
+    convocados.map((cp) => cp.player?.id).filter((id): id is string => Boolean(id)),
+  );
+
   const playerInfoById = new Map<string, PlayerInfo>();
   for (const cp of convocados) {
     const p = cp.player;
     if (p && p.internal_score !== null) {
+      const g = groupRatingOverrides.get(p.id);
       playerInfoById.set(p.id, {
         id: p.id,
         nombre: p.nombre,
         apodo: p.apodo,
-        role_field: p.role_field,
-        position_pref: p.position_pref,
-        internal_score: Number(p.internal_score),
+        role_field: g?.role_field ?? p.role_field,
+        position_pref: g?.position_pref ?? p.position_pref,
+        internal_score: g ? g.internal_score : Number(p.internal_score),
         club_id: p.club_id,
-        physical: p.physical,
-        mental: p.mental,
-        technical: p.technical,
+        physical: g?.physical ?? p.physical,
+        mental: g?.mental ?? p.mental,
+        technical: g?.technical ?? p.technical,
         edad: p.edad,
       });
     }
