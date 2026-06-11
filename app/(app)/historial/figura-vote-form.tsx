@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { playerLabel } from "@/lib/players/label";
 
@@ -39,6 +39,9 @@ export function FiguraVoteForm({
   closesAt: string | null;
 }) {
   const [state, formAction, pending] = useActionState<VoteState, FormData>(castFiguraVote, null);
+  // Controlado: el form action de React 19 resetea los campos no-controlados al
+  // enviar; así el select mantiene a quién votaste en vez de "limpiarse".
+  const [selected, setSelected] = useState(currentVote ?? "");
   const cierre = closesAt ? formatCierre(closesAt) : "";
 
   return (
@@ -59,7 +62,8 @@ export function FiguraVoteForm({
         <select
           id={`figura_vote_${matchId}`}
           name="voted_player_id"
-          defaultValue={currentVote ?? ""}
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
           className={selectClass + " sm:w-auto"}
         >
           <option value="" disabled>
