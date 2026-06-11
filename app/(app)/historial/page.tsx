@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 
+import { AwardVoteForm } from "./award-vote-form";
 import { FiguraVoteForm, type VoteCandidate } from "./figura-vote-form";
 import { HistorialResumen, type HistorialResumenData } from "./historial-resumen";
 import { ProdeTablas, type ProdeTablaGrupo } from "./prode-tabla";
@@ -67,6 +68,11 @@ export default async function HistorialPage() {
         }));
       }),
   );
+
+  // Estado de los premios votados (carnicero / pinocho) por partido (FUT-102).
+  // Mismo conjunto de partidos que el historial; se mergea por match_id.
+  const { data: awardsData } = await supabase.rpc("get_my_match_awards");
+  const awardsByMatch = new Map((awardsData ?? []).map((a) => [a.match_id, a]));
 
   // Resumen ("carné"): se agrega a partir de las MISMAS filas que ya trajimos
   // para la lista (sin DB nueva). Muestra la realidad: V/E/D + %.
@@ -138,6 +144,9 @@ export default async function HistorialPage() {
         <ul className="space-y-2">
           {rows.map((r) => {
             const meta = RESULTADO_META[asResultado(r.resultado)];
+            const award = awardsByMatch.get(r.match_id);
+            const candidates = candidatesByMatch[r.match_id] ?? [];
+            const votingOpen = r.figura_votacion_abierta && candidates.length > 0;
             return (
               <li
                 key={r.match_id}
@@ -155,6 +164,16 @@ export default async function HistorialPage() {
                       </p>
                     ) : r.figura_nombre ? (
                       <p className="mt-1 text-xs text-neutral-500">⭐ Figura: {r.figura_nombre}</p>
+                    ) : null}
+                    {award?.carnicero_nombre ? (
+                      <p className="mt-1 text-xs text-neutral-500">
+                        🔪 Carnicero: {award.carnicero_nombre}
+                      </p>
+                    ) : null}
+                    {award?.pinocho_nombre ? (
+                      <p className="mt-1 text-xs text-neutral-500">
+                        🪵 Pinocho: {award.pinocho_nombre}
+                      </p>
                     ) : null}
                     {r.video_resumen_url ? (
                       <a
@@ -195,12 +214,30 @@ export default async function HistorialPage() {
                     </span>
                   </div>
                 </div>
-                {r.figura_votacion_abierta && (candidatesByMatch[r.match_id]?.length ?? 0) > 0 ? (
+                {votingOpen ? (
                   <FiguraVoteForm
                     matchId={r.match_id}
-                    candidates={candidatesByMatch[r.match_id] ?? []}
+                    candidates={candidates}
                     currentVote={r.mi_voto_player_id}
                     closesAt={r.figura_votacion_cierra}
+                  />
+                ) : null}
+                {votingOpen ? (
+                  <AwardVoteForm
+                    matchId={r.match_id}
+                    categoria="carnicero"
+                    titulo="🔪 Votá al Carnicero (el más rudo)"
+                    candidates={candidates}
+                    currentVote={award?.mi_voto_carnicero ?? null}
+                  />
+                ) : null}
+                {votingOpen && award?.pinocho_habilitado ? (
+                  <AwardVoteForm
+                    matchId={r.match_id}
+                    categoria="pinocho"
+                    titulo="🪵 Votá al Pinocho (el peor)"
+                    candidates={candidates}
+                    currentVote={award?.mi_voto_pinocho ?? null}
                   />
                 ) : null}
               </li>

@@ -14,6 +14,7 @@ import { MembersSections } from "./members-sections";
 import { AddMemberForm } from "./membership-forms";
 import { GroupJoinLinkSection } from "./group-join-link";
 import { PendingInvitesList, type PendingInvite } from "./pending-invites";
+import { PremioPinochoToggle } from "./premio-pinocho-toggle";
 import { ProdeResetForm } from "./prode-reset-form";
 import { ShareProdeButton } from "./share-prode-button";
 import { ProdeTablaTable, type ProdeTablaRow } from "../../historial/prode-tabla";
@@ -37,7 +38,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
   const { data: grupo, error: grupoErr } = await supabase
     .from("grupos")
     .select(
-      "id, nombre, lugar_id, dia_semana, hora, cupo_titulares, status, auto_renovar, join_token, lugar:lugares!lugar_id(nombre)",
+      "id, nombre, lugar_id, dia_semana, hora, cupo_titulares, status, auto_renovar, join_token, premio_pinocho, lugar:lugares!lugar_id(nombre)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -350,6 +351,20 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
           <div className="mt-3">
             <ProdeResetForm grupoId={grupo.id} year={prodeYear} />
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+          🏆 Premios votados
+        </h2>
+        <p className="mt-1 text-xs text-neutral-500">
+          Después de cada partido, los que jugaron votan los premios: ⭐ Figura y 🔪 Carnicero (el
+          más rudo) van siempre. El 🪵 Pinocho (el peor) es opcional: prendelo solo si al grupo le
+          gusta la cargada.
+        </p>
+        <div className="mt-4">
+          <PremioPinochoToggle grupoId={grupo.id} initial={grupo.premio_pinocho} />
         </div>
       </section>
     </div>
