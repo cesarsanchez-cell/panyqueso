@@ -73,6 +73,7 @@ export default async function ConvocatoriasPage({
     .from("convocatorias")
     .select(
       `id, fecha, hora, status, cupo_maximo, notas, created_at,
+       grupo:grupos!grupo_id(nombre),
        lugar:lugares!lugar_id(nombre),
        creator:profiles!created_by(nombre)`,
     )
@@ -147,9 +148,12 @@ export default async function ConvocatoriasPage({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-neutral-900">
-                      {formatDate(c.fecha)} · {formatHora(c.hora)}
+                      {c.grupo?.nombre ?? "Convocatoria suelta"}
                     </p>
                     <p className="mt-0.5 text-sm text-neutral-600">
+                      {formatDate(c.fecha)} · {formatHora(c.hora)}
+                    </p>
+                    <p className="mt-0.5 text-xs text-neutral-500">
                       {c.lugar?.nombre ?? "Lugar sin definir"} · cupo {c.cupo_maximo}
                     </p>
                     {c.notas ? (
