@@ -321,6 +321,7 @@ export type Database = {
           lugar_id: string;
           nombre: string;
           owner_id: string;
+          premio_pinocho: boolean;
           status: Database["public"]["Enums"]["grupo_status"];
           updated_at: string;
         };
@@ -336,6 +337,7 @@ export type Database = {
           lugar_id: string;
           nombre: string;
           owner_id: string;
+          premio_pinocho?: boolean;
           status?: Database["public"]["Enums"]["grupo_status"];
           updated_at?: string;
         };
@@ -351,6 +353,7 @@ export type Database = {
           lugar_id?: string;
           nombre?: string;
           owner_id?: string;
+          premio_pinocho?: boolean;
           status?: Database["public"]["Enums"]["grupo_status"];
           updated_at?: string;
         };
@@ -617,12 +620,14 @@ export type Database = {
           balance_snapshot: Json | null;
           confirmed_at: string | null;
           confirmed_by: string | null;
+          carnicero_player_id: string | null;
           confirmed_with_warning: boolean;
           convocatoria_id: string;
           created_at: string;
           fecha: string;
           figura_player_id: string | null;
           id: string;
+          pinocho_player_id: string | null;
           notas: string | null;
           score_team_a: number | null;
           score_team_b: number | null;
@@ -635,6 +640,7 @@ export type Database = {
           balance_snapshot?: Json | null;
           confirmed_at?: string | null;
           confirmed_by?: string | null;
+          carnicero_player_id?: string | null;
           confirmed_with_warning?: boolean;
           convocatoria_id: string;
           created_at?: string;
@@ -642,6 +648,7 @@ export type Database = {
           figura_player_id?: string | null;
           id?: string;
           notas?: string | null;
+          pinocho_player_id?: string | null;
           score_team_a?: number | null;
           score_team_b?: number | null;
           updated_at?: string;
@@ -653,6 +660,7 @@ export type Database = {
           balance_snapshot?: Json | null;
           confirmed_at?: string | null;
           confirmed_by?: string | null;
+          carnicero_player_id?: string | null;
           confirmed_with_warning?: boolean;
           convocatoria_id?: string;
           created_at?: string;
@@ -660,6 +668,7 @@ export type Database = {
           figura_player_id?: string | null;
           id?: string;
           notas?: string | null;
+          pinocho_player_id?: string | null;
           score_team_a?: number | null;
           score_team_b?: number | null;
           updated_at?: string;
@@ -1141,6 +1150,14 @@ export type Database = {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
       };
+      cast_award_vote: {
+        Args: {
+          p_match_id: string;
+          p_categoria: Database["public"]["Enums"]["award_category"];
+          p_voted_player_id: string;
+        };
+        Returns: undefined;
+      };
       cast_figura_vote: {
         Args: { p_match_id: string; p_voted_player_id: string };
         Returns: undefined;
@@ -1231,6 +1248,18 @@ export type Database = {
           player_id: string;
         }[];
       };
+      get_award_votes: {
+        Args: {
+          p_match_id: string;
+          p_categoria: Database["public"]["Enums"]["award_category"];
+        };
+        Returns: {
+          apodo: string;
+          nombre: string;
+          voted_player_id: string;
+          votos: number;
+        }[];
+      };
       get_figura_votes: {
         Args: { p_match_id: string };
         Returns: {
@@ -1238,6 +1267,17 @@ export type Database = {
           nombre: string;
           voted_player_id: string;
           votos: number;
+        }[];
+      };
+      get_my_match_awards: {
+        Args: never;
+        Returns: {
+          match_id: string;
+          carnicero_nombre: string | null;
+          mi_voto_carnicero: string | null;
+          pinocho_habilitado: boolean;
+          pinocho_nombre: string | null;
+          mi_voto_pinocho: string | null;
         }[];
       };
       get_my_prode: {
@@ -1395,6 +1435,13 @@ export type Database = {
         Args: { p_convocatoria_id: string };
         Returns: boolean;
       };
+      match_award_resolved: {
+        Args: {
+          p_match_id: string;
+          p_categoria: Database["public"]["Enums"]["award_category"];
+        };
+        Returns: string;
+      };
       match_figura_resolved: { Args: { p_match_id: string }; Returns: string };
       player_decline_convocatoria: {
         Args: { p_convocatoria_id: string };
@@ -1454,6 +1501,7 @@ export type Database = {
         | "declinado"
         | "ausente_sin_aviso"
         | "lista_espera";
+      award_category: "carnicero" | "pinocho";
       change_request_action:
         | "create_player"
         | "update_sensitive_fields"
@@ -1609,6 +1657,7 @@ export const Constants = {
         "ausente_sin_aviso",
         "lista_espera",
       ],
+      award_category: ["carnicero", "pinocho"],
       change_request_action: [
         "create_player",
         "update_sensitive_fields",
