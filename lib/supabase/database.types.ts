@@ -324,6 +324,7 @@ export type Database = {
           premio_pinocho: boolean;
           status: Database["public"]["Enums"]["grupo_status"];
           updated_at: string;
+          veedor_activo: boolean;
         };
         Insert: {
           auto_renovar?: boolean;
@@ -340,6 +341,7 @@ export type Database = {
           premio_pinocho?: boolean;
           status?: Database["public"]["Enums"]["grupo_status"];
           updated_at?: string;
+          veedor_activo?: boolean;
         };
         Update: {
           auto_renovar?: boolean;
@@ -356,6 +358,7 @@ export type Database = {
           premio_pinocho?: boolean;
           status?: Database["public"]["Enums"]["grupo_status"];
           updated_at?: string;
+          veedor_activo?: boolean;
         };
         Relationships: [
           {
@@ -712,6 +715,7 @@ export type Database = {
           created_at: string;
           created_player_id: string | null;
           fields_changed: string[] | null;
+          grupo_id: string | null;
           id: string;
           old_values: Json | null;
           player_id: string | null;
@@ -728,6 +732,7 @@ export type Database = {
           created_at?: string;
           created_player_id?: string | null;
           fields_changed?: string[] | null;
+          grupo_id?: string | null;
           id?: string;
           old_values?: Json | null;
           player_id?: string | null;
@@ -744,6 +749,7 @@ export type Database = {
           created_at?: string;
           created_player_id?: string | null;
           fields_changed?: string[] | null;
+          grupo_id?: string | null;
           id?: string;
           old_values?: Json | null;
           player_id?: string | null;
@@ -756,6 +762,13 @@ export type Database = {
           status?: Database["public"]["Enums"]["change_request_status"];
         };
         Relationships: [
+          {
+            foreignKeyName: "player_change_requests_grupo_id_fkey";
+            columns: ["grupo_id"];
+            isOneToOne: false;
+            referencedRelation: "grupos";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "player_change_requests_created_player_id_fkey";
             columns: ["created_player_id"];
@@ -1533,6 +1546,15 @@ export type Database = {
       player_undo_decline_convocatoria: {
         Args: { p_convocatoria_id: string };
         Returns: string;
+      };
+      propose_group_rating_change: {
+        Args: {
+          p_grupo_id: string;
+          p_player_id: string;
+          p_proposed: Json;
+          p_reason: string;
+        };
+        Returns: Json;
       };
       reject_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
