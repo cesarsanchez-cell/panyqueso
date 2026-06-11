@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AdminPhotoForm } from "./admin-photo-form";
 import { AdminPlayerForm } from "./admin-player-form";
 import { AdminResetPassword } from "./admin-reset-password";
+import { GroupRatingEditor } from "./group-rating-editor";
 import { InviteToComplete } from "./invite-to-complete";
 import { PrivateNotesForm } from "./private-notes-form";
 
@@ -125,7 +126,8 @@ export default async function JugadorDetallePage({
   const { data: requestsRaw, error: requestsError } = await supabase
     .from("player_change_requests")
     .select(
-      `id, action_type, status, reason, created_at, reviewed_at, review_comment,
+      `id, action_type, status, reason, created_at, reviewed_at, review_comment, grupo_id,
+       grupo:grupos!grupo_id(nombre),
        requester:profiles!requested_by(nombre),
        reviewer:profiles!reviewed_by(nombre)`,
     )
@@ -136,10 +138,39 @@ export default async function JugadorDetallePage({
     throw new Error(`No se pudieron cargar las solicitudes: ${requestsError.message}`);
   }
 
+  // Ratings por grupo (FUT-105 1c-ii): grupos activos del jugador + su rating en
+  // cada uno. El seed (FUT-103) garantiza una fila por (jugador, grupo) miembro.
+  const { data: membresias } = await supabase
+    .from("grupo_membresias")
+    .select("grupo:grupos!grupo_id(id, nombre, veedor_activo)")
+    .eq("player_id", id)
+    .eq("status", "activo");
+
+  const { data: groupRatings } = await supabase
+    .from("player_group_ratings")
+    .select(
+      `grupo_id, phys_power, phys_speed, phys_stamina, ment_tactical, ment_resilience,
+       ment_attitude, tech_passing, tech_finishing, tech_linkup, role_field, position_pref,
+       internal_score`,
+    )
+    .eq("player_id", id);
+
+  const ratingByGrupo = new Map((groupRatings ?? []).map((r) => [r.grupo_id, r]));
+  const gruposDelJugador = (membresias ?? [])
+    .map((m) => m.grupo)
+    .filter((g): g is NonNullable<typeof g> => Boolean(g))
+    .flatMap((g) => {
+      const rating = ratingByGrupo.get(g.id);
+      return rating ? [{ grupo: g, rating }] : [];
+    })
+    .sort((a, b) => a.grupo.nombre.localeCompare(b.grupo.nombre));
+
   const requests = requestsRaw ?? [];
   const pendingRequests = requests.filter((r) => r.status === "pending" || r.status === "flagged");
+  // Solo las solicitudes GLOBALES (sin grupo) bloquean el editar global; las de
+  // grupo (FUT-105) tienen su propio flujo en "Ratings por grupo".
   const hasPendingSensitive = pendingRequests.some(
-    (r) => r.action_type === "update_sensitive_fields",
+    (r) => r.action_type === "update_sensitive_fields" && !r.grupo_id,
   );
 
   const { data: gateData } = await supabase.rpc("requiere_veedor");
@@ -274,6 +305,32 @@ export default async function JugadorDetallePage({
         ) : null}
       </Section>
 
+      {isAdmin && gruposDelJugador.length > 0 ? (
+        <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+            Ratings por grupo
+          </h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Cada grupo puede calificar distinto al jugador (rinde distinto según el fútbol). Editás
+            los 9 sub-ratings y el rol/posición de <strong>ese</strong> grupo; la técnica/físico/mental
+            y el score se recalculan solos. La edad es global. Los equipos de cada grupo se arman con
+            su propio rating.
+          </p>
+          <div className="mt-4 space-y-4">
+            {gruposDelJugador.map(({ grupo, rating }) => (
+              <GroupRatingEditor
+                key={grupo.id}
+                playerId={player.id}
+                grupoId={grupo.id}
+                grupoNombre={grupo.nombre}
+                veedorActivo={grupo.veedor_activo}
+                initial={rating}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {isAdmin ? (
         <PrivateNotesForm playerId={player.id} initial={player.private_notes ?? ""} />
       ) : player.private_notes ? (
@@ -314,6 +371,12 @@ export default async function JugadorDetallePage({
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-neutral-900">
                         {REQUEST_ACTION_LABEL[r.action_type]}
+                        {r.grupo_id && r.grupo?.nombre ? (
+                          <span className="font-normal text-neutral-500">
+                            {" "}
+                            · grupo {r.grupo.nombre}
+                          </span>
+                        ) : null}
                       </span>
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${REQUEST_STATUS_BADGE[r.status]}`}
