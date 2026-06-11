@@ -15,6 +15,7 @@ import { loadPreviousComposition } from "@/lib/teams/previous";
 
 import { AddGuestForm } from "./add-guest-form";
 import { AddPlayerForm } from "./add-player-form";
+import { AwardAdminForm, type AwardOption } from "./award-admin-form";
 import { CancelForm } from "./cancel-form";
 import { ConfirmMatchForm } from "./confirm-match-form";
 import { CupoEditor } from "./cupo-editor";
@@ -104,7 +105,7 @@ async function loadMatch(supabase: SupabaseLike, convocatoriaId: string) {
     .from("matches")
     .select(
       `id, score_team_a, score_team_b, winner, notas, confirmed_at, confirmed_with_warning,
-       video_resumen_url, figura_player_id,
+       video_resumen_url, figura_player_id, carnicero_player_id, pinocho_player_id,
        reviewer:profiles!confirmed_by(nombre),
        teams:match_teams!match_id(
          id, team_label, total_score,
@@ -141,7 +142,7 @@ export default async function ConvocatoriaDetallePage({
     .select(
       `id, fecha, hora, status, cupo_maximo, notas, created_at, team_draft, grupo_id,
        lugar:lugares!lugar_id(id, nombre),
-       grupo:grupos!grupo_id(nombre),
+       grupo:grupos!grupo_id(nombre, premio_pinocho),
        creator:profiles!created_by(nombre)`,
     )
     .eq("id", id)
@@ -215,6 +216,37 @@ export default async function ConvocatoriaDetallePage({
       apodo: v.apodo,
       votos: Number(v.votos),
     }));
+  }
+
+  // Conteo de votos de los premios (FUT-102): SOLO admin, igual que la figura.
+  // Pinocho solo si el grupo lo tiene habilitado.
+  type AwardVoteRow = { playerId: string; nombre: string; apodo: string | null; votos: number };
+  const premioPinochoOn = convocatoria.grupo?.premio_pinocho ?? false;
+  let carniceroVotes: AwardVoteRow[] = [];
+  let pinochoVotes: AwardVoteRow[] = [];
+  if (match && isAdmin) {
+    const { data: carniceroData } = await supabase.rpc("get_award_votes", {
+      p_match_id: match.id,
+      p_categoria: "carnicero",
+    });
+    carniceroVotes = (carniceroData ?? []).map((v) => ({
+      playerId: v.voted_player_id,
+      nombre: v.nombre,
+      apodo: v.apodo,
+      votos: Number(v.votos),
+    }));
+    if (premioPinochoOn) {
+      const { data: pinochoData } = await supabase.rpc("get_award_votes", {
+        p_match_id: match.id,
+        p_categoria: "pinocho",
+      });
+      pinochoVotes = (pinochoData ?? []).map((v) => ({
+        playerId: v.voted_player_id,
+        nombre: v.nombre,
+        apodo: v.apodo,
+        votos: Number(v.votos),
+      }));
+    }
   }
 
   // Selector: admin puede editar el roster en abierta, cerrada y jugada.
@@ -554,6 +586,9 @@ export default async function ConvocatoriaDetallePage({
           assistsByPlayerId={assistsByPlayerId}
           ownGoalsByPlayerId={ownGoalsByPlayerId}
           figuraVotes={figuraVotes}
+          carniceroVotes={carniceroVotes}
+          pinochoVotes={pinochoVotes}
+          premioPinochoOn={premioPinochoOn}
         />
       ) : null}
 
@@ -663,6 +698,9 @@ function MatchSection({
   assistsByPlayerId,
   ownGoalsByPlayerId,
   figuraVotes,
+  carniceroVotes,
+  pinochoVotes,
+  premioPinochoOn,
 }: {
   match: MatchData;
   convocatoriaId: string;
@@ -672,6 +710,9 @@ function MatchSection({
   assistsByPlayerId: Record<string, number>;
   ownGoalsByPlayerId: Record<string, number>;
   figuraVotes: { playerId: string; nombre: string; apodo: string | null; votos: number }[];
+  carniceroVotes: { playerId: string; nombre: string; apodo: string | null; votos: number }[];
+  pinochoVotes: { playerId: string; nombre: string; apodo: string | null; votos: number }[];
+  premioPinochoOn: boolean;
 }) {
   const hasResult = match.score_team_a !== null && match.score_team_b !== null;
   const teams = [...(match.teams ?? [])].sort((a, b) => a.team_label.localeCompare(b.team_label));
@@ -702,6 +743,21 @@ function MatchSection({
   const figura = resolvedFiguraId
     ? (figuraOptions.find((p) => p.playerId === resolvedFiguraId) ?? null)
     : null;
+
+  // Premios votados (FUT-102): mismo cálculo que la figura — override del admin
+  // ?? líder único del conteo. El veedor (sin conteo) cae al override.
+  const awardOptions: AwardOption[] = figuraOptions;
+  const resolveAward = (
+    overrideId: string | null,
+    votes: { playerId: string; votos: number }[],
+  ): AwardOption | null => {
+    const [t, s] = votes;
+    const leaderId = t && (!s || t.votos > s.votos) ? t.playerId : null;
+    const id = overrideId ?? leaderId;
+    return id ? (awardOptions.find((p) => p.playerId === id) ?? null) : null;
+  };
+  const carnicero = resolveAward(match.carnicero_player_id, carniceroVotes);
+  const pinocho = premioPinochoOn ? resolveAward(match.pinocho_player_id, pinochoVotes) : null;
 
   return (
     <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
@@ -735,6 +791,28 @@ function MatchSection({
           </p>
           <p className="mt-1 text-sm font-semibold text-amber-900">
             {playerLabel(figura.nombre, figura.apodo)}
+          </p>
+        </div>
+      ) : null}
+
+      {carnicero ? (
+        <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">
+            🔪 El Carnicero
+          </p>
+          <p className="mt-1 text-sm font-semibold text-rose-900">
+            {playerLabel(carnicero.nombre, carnicero.apodo)}
+          </p>
+        </div>
+      ) : null}
+
+      {pinocho ? (
+        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+            🪵 El Pinocho
+          </p>
+          <p className="mt-1 text-sm font-semibold text-amber-900">
+            {playerLabel(pinocho.nombre, pinocho.apodo)}
           </p>
         </div>
       ) : null}
@@ -833,6 +911,46 @@ function MatchSection({
               players={figuraOptions}
               initialFiguraId={match.figura_player_id}
               votes={figuraVotes}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {isAdmin ? (
+        <div className="mt-5 border-t border-neutral-200 pt-5">
+          <h3 className="text-sm font-semibold text-neutral-900">🔪 El Carnicero (el más rudo)</h3>
+          <p className="mt-1 text-xs text-neutral-500">
+            Lo votan los que jugaron (desde su historial). Gana el más votado; vos desempatás o lo
+            cambiás acá. Puede quedar sin asignar.
+          </p>
+          <div className="mt-3">
+            <AwardAdminForm
+              convocatoriaId={convocatoriaId}
+              categoria="carnicero"
+              nombrePremio="el Carnicero"
+              players={awardOptions}
+              initialPlayerId={match.carnicero_player_id}
+              votes={carniceroVotes}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {isAdmin && premioPinochoOn ? (
+        <div className="mt-5 border-t border-neutral-200 pt-5">
+          <h3 className="text-sm font-semibold text-neutral-900">🪵 El Pinocho (el peor)</h3>
+          <p className="mt-1 text-xs text-neutral-500">
+            Premio opt-in del grupo. Lo votan los que jugaron; vos desempatás o lo cambiás acá.
+            Puede quedar sin asignar.
+          </p>
+          <div className="mt-3">
+            <AwardAdminForm
+              convocatoriaId={convocatoriaId}
+              categoria="pinocho"
+              nombrePremio="el Pinocho"
+              players={awardOptions}
+              initialPlayerId={match.pinocho_player_id}
+              votes={pinochoVotes}
             />
           </div>
         </div>
