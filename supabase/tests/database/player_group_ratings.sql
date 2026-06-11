@@ -1,10 +1,10 @@
 -- ============================================================================
--- FUT-103: tests de player_group_ratings (ratings por grupo)
+-- FUT-103: tests de player_group_ratings (ratings por grupo, scoring v2)
 -- ============================================================================
 -- Cubre:
 --   1. Al agregar una membresía se auto-crea la fila de rating (copiada de la base).
---   2. internal_score = misma fórmula que players (técnica·0.45 + físico·factor·0.30 + mental·0.25).
---   3. Editar el rating del grupo recalcula el score y NO toca la base de players.
+--   2. internal_score = compute_internal_score_v2 (físico_ef×0.35 + mental×0.325 + técnica×0.325).
+--   3. Editar los subs recalcula dimensión derivada + score, y NO toca la base de players.
 --   4. on conflict do nothing: re-ingresar al grupo conserva el rating afinado (no resetea).
 --   5. Cambiar players.edad recalcula el score de todas las filas del jugador.
 --   6. RLS: el player NO ve la tabla; el admin sí.
@@ -31,7 +31,8 @@ insert into auth.users (
 update public.profiles set role = 'admin',  nombre = 'Admin' where id = '00000000-0000-0000-0000-0000000000a1';
 update public.profiles set role = 'player', nombre = 'P1'    where id = '00000000-0000-0000-0000-0000000000a2';
 
--- b1: base technical 8, physical 6, mental 7, edad 30 (factor 1.00).
+-- b1: base technical 8, physical 6, mental 7, edad 30. Subs null -> el seed los
+-- coalesce a la dimensión (phys=6, ment=7, tech=8).
 insert into public.players (
   id, nombre, edad, role_field, position_pref, technical, physical, mental, status, created_by, auth_user_id
 ) values
@@ -55,15 +56,6 @@ begin
 end;
 $$;
 
-create or replace function _reset()
-returns void
-language plpgsql as $$
-begin
-  perform set_config('role', 'postgres', true);
-  perform set_config('request.jwt.claims', null, true);
-end;
-$$;
-
 -- 1. Agregar la membresía -> el trigger auto-crea la fila de rating.
 insert into public.grupo_membresias (grupo_id, player_id, tipo, status) values
   ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000b1', 'titular', 'activo');
@@ -76,17 +68,20 @@ select is(
   'Agregar la membresía auto-crea 1 fila de rating del grupo'
 );
 
--- 2. Score = 8*0.45 + 6*1.00*0.30 + 7*0.25 = 3.60 + 1.80 + 1.75 = 7.15.
+-- 2. Score v2 con dims derivadas (físico 6, mental 7, técnica 8) y edad 30
+-- (factor 1.00): 6*1.00*0.35 + 7*0.325 + 8*0.325 = 2.10 + 2.275 + 2.60 = 6.975 -> 6.98.
 select is(
   (select internal_score from public.player_group_ratings
     where player_id = '00000000-0000-0000-0000-0000000000b1'
       and grupo_id  = '00000000-0000-0000-0000-0000000000e1'),
-  7.15::numeric,
-  'internal_score inicial = fórmula sobre la base (7.15)'
+  6.98::numeric,
+  'internal_score inicial = compute_internal_score_v2 sobre la base (6.98)'
 );
 
--- 3. Editar el rating del grupo (technical 8 -> 10) recalcula: 10*0.45 + 6*0.30 + 7*0.25 = 8.05.
-update public.player_group_ratings set technical = 10
+-- 3. Editar los subs técnicos a 10 -> técnica derivada 10 ->
+-- 6*0.35 + 7*0.325 + 10*0.325 = 2.10 + 2.275 + 3.25 = 7.625 -> 7.63.
+update public.player_group_ratings
+   set tech_passing = 10, tech_finishing = 10, tech_linkup = 10
   where player_id = '00000000-0000-0000-0000-0000000000b1'
     and grupo_id  = '00000000-0000-0000-0000-0000000000e1';
 
@@ -94,8 +89,8 @@ select is(
   (select internal_score from public.player_group_ratings
     where player_id = '00000000-0000-0000-0000-0000000000b1'
       and grupo_id  = '00000000-0000-0000-0000-0000000000e1'),
-  8.05::numeric,
-  'Editar technical recalcula el score del grupo (8.05)'
+  7.63::numeric,
+  'Editar los subs técnicos recalcula dim derivada + score (7.63)'
 );
 
 -- 4. La base de players NO se tocó (sigue en 8).
@@ -113,22 +108,23 @@ insert into public.grupo_membresias (grupo_id, player_id, tipo, status) values
   ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000b1', 'titular', 'activo');
 
 select is(
-  (select technical from public.player_group_ratings
+  (select tech_passing from public.player_group_ratings
     where player_id = '00000000-0000-0000-0000-0000000000b1'
       and grupo_id  = '00000000-0000-0000-0000-0000000000e1'),
   10,
   'Re-ingresar al grupo conserva el rating afinado (no resetea a la base)'
 );
 
--- 6. Cambiar la edad (30 -> 56, factor 0.75) recalcula: 10*0.45 + 6*0.75*0.30 + 7*0.25 = 7.60.
+-- 6. Cambiar la edad (30 -> 56, factor 0.70) recalcula:
+-- 6*0.70*0.35 + 7*0.325 + 10*0.325 = 1.47 + 2.275 + 3.25 = 6.995 -> 7.00.
 update public.players set edad = 56 where id = '00000000-0000-0000-0000-0000000000b1';
 
 select is(
   (select internal_score from public.player_group_ratings
     where player_id = '00000000-0000-0000-0000-0000000000b1'
       and grupo_id  = '00000000-0000-0000-0000-0000000000e1'),
-  7.60::numeric,
-  'Cambiar players.edad recalcula el score del grupo (7.60)'
+  7.00::numeric,
+  'Cambiar players.edad recalcula el score del grupo (7.00)'
 );
 
 -- 7. RLS: el player no ve la tabla.
@@ -138,7 +134,6 @@ select is(
   0,
   'RLS: el player no ve player_group_ratings'
 );
-select _reset();
 
 -- 8. RLS: el admin sí la ve.
 select _as('00000000-0000-0000-0000-0000000000a1');
@@ -147,7 +142,6 @@ select is(
   1,
   'RLS: el admin ve player_group_ratings'
 );
-select _reset();
 
 select * from finish();
 rollback;
