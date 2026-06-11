@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import { playerLabel } from "@/lib/players/label";
 
@@ -44,9 +44,6 @@ export function AwardVoteForm({
     castAwardVote,
     null,
   );
-  // Controlado: el form action de React 19 resetea los campos no-controlados al
-  // enviar; así el select mantiene a quién votaste en vez de "limpiarse".
-  const [selected, setSelected] = useState(currentVote ?? "");
   const tone = TONES[categoria];
 
   return (
@@ -61,10 +58,13 @@ export function AwardVoteForm({
       </label>
       <div className="mt-1 flex flex-wrap items-center gap-2">
         <select
+          // key atado al voto guardado: cuando el voto se guarda (currentVote
+          // cambia), el select se re-monta mostrando al votado, sin que el reset
+          // del form action de React 19 lo "limpie".
+          key={currentVote ?? "empty"}
           id={`award_${categoria}_${matchId}`}
           name="voted_player_id"
-          value={selected}
-          onChange={(e) => setSelected(e.target.value)}
+          defaultValue={currentVote ?? ""}
           className={`mt-1 block w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-1 sm:w-auto ${tone.select}`}
         >
           <option value="" disabled>
