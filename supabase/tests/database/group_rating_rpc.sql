@@ -138,7 +138,7 @@ select throws_ok(
        '00000000-0000-0000-0000-0000000000e1',
        '{"tech_passing":9}'::jsonb, 'no deberia') $$,
   'P0013',
-  'not_an_admin',
+  'not_authorized',
   'Un no-admin no puede proponer cambios de rating de grupo'
 );
 

@@ -81,24 +81,26 @@ select is(
   'coordinador ve solo su grupo'
 );
 
--- 3-4. UPDATE grupos (premio_pinocho): 1 fila en el suyo, 0 en el ajeno.
---   (Un UPDATE filtrado por RLS USING afecta 0 filas, no lanza 42501.)
+-- 3-4. UPDATE grupos (premio_pinocho): efectivo en el suyo, no en el ajeno.
+--   (Un UPDATE filtrado por RLS USING afecta 0 filas, no lanza 42501; por eso
+--   se verifica el EFECTO leyendo como admin, no por excepción ni CTE.)
+update public.grupos set premio_pinocho = true where id = '00000000-0000-0000-0000-0000000000e1';
+update public.grupos set premio_pinocho = true where id = '00000000-0000-0000-0000-0000000000e2';
+
+select _as('00000000-0000-0000-0000-0000000000a1');
 select is(
-  (with u as (
-     update public.grupos set premio_pinocho = true
-      where id = '00000000-0000-0000-0000-0000000000e1' returning 1
-   ) select count(*)::int from u),
+  (select premio_pinocho::int from public.grupos where id = '00000000-0000-0000-0000-0000000000e1'),
   1,
   'coordinador actualiza la config de su grupo'
 );
 select is(
-  (with u as (
-     update public.grupos set premio_pinocho = true
-      where id = '00000000-0000-0000-0000-0000000000e2' returning 1
-   ) select count(*)::int from u),
+  (select premio_pinocho::int from public.grupos where id = '00000000-0000-0000-0000-0000000000e2'),
   0,
   'coordinador NO actualiza la config de un grupo ajeno'
 );
+
+-- Volvemos al coordinador para el resto.
+select _as('00000000-0000-0000-0000-0000000000a2');
 
 -- 5-6. set_grupo_requiere_veedor: ok en el suyo, P0013 en el ajeno.
 select lives_ok(
