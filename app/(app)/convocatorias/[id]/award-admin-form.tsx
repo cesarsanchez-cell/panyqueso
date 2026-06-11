@@ -111,6 +111,10 @@ export function AwardAdminForm({
             : `Elegí ${nombrePremio} a mano (o dejalo sin asignar).`}
         </label>
         <select
+          // key atado al valor guardado: tras guardar (revalidate), el select se
+          // re-monta mostrando al elegido, sin que el reset del form action de
+          // React 19 lo vuelva al default de cuando montó.
+          key={initialPlayerId ?? "empty"}
           id={`award_${categoria}_player_id`}
           name="award_player_id"
           defaultValue={initialPlayerId ?? ""}

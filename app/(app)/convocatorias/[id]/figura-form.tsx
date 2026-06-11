@@ -91,6 +91,10 @@ export function FiguraForm({ convocatoriaId, players, initialFiguraId, votes }: 
             : "Elegí la figura del partido (o dejala sin asignar)."}
         </label>
         <select
+          // key atado al valor guardado: tras guardar (revalidate), el select se
+          // re-monta mostrando al elegido, sin que el reset del form action de
+          // React 19 lo vuelva al default de cuando montó.
+          key={initialFiguraId ?? "empty"}
           id="figura_player_id"
           name="figura_player_id"
           defaultValue={initialFiguraId ?? ""}
