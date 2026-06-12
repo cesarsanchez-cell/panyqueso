@@ -67,7 +67,7 @@ begin
 end;
 $$;
 
-select plan(9);
+select plan(10);
 
 select _as('00000000-0000-0000-0000-0000000000a2');
 
