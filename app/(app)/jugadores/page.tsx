@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
-import { AltaCoordinadorCard, type CoordinadorGrupo } from "./alta-coordinador-card";
+import { AgregarJugadorCard, type AgregarJugadorGrupo } from "./agregar-jugador-card";
 import { PlayersListFilterable } from "./players-list-filterable";
 
 type PlayerStatus = Database["public"]["Enums"]["player_status"];
@@ -78,6 +78,9 @@ export default async function JugadoresPage({
   const statusFilter = parseStatus(params.status);
   const isAdmin = ctx.profile.role === "admin";
   const isCoordinador = ctx.profile.role === "coordinador";
+  // Admin y coordinador gestionan rosters (el veedor solo audita). La card de
+  // "Agregar jugador" es para ambos; el veedor no la ve.
+  const canManage = isAdmin || isCoordinador;
   const showCreatedFlash = params.created === "1";
   const showRequestedFlash = params.requested === "1";
 
@@ -119,16 +122,16 @@ export default async function JugadoresPage({
     createRequests = data ?? [];
   }
 
-  // Para el alta group-first del coordinador: sus grupos activos (la RLS ya los
-  // filtra a los que gestiona).
-  let coordinadorGrupos: CoordinadorGrupo[] = [];
-  if (isCoordinador) {
+  // Para la card "Agregar jugador": grupos activos gestionables. La RLS de grupos
+  // los filtra (admin ve todos, coordinador solo los suyos).
+  let gruposGestionables: AgregarJugadorGrupo[] = [];
+  if (canManage) {
     const { data: grupos } = await supabase
       .from("grupos")
       .select("id, nombre")
       .eq("status", "activo")
       .order("nombre", { ascending: true });
-    coordinadorGrupos = grupos ?? [];
+    gruposGestionables = grupos ?? [];
   }
 
   const isEmpty = players.length === 0 && createRequests.length === 0;
@@ -137,14 +140,6 @@ export default async function JugadoresPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Jugadores</h1>
-        {isAdmin ? (
-          <Link
-            href="/jugadores/nuevo"
-            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-neutral-800"
-          >
-            Nuevo jugador
-          </Link>
-        ) : null}
       </div>
 
       {showCreatedFlash ? (
@@ -159,7 +154,7 @@ export default async function JugadoresPage({
         </div>
       ) : null}
 
-      {isCoordinador ? <AltaCoordinadorCard grupos={coordinadorGrupos} /> : null}
+      {canManage ? <AgregarJugadorCard grupos={gruposGestionables} /> : null}
 
       <nav className="-mb-px flex gap-2 overflow-x-auto border-b border-neutral-200">
         {FILTERS.map((opt) => {

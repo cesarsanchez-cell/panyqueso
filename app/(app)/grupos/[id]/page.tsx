@@ -304,9 +304,9 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
         <div className="mt-3">
           {availablePlayers.length === 0 ? (
             <p className="text-sm text-neutral-500">
-              No hay jugadores approved disponibles. Cargá nuevos jugadores en{" "}
-              <Link href="/jugadores/nuevo" className="underline">
-                /jugadores/nuevo
+              No hay jugadores approved disponibles. Agregá jugadores desde{" "}
+              <Link href="/jugadores" className="underline">
+                Jugadores
               </Link>
               .
             </p>

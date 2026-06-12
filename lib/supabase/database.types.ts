@@ -1353,6 +1353,14 @@ export type Database = {
         };
         Returns: Json;
       };
+      lookup_jugador_por_celular: {
+        Args: { p_celular: string; p_grupo_id: string };
+        Returns: Json;
+      };
+      vincular_jugador_a_grupo: {
+        Args: { p_celular: string; p_grupo_id: string };
+        Returns: Json;
+      };
       create_convocatoria_from_grupo: {
         Args: { p_fecha?: string; p_grupo_id: string };
         Returns: string;
