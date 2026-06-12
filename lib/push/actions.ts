@@ -244,3 +244,62 @@ export async function notifyOpenSpot(
     return { ok: false, error: (e as Error).message };
   }
 }
+
+// Aviso de bienvenida cuando un admin/coordinador VINCULA a un jugador EXISTENTE
+// a un grupo (FUT-110). Best-effort: solo le llega si el jugador ya tiene la app
+// con avisos activados (un jugador nuevo, que entra por invitación, todavía no
+// tiene suscripción y no recibe nada — es esperado). Nunca lanza.
+//
+// Corre con service-role para leer las suscripciones del jugador destino (RLS
+// solo deja ver las propias). No requiere sesión del jugador: lo dispara el
+// server action de vinculación, que ya validó el rol del actor.
+export async function notifyGroupWelcome(playerId: string, grupoId: string): Promise<PushResult> {
+  try {
+    if (!configureVapid()) return { ok: true, sent: 0 };
+
+    const admin = createServiceClient();
+
+    const { data: grupo } = await admin
+      .from("grupos")
+      .select("nombre")
+      .eq("id", grupoId)
+      .maybeSingle();
+    if (!grupo) return { ok: true, sent: 0 };
+
+    const { data: subs } = await admin
+      .from("push_subscriptions")
+      .select("endpoint, p256dh, auth")
+      .eq("player_id", playerId);
+    if (!subs || subs.length === 0) return { ok: true, sent: 0 };
+
+    const payload = JSON.stringify({
+      title: "¡Estás dentro! ⚽",
+      body: `Te sumaron al grupo ${grupo.nombre}. ¡Bienvenido!`,
+      url: "/mi-perfil",
+      tag: `welcome-${grupoId}`,
+    });
+
+    const results = await Promise.allSettled(
+      subs.map(async (s) => {
+        try {
+          await webpush.sendNotification(
+            { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+            payload,
+          );
+          return true;
+        } catch (e) {
+          const code = (e as { statusCode?: number }).statusCode;
+          if (code === 404 || code === 410) {
+            await admin.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
+          }
+          return false;
+        }
+      }),
+    );
+    const sent = results.filter((r) => r.status === "fulfilled" && r.value).length;
+
+    return { ok: true, sent };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
