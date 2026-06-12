@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
+import { AltaCoordinadorCard, type CoordinadorGrupo } from "./alta-coordinador-card";
 import { PlayersListFilterable } from "./players-list-filterable";
 
 type PlayerStatus = Database["public"]["Enums"]["player_status"];
@@ -76,6 +77,7 @@ export default async function JugadoresPage({
   const params = await searchParams;
   const statusFilter = parseStatus(params.status);
   const isAdmin = ctx.profile.role === "admin";
+  const isCoordinador = ctx.profile.role === "coordinador";
   const showCreatedFlash = params.created === "1";
   const showRequestedFlash = params.requested === "1";
 
@@ -117,6 +119,18 @@ export default async function JugadoresPage({
     createRequests = data ?? [];
   }
 
+  // Para el alta group-first del coordinador: sus grupos activos (la RLS ya los
+  // filtra a los que gestiona).
+  let coordinadorGrupos: CoordinadorGrupo[] = [];
+  if (isCoordinador) {
+    const { data: grupos } = await supabase
+      .from("grupos")
+      .select("id, nombre")
+      .eq("status", "activo")
+      .order("nombre", { ascending: true });
+    coordinadorGrupos = grupos ?? [];
+  }
+
   const isEmpty = players.length === 0 && createRequests.length === 0;
 
   return (
@@ -144,6 +158,8 @@ export default async function JugadoresPage({
           Solicitud creada. Queda pendiente de aprobación por un veedor.
         </div>
       ) : null}
+
+      {isCoordinador ? <AltaCoordinadorCard grupos={coordinadorGrupos} /> : null}
 
       <nav className="-mb-px flex gap-2 overflow-x-auto border-b border-neutral-200">
         {FILTERS.map((opt) => {
