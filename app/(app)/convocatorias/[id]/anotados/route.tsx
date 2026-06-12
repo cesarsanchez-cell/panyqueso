@@ -57,7 +57,7 @@ async function loadCrests(origin: string, clubIds: string[]): Promise<Map<string
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  await requireRole(["admin"]);
+  await requireRole(["admin", "coordinador"]);
   const { id } = await params;
   const supabase = await createClient();
 

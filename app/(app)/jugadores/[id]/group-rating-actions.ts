@@ -36,7 +36,7 @@ export async function proposeGroupRating(
   _prev: GroupRatingState,
   formData: FormData,
 ): Promise<GroupRatingState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const playerId = String(formData.get("player_id") ?? "").trim();
   const grupoId = String(formData.get("grupo_id") ?? "").trim();

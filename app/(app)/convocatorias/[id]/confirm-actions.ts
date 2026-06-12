@@ -35,7 +35,7 @@ export async function confirmMatch(
   _prev: ConfirmMatchState,
   formData: FormData,
 ): Promise<ConfirmMatchState> {
-  const ctx = await requireRole("admin");
+  const ctx = await requireRole(["admin", "coordinador"]);
 
   const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
   if (!convocatoriaId) return { error: "Falta el id de la convocatoria." };

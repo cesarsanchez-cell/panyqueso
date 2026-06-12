@@ -34,7 +34,7 @@ export async function createConvocatoria(
 ): Promise<CreateConvocatoriaState> {
   // Server-side guard: admin obligatorio (la UI ya lo respeta, pero esto es
   // la frontera real).
-  const ctx = await requireRole("admin");
+  const ctx = await requireRole(["admin", "coordinador"]);
 
   const errors: Record<string, string> = {};
 
@@ -120,7 +120,7 @@ export async function createConvocatoriaFromGrupo(
   _prev: CreateFromGrupoState,
   formData: FormData,
 ): Promise<CreateFromGrupoState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const grupoId = String(formData.get("grupo_id") ?? "").trim();
   const fecha = String(formData.get("fecha") ?? "").trim();

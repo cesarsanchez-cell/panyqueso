@@ -35,7 +35,7 @@ export async function saveMatchResult(
   _prev: SaveResultState,
   formData: FormData,
 ): Promise<SaveResultState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
   if (!convocatoriaId) return { error: "Falta el id de la convocatoria." };

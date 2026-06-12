@@ -32,7 +32,7 @@ export async function saveMatchPlayerGoals(
   _prev: SaveGoalsState,
   formData: FormData,
 ): Promise<SaveGoalsState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
   if (!convocatoriaId) return { error: "Falta el id de la convocatoria." };

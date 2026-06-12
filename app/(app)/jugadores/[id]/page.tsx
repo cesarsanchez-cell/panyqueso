@@ -100,11 +100,14 @@ export default async function JugadorDetallePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<SearchParams>;
 }) {
-  const ctx = await requireRole(["admin", "veedor"]);
+  const ctx = await requireRole(["admin", "veedor", "coordinador"]);
 
   const { id } = await params;
   const sp = await searchParams;
   const isAdmin = ctx.profile.role === "admin";
+  // El coordinador no edita la ficha global, pero SÍ el rating por grupo (de los
+  // grupos que gestiona; la RLS ya filtra gruposDelJugador a esos).
+  const canManageRatings = isAdmin || ctx.profile.role === "coordinador";
   const showProposedFlash = sp.proposed === "1";
   const showAppliedFlash = sp.applied === "1";
 
@@ -176,7 +179,7 @@ export default async function JugadorDetallePage({
   // Con rating por grupo, el card global "Ratings" sobra para el admin cuando el
   // jugador ya está en grupos (lo rige el rating por grupo). Se muestra solo si
   // no está en ningún grupo (ahí el base es lo único) o para el veedor.
-  const showBaseRatings = !(isAdmin && gruposDelJugador.length > 0);
+  const showBaseRatings = !(canManageRatings && gruposDelJugador.length > 0);
 
   const { data: gateData } = await supabase.rpc("requiere_veedor");
   const requiereVeedor = gateData === true;
@@ -312,7 +315,7 @@ export default async function JugadorDetallePage({
         </Section>
       ) : null}
 
-      {isAdmin && gruposDelJugador.length > 0 ? (
+      {canManageRatings && gruposDelJugador.length > 0 ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
             Ratings por grupo

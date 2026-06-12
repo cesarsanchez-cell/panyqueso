@@ -26,7 +26,7 @@ export async function saveMatchAward(
   _prev: SaveAwardState,
   formData: FormData,
 ): Promise<SaveAwardState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
   if (!convocatoriaId) return { error: "Falta el id de la convocatoria." };

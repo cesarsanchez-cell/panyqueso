@@ -32,7 +32,7 @@ export async function createInvitation(
   _prev: CreateInvitationState,
   formData: FormData,
 ): Promise<CreateInvitationState> {
-  const ctx = await requireRole("admin");
+  const ctx = await requireRole(["admin", "coordinador"]);
 
   const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
   if (!convocatoriaId) return { error: "Falta el id de la convocatoria." };
@@ -129,7 +129,7 @@ export async function createInvitation(
 }
 
 export async function cancelConvocatoriaInvitation(formData: FormData): Promise<void> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const invitation_id = String(formData.get("invitation_id") ?? "").trim();
   if (!invitation_id) return;

@@ -33,9 +33,14 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
     { label: "Mi Actividad", href: "/historial" },
     { label: "Mi cuenta", href: "/perfil" },
   ],
-  // La experiencia del coordinador (nav + páginas filtradas por sus grupos) se
-  // enciende en 2c-2. Hasta entonces no entra al panel (el layout no lo permite).
-  coordinador: [],
+  // El coordinador entra al mismo panel que el admin, acotado a sus grupos (la
+  // RLS filtra los datos). Sin Lugares ni Configuración global (admin-only).
+  coordinador: [
+    { label: "Inicio", href: "/" },
+    { label: "Jugadores", href: "/jugadores" },
+    { label: "Convocatorias", href: "/convocatorias" },
+    { label: "Grupos", href: "/grupos" },
+  ],
 };
 
 export function AppHeader({

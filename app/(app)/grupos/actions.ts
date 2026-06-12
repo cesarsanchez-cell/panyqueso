@@ -110,7 +110,7 @@ export async function updateGrupo(
   _prev: UpdateGrupoState,
   formData: FormData,
 ): Promise<UpdateGrupoState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) return { error: "Falta el id." };
@@ -184,7 +184,7 @@ export async function addMember(
   _prev: MembershipState,
   formData: FormData,
 ): Promise<MembershipState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const grupo_id = String(formData.get("grupo_id") ?? "").trim();
   if (!grupo_id) return { error: "Falta el grupo." };
@@ -244,7 +244,7 @@ export async function addMember(
 // suplente si era titular.
 // ============================================================================
 export async function removeMember(formData: FormData): Promise<void> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const membresia_id = String(formData.get("membresia_id") ?? "").trim();
   if (!membresia_id) return;
@@ -272,7 +272,7 @@ export async function removeMember(formData: FormData): Promise<void> {
 // link viejo). Desactivar lo pone en null. Solo admin, solo grupo activo.
 // ============================================================================
 export async function regenerateGroupJoinLink(formData: FormData): Promise<void> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const grupo_id = String(formData.get("grupo_id") ?? "").trim();
   if (!grupo_id) return;
@@ -293,7 +293,7 @@ export async function regenerateGroupJoinLink(formData: FormData): Promise<void>
 }
 
 export async function disableGroupJoinLink(formData: FormData): Promise<void> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const grupo_id = String(formData.get("grupo_id") ?? "").trim();
   if (!grupo_id) return;
@@ -310,7 +310,7 @@ export async function disableGroupJoinLink(formData: FormData): Promise<void> {
 // porque la pagina publica /invite/<token> chequea expires_at > now().
 // ============================================================================
 export async function cancelInvitation(formData: FormData): Promise<void> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const invitation_id = String(formData.get("invitation_id") ?? "").trim();
   if (!invitation_id) return;

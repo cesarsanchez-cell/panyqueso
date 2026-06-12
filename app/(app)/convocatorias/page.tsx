@@ -61,7 +61,7 @@ export default async function ConvocatoriasPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const ctx = await requireRole(["admin", "veedor"]);
+  const ctx = await requireRole(["admin", "veedor", "coordinador"]);
   const isAdmin = ctx.profile.role === "admin";
 
   const sp = await searchParams;

@@ -99,7 +99,7 @@ export async function generateDraft(
   _prev: DraftMutationState,
   formData: FormData,
 ): Promise<DraftMutationState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
   if (!convocatoriaId) return { error: "Falta el id de la convocatoria." };
@@ -140,7 +140,7 @@ export async function clearDraft(
   _prev: DraftMutationState,
   formData: FormData,
 ): Promise<DraftMutationState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
   if (!convocatoriaId) return { error: "Falta el id de la convocatoria." };
@@ -167,7 +167,7 @@ async function updateDraftWith(
   convocatoriaId: string,
   mutate: (draft: TeamDraft) => TeamDraft,
 ): Promise<DraftMutationState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const supabase = await createClient();
   const row = await loadConvocatoriaWithDraft(supabase, convocatoriaId);
