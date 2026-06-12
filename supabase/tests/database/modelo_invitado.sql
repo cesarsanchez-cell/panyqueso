@@ -106,11 +106,14 @@ select is(
   'players_public excluye al invitado'
 );
 
--- 6. Sin puntaje → default 6.
+-- 6. Sin puntaje → default 6. (Crear y leer en SELECTs separados: una función
+--    volátil que inserta no es visible en el mismo statement.)
+create temporary table _g2 on commit drop as
+select (public.agregar_invitado_a_convocatoria(
+          '00000000-0000-0000-0000-0000000000c1', 'Otro Salvavidas') ->> 'player_id')::uuid as pid;
+
 select cmp_ok(
-  (select internal_score from public.players
-    where id = (public.agregar_invitado_a_convocatoria(
-                  '00000000-0000-0000-0000-0000000000c1', 'Otro Salvavidas') ->> 'player_id')::uuid),
+  (select internal_score from public.players where id = (select pid from _g2)),
   '=', 6::numeric,
   'sin puntaje el invitado arranca en 6 (neutro)'
 );
