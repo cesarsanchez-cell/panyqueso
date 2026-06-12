@@ -343,6 +343,19 @@ export default async function ConvocatoriaDetallePage({
   }> = [];
 
   if (showSelector) {
+    // El catálogo se limita a los miembros ACTIVOS del grupo de esta
+    // convocatoria (no a todos los jugadores del sistema). Para convocatorias
+    // sueltas (sin grupo) caemos a todos los approved.
+    let memberIds: string[] | null = null;
+    if (convocatoria.grupo_id) {
+      const { data: members } = await supabase
+        .from("grupo_membresias")
+        .select("player_id")
+        .eq("grupo_id", convocatoria.grupo_id)
+        .eq("status", "activo");
+      memberIds = (members ?? []).map((m) => m.player_id);
+    }
+
     let q2 = supabase
       .from("players")
       .select("id, nombre, apodo, role_field, position_pref")
@@ -351,6 +364,7 @@ export default async function ConvocatoriaDetallePage({
       .order("nombre", { ascending: true })
       .limit(50);
 
+    if (memberIds !== null) q2 = q2.in("id", memberIds);
     if (q.length > 0) q2 = q2.ilike("nombre", `%${q}%`);
     if (rol) q2 = q2.eq("role_field", rol);
     if (pos) q2 = q2.eq("position_pref", pos);
