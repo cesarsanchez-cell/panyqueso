@@ -20,22 +20,22 @@ insert into auth.users (
 ) values
   ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-000000000000',
    'admin-bh@test.local', '', 'authenticated', 'authenticated', now(), now(), now(), '{}'::jsonb, '{}'::jsonb),
-  ('00000000-0000-0000-0000-0000000000ap', '00000000-0000-0000-0000-000000000000',
+  ('00000000-0000-0000-0000-0000000000a9', '00000000-0000-0000-0000-000000000000',
    'player-bh@test.local', '', 'authenticated', 'authenticated', now(), now(), now(), '{}'::jsonb, '{}'::jsonb);
 
 update public.profiles set role = 'admin'  where id = '00000000-0000-0000-0000-0000000000a1';
-update public.profiles set role = 'player' where id = '00000000-0000-0000-0000-0000000000ap';
+update public.profiles set role = 'player' where id = '00000000-0000-0000-0000-0000000000a9';
 
 -- p0 es el que mira (current_player_id). pa/pb juegan en los equipos, con la
 -- MISMA base (6/6/6) -> por base, parejos.
 insert into public.players (
   id, nombre, edad, role_field, position_pref, technical, physical, mental, status, created_by, auth_user_id
 ) values
-  ('00000000-0000-0000-0000-0000000000p0', 'Viewer', 30, 'jugador_campo', 'mediocampista', 6, 6, 6, 'approved',
-   '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000ap'),
-  ('00000000-0000-0000-0000-0000000000pa', 'PA', 30, 'jugador_campo', 'mediocampista', 6, 6, 6, 'approved',
+  ('00000000-0000-0000-0000-0000000000b0', 'Viewer', 30, 'jugador_campo', 'mediocampista', 6, 6, 6, 'approved',
+   '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000a9'),
+  ('00000000-0000-0000-0000-0000000000ba', 'PA', 30, 'jugador_campo', 'mediocampista', 6, 6, 6, 'approved',
    '00000000-0000-0000-0000-0000000000a1', null),
-  ('00000000-0000-0000-0000-0000000000pb', 'PB', 30, 'jugador_campo', 'mediocampista', 6, 6, 6, 'approved',
+  ('00000000-0000-0000-0000-0000000000bb', 'PB', 30, 'jugador_campo', 'mediocampista', 6, 6, 6, 'approved',
    '00000000-0000-0000-0000-0000000000a1', null);
 
 insert into public.lugares (id, nombre, created_by) values
@@ -47,16 +47,16 @@ insert into public.grupos (id, nombre, lugar_id, dia_semana, hora, cupo_titulare
 
 -- Todos miembros activos de e1 (siembra los ratings de grupo desde la base).
 insert into public.grupo_membresias (grupo_id, player_id, tipo) values
-  ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000p0', 'titular'),
-  ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000pa', 'titular'),
-  ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000pb', 'titular');
+  ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000b0', 'titular'),
+  ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000ba', 'titular'),
+  ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000bb', 'titular');
 
 -- Rating por grupo de PA alto (9 subs en 10); PB queda en la base (6).
 update public.player_group_ratings
    set phys_power = 10, phys_speed = 10, phys_stamina = 10,
        ment_tactical = 10, ment_resilience = 10, ment_attitude = 10,
        tech_passing = 10, tech_finishing = 10, tech_linkup = 10
- where player_id = '00000000-0000-0000-0000-0000000000pa'
+ where player_id = '00000000-0000-0000-0000-0000000000ba'
    and grupo_id  = '00000000-0000-0000-0000-0000000000e1';
 
 -- Convocatoria + match confirmado de e1 (fecha hoy).
@@ -72,8 +72,8 @@ insert into public.match_teams (id, match_id, team_label) values
   ('00000000-0000-0000-0000-000000000fb1', '00000000-0000-0000-0000-0000000000d1', 'B');
 
 insert into public.match_team_players (match_team_id, player_id) values
-  ('00000000-0000-0000-0000-000000000fa1', '00000000-0000-0000-0000-0000000000pa'),
-  ('00000000-0000-0000-0000-000000000fb1', '00000000-0000-0000-0000-0000000000pb');
+  ('00000000-0000-0000-0000-000000000fa1', '00000000-0000-0000-0000-0000000000ba'),
+  ('00000000-0000-0000-0000-000000000fb1', '00000000-0000-0000-0000-0000000000bb');
 
 create or replace function _as(p_id uuid)
 returns void
@@ -85,7 +85,7 @@ begin
 end;
 $$;
 
-select _as('00000000-0000-0000-0000-0000000000ap');
+select _as('00000000-0000-0000-0000-0000000000a9');
 
 select is(
   (select distinct balance_hint from public.get_my_confirmed_match_teams()
