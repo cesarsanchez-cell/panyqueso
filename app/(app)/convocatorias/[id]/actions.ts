@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireRole } from "@/lib/auth/require-role";
-import { notifyOpenSpot } from "@/lib/push/actions";
+import { notifyOpenSpot, notifyRemovedFromConvocatoria } from "@/lib/push/actions";
 import { createClient } from "@/lib/supabase/server";
 
 export type MutationState = null | { error: string } | { success: string };
@@ -317,8 +317,15 @@ export async function removePlayer(
   revalidatePath(`/convocatorias/${convocatoriaId}`);
 
   // Best-effort: si quedó un lugar libre (titular o banca de suplentes), avisar
-  // al grupo. No le avisamos al jugador que el admin acaba de sacar.
+  // al grupo. No le avisamos al jugador que el admin acaba de sacar (a ese le
+  // mandamos su propio aviso abajo).
   await notifyOpenSpot(convocatoriaId, { excludePlayerId: removedRow?.player_id ?? undefined });
+
+  // Y al jugador sacado le avisamos que quedó afuera y que puede volver (solo si
+  // es un jugador real, no un invitado nombre_libre). FUT-113.
+  if (removedRow?.player_id) {
+    await notifyRemovedFromConvocatoria(removedRow.player_id, convocatoriaId);
+  }
 
   return { success: "Jugador quitado." };
 }
