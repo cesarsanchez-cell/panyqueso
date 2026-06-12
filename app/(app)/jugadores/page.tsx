@@ -88,6 +88,7 @@ export default async function JugadoresPage({
   let playersQuery = supabase
     .from("players")
     .select("id, nombre, apodo, edad, status, role_field, avatar_url, club_id")
+    .eq("is_guest", false) // los invitados puntuales no son jugadores del sistema
     .order("nombre", { ascending: true });
 
   if (statusFilter) {

@@ -347,6 +347,7 @@ export default async function ConvocatoriaDetallePage({
       .from("players")
       .select("id, nombre, apodo, role_field, position_pref")
       .eq("status", "approved")
+      .eq("is_guest", false) // los invitados puntuales no van al catálogo
       .order("nombre", { ascending: true })
       .limit(50);
 

@@ -63,17 +63,12 @@ export async function addPlayer(_prev: MutationState, formData: FormData): Promi
 
   const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
   const playerId = String(formData.get("player_id") ?? "").trim();
-  const nombreLibre = String(formData.get("nombre_libre") ?? "").trim();
 
   if (!convocatoriaId) {
     return { error: "Falta el id de la convocatoria." };
   }
-  // Uno y solo uno: o playerId del catalogo o nombreLibre (invitado).
-  if (!playerId && !nombreLibre) {
-    return { error: "Indicá un jugador del catálogo o un nombre libre." };
-  }
-  if (playerId && nombreLibre) {
-    return { error: "Elegí jugador del catálogo o nombre libre, no las dos cosas." };
+  if (!playerId) {
+    return { error: "Indicá un jugador del catálogo." };
   }
 
   const supabase = await createClient();
@@ -87,26 +82,6 @@ export async function addPlayer(_prev: MutationState, formData: FormData): Promi
     .select("grupo_id")
     .eq("id", convocatoriaId)
     .maybeSingle();
-
-  // Caso 1: invitado libre (sin player_id). Inserta como invitado puntual,
-  // sin pasar por grupo_membresias. nombre_libre se muestra directo en el
-  // lineup, no depende de players_public.
-  if (nombreLibre) {
-    const rolInvitado = await computeRolForNewEntry(supabase, convocatoriaId, conv?.grupo_id);
-    const { error } = await supabase.from("convocatoria_players").insert({
-      convocatoria_id: convocatoriaId,
-      player_id: null,
-      nombre_libre: nombreLibre,
-      rol_en_convocatoria: rolInvitado.rol,
-      orden_suplente: rolInvitado.ordenSuplente,
-      attendance_status: "confirmado",
-    });
-    if (error) {
-      return { error: `No se pudo agregar: ${error.message}` };
-    }
-    revalidatePath(`/convocatorias/${convocatoriaId}`);
-    return { success: `Invitado "${nombreLibre}" agregado.` };
-  }
 
   // Caso 2: player del catalogo. Si la conv tiene grupo, garantizamos que
   // el player es miembro activo del grupo antes de armar el roster. Asi el
@@ -219,6 +194,50 @@ export async function addPlayer(_prev: MutationState, formData: FormData): Promi
 
   revalidatePath(`/convocatorias/${convocatoriaId}`);
   return { success: "Jugador agregado." };
+}
+
+/**
+ * Agrega un invitado puntual (FUT-111): el "salvavidas" que se llama cuando
+ * falta gente. Crea un registro fantasma (is_guest) con un puntaje único y lo
+ * suma a la convocatoria, vía el RPC agregar_invitado_a_convocatoria (atómico,
+ * gate can_manage_convocatoria). Participa del armado y del partido como uno
+ * más, pero no es un alta ni aparece en la lista de Jugadores.
+ */
+export async function agregarInvitado(
+  _prev: MutationState,
+  formData: FormData,
+): Promise<MutationState> {
+  await requireRole(["admin", "coordinador"]);
+
+  const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  const scoreRaw = String(formData.get("score") ?? "").trim();
+
+  if (!convocatoriaId) return { error: "Falta el id de la convocatoria." };
+  if (!nombre) return { error: "Indicá el nombre del invitado." };
+  if (nombre.length > 80) return { error: "Nombre demasiado largo (máx 80)." };
+
+  const score = scoreRaw === "" ? 6 : Number(scoreRaw);
+  if (!Number.isInteger(score) || score < 1 || score > 10) {
+    return { error: "El puntaje tiene que ser un número entre 1 y 10." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("agregar_invitado_a_convocatoria", {
+    p_convocatoria_id: convocatoriaId,
+    p_nombre: nombre,
+    p_score: score,
+  });
+
+  if (error) {
+    const code = (error as { code?: string }).code;
+    if (code === "P0013") return { error: "No gestionás esta convocatoria." };
+    if (code === "P0031") return { error: "La convocatoria está cancelada." };
+    return { error: `No se pudo agregar el invitado: ${error.message}` };
+  }
+
+  revalidatePath(`/convocatorias/${convocatoriaId}`);
+  return { success: `Invitado "${nombre}" agregado.` };
 }
 
 async function computeRolForNewEntry(
