@@ -8,6 +8,7 @@ const ROLE_LABEL: Record<NonNullable<AuthContext["profile"]["role"]>, string> = 
   admin: "Admin",
   veedor: "Veedor",
   player: "Jugador",
+  coordinador: "Coordinador",
 };
 
 type NavItem = { label: string; href: string; key?: string };
@@ -32,6 +33,9 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
     { label: "Mi Actividad", href: "/historial" },
     { label: "Mi cuenta", href: "/perfil" },
   ],
+  // La experiencia del coordinador (nav + páginas filtradas por sus grupos) se
+  // enciende en 2c-2. Hasta entonces no entra al panel (el layout no lo permite).
+  coordinador: [],
 };
 
 export function AppHeader({

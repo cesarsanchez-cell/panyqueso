@@ -7,7 +7,7 @@ type CardLink = {
   href: string;
   title: string;
   description: string;
-  roles: Array<"admin" | "veedor" | "player">;
+  roles: Array<"admin" | "veedor" | "player" | "coordinador">;
 };
 
 const CARDS: CardLink[] = [
