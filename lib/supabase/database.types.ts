@@ -1344,6 +1344,15 @@ export type Database = {
         Args: { p_match_id: string };
         Returns: undefined;
       };
+      coordinador_alta_jugador: {
+        Args: {
+          p_celular: string;
+          p_edad: number;
+          p_grupo_id: string;
+          p_nombre: string;
+        };
+        Returns: Json;
+      };
       create_convocatoria_from_grupo: {
         Args: { p_fecha?: string; p_grupo_id: string };
         Returns: string;
