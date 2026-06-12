@@ -28,6 +28,8 @@ function mapError(code: string | undefined, fallback: string): string {
       return "La convocatoria ya no está abierta. Si necesitás un cambio, hablalo con el organizador.";
     case "P0059":
       return "Ya estás en esta convocatoria.";
+    case "P0071":
+      return "Los equipos ya están armados y la lista quedó cerrada. Cualquier cosa, hablá con el coordinador / admin.";
     default:
       return fallback;
   }
