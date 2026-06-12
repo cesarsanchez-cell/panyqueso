@@ -80,7 +80,7 @@ export async function bulkCreateInvitations(
   _prev: BulkImportState,
   formData: FormData,
 ): Promise<BulkImportState> {
-  const ctx = await requireRole("admin");
+  const ctx = await requireRole(["admin", "coordinador"]);
 
   const grupoId = String(formData.get("grupo_id") ?? "").trim();
   if (!grupoId) return { error: "Falta el id del grupo." };

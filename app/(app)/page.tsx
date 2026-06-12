@@ -15,13 +15,13 @@ const CARDS: CardLink[] = [
     href: "/jugadores",
     title: "Jugadores",
     description: "Listado, alta y propuestas de cambio. Admin crea solicitudes; veedor aprueba.",
-    roles: ["admin", "veedor"],
+    roles: ["admin", "veedor", "coordinador"],
   },
   {
     href: "/convocatorias",
     title: "Convocatorias",
     description: "Armado de partidos: convocados, draft de teams, confirmación y resultado.",
-    roles: ["admin", "veedor"],
+    roles: ["admin", "veedor", "coordinador"],
   },
   {
     href: "/auditoria",
@@ -34,7 +34,7 @@ const CARDS: CardLink[] = [
     title: "Grupos",
     description:
       "Grupos recurrentes (lugar/día/hora) con titulares y lista de espera FIFO persistente.",
-    roles: ["admin"],
+    roles: ["admin", "coordinador"],
   },
   {
     href: "/lugares",

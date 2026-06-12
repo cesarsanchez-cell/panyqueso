@@ -132,8 +132,8 @@ export default async function ConvocatoriaDetallePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<SearchParams>;
 }) {
-  const ctx = await requireRole(["admin", "veedor"]);
-  const isAdmin = ctx.profile.role === "admin";
+  const ctx = await requireRole(["admin", "veedor", "coordinador"]);
+  const canManage = ctx.profile.role === "admin" || ctx.profile.role === "coordinador";
   const { id } = await params;
   const sp = await searchParams;
 
@@ -209,7 +209,7 @@ export default async function ConvocatoriaDetallePage({
   // Conteo de votos de la figura (FUT-99): SOLO admin. La RPC ya devuelve vacío
   // para no-admin, pero evitamos la llamada salvo que sea admin.
   let figuraVotes: { playerId: string; nombre: string; apodo: string | null; votos: number }[] = [];
-  if (match && isAdmin) {
+  if (match && canManage) {
     const { data: votesData } = await supabase.rpc("get_figura_votes", { p_match_id: match.id });
     figuraVotes = (votesData ?? []).map((v) => ({
       playerId: v.voted_player_id,
@@ -225,7 +225,7 @@ export default async function ConvocatoriaDetallePage({
   const premioPinochoOn = convocatoria.grupo?.premio_pinocho ?? false;
   let carniceroVotes: AwardVoteRow[] = [];
   let pinochoVotes: AwardVoteRow[] = [];
-  if (match && isAdmin) {
+  if (match && canManage) {
     const { data: carniceroData } = await supabase.rpc("get_award_votes", {
       p_match_id: match.id,
       p_categoria: "carnicero",
@@ -253,10 +253,10 @@ export default async function ConvocatoriaDetallePage({
   // Selector: admin puede editar el roster en abierta, cerrada y jugada.
   // En cerrada/jugada es "ultimo recurso" para registrar eventualidades
   // (faltazos, invitados que cubrieron, etc).
-  const showSelector = isAdmin && (isOpen || isClosed || isPlayed);
+  const showSelector = canManage && (isOpen || isClosed || isPlayed);
 
   // Invites: solo si la convocatoria pertenece a un grupo (Fase 9).
-  const canInvite = isAdmin && isOpen && convocatoria.grupo_id !== null;
+  const canInvite = canManage && isOpen && convocatoria.grupo_id !== null;
 
   let pendingInvites: PendingConvocatoriaInvite[] = [];
   let origin = "";
@@ -292,7 +292,7 @@ export default async function ConvocatoriaDetallePage({
   // Teams: admin + abierta + al menos 10 convocados (5v5 minimo segun
   // plan v4). El draft persistido vive en convocatorias.team_draft (PR 2).
   const MIN_CONVOCADOS_PARA_GENERAR = 10;
-  const canGenerateTeams = isAdmin && isOpen && convocados.length >= MIN_CONVOCADOS_PARA_GENERAR;
+  const canGenerateTeams = canManage && isOpen && convocados.length >= MIN_CONVOCADOS_PARA_GENERAR;
 
   const teamDraft = parseTeamDraft(convocatoria.team_draft);
 
@@ -300,7 +300,7 @@ export default async function ConvocatoriaDetallePage({
   // jugar, no se puede cerrar esta (el admin debe cargar antes el resultado del
   // partido viejo). Solo importa cuando el admin podría confirmar.
   const unplayedPrevious =
-    isAdmin && isOpen ? await findUnplayedPreviousConvocatoria(supabase, convocatoria.id) : null;
+    canManage && isOpen ? await findUnplayedPreviousConvocatoria(supabase, convocatoria.id) : null;
 
   // FUT-88: señal de variedad vs la fecha anterior, recalculada en vivo desde
   // el draft actual (refleja también los swaps manuales del admin).
@@ -441,7 +441,7 @@ export default async function ConvocatoriaDetallePage({
         </section>
       ) : null}
 
-      {isAdmin && isOpen ? (
+      {canManage && isOpen ? (
         <CupoEditor convocatoriaId={convocatoria.id} cupoActual={convocatoria.cupo_maximo} />
       ) : null}
 
@@ -467,7 +467,7 @@ export default async function ConvocatoriaDetallePage({
           />
         )}
 
-        {isAdmin && isOpen ? (
+        {canManage && isOpen ? (
           <div className="mt-4 border-t border-neutral-200 pt-4">
             <ShareAnotadosButton convocatoriaId={convocatoria.id} />
             <p className="mt-1 text-xs text-neutral-500">
@@ -591,7 +591,7 @@ export default async function ConvocatoriaDetallePage({
         <MatchSection
           match={match}
           convocatoriaId={convocatoria.id}
-          isAdmin={isAdmin}
+          canManage={canManage}
           isPlayed={isPlayed}
           goalsByPlayerId={goalsByPlayerId}
           assistsByPlayerId={assistsByPlayerId}
@@ -630,24 +630,24 @@ export default async function ConvocatoriaDetallePage({
                 side={teamDraft.A}
                 playerInfoById={playerInfoById}
                 convocatoriaId={convocatoria.id}
-                editable={isAdmin && isOpen}
+                editable={canManage && isOpen}
               />
               <DraftTeamColumn
                 label="B"
                 side={teamDraft.B}
                 playerInfoById={playerInfoById}
                 convocatoriaId={convocatoria.id}
-                editable={isAdmin && isOpen}
+                editable={canManage && isOpen}
               />
             </div>
-          ) : isAdmin && isOpen ? (
+          ) : canManage && isOpen ? (
             <p className="mt-3 text-sm text-neutral-500">
               Hacé click en &ldquo;Generar teams&rdquo; para armar el draft. Después vas a poder
               mover jugadores entre A y B.
             </p>
           ) : null}
 
-          {teamDraft && isAdmin && isOpen ? (
+          {teamDraft && canManage && isOpen ? (
             <div className="mt-5 border-t border-neutral-200 pt-5">
               <h3 className="text-sm font-semibold text-neutral-900">Confirmar match</h3>
               <p className="mt-1 text-xs text-neutral-500">
@@ -667,14 +667,14 @@ export default async function ConvocatoriaDetallePage({
         </section>
       ) : null}
 
-      {isAdmin && isOpen && !canGenerateTeams ? (
+      {canManage && isOpen && !canGenerateTeams ? (
         <section className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-5 text-sm text-neutral-600">
           Para generar el draft de teams hacen falta al menos {MIN_CONVOCADOS_PARA_GENERAR}{" "}
           convocados. Llevás {convocados.length}.
         </section>
       ) : null}
 
-      {isAdmin && isOpen ? (
+      {canManage && isOpen ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
             Cancelar convocatoria
@@ -703,7 +703,7 @@ const WINNER_LABEL: Record<NonNullable<MatchData["winner"]>, string> = {
 function MatchSection({
   match,
   convocatoriaId,
-  isAdmin,
+  canManage,
   isPlayed,
   goalsByPlayerId,
   assistsByPlayerId,
@@ -715,7 +715,7 @@ function MatchSection({
 }: {
   match: MatchData;
   convocatoriaId: string;
-  isAdmin: boolean;
+  canManage: boolean;
   isPlayed: boolean;
   goalsByPlayerId: Record<string, number>;
   assistsByPlayerId: Record<string, number>;
@@ -783,7 +783,7 @@ function MatchSection({
         )}
       </div>
 
-      {isAdmin ? (
+      {canManage ? (
         <div className="mt-3">
           <ShareTeamsButton convocatoriaId={convocatoriaId} />
         </div>
@@ -854,7 +854,7 @@ function MatchSection({
         </div>
       ) : null}
 
-      {isAdmin ? (
+      {canManage ? (
         <div className="mt-5 border-t border-neutral-200 pt-5">
           <h3 className="text-sm font-semibold text-neutral-900">
             {hasResult ? "Editar resultado" : "Cargar resultado"}
@@ -882,7 +882,7 @@ function MatchSection({
 
       <div className="mt-5 border-t border-neutral-200 pt-5">
         <h3 className="text-sm font-semibold text-neutral-900">Goles y asistencias por jugador</h3>
-        {isAdmin ? (
+        {canManage ? (
           <>
             <p className="mt-1 text-xs text-neutral-500">
               {isPlayed
@@ -909,7 +909,7 @@ function MatchSection({
         )}
       </div>
 
-      {isAdmin ? (
+      {canManage ? (
         <div className="mt-5 border-t border-neutral-200 pt-5">
           <h3 className="text-sm font-semibold text-neutral-900">Figura del partido</h3>
           <p className="mt-1 text-xs text-neutral-500">
@@ -927,7 +927,7 @@ function MatchSection({
         </div>
       ) : null}
 
-      {isAdmin ? (
+      {canManage ? (
         <div className="mt-5 border-t border-neutral-200 pt-5">
           <h3 className="text-sm font-semibold text-neutral-900">🔪 El Carnicero (el más rudo)</h3>
           <p className="mt-1 text-xs text-neutral-500">
@@ -947,7 +947,7 @@ function MatchSection({
         </div>
       ) : null}
 
-      {isAdmin && premioPinochoOn ? (
+      {canManage && premioPinochoOn ? (
         <div className="mt-5 border-t border-neutral-200 pt-5">
           <h3 className="text-sm font-semibold text-neutral-900">🪵 El Pinocho (el peor)</h3>
           <p className="mt-1 text-xs text-neutral-500">
@@ -967,7 +967,7 @@ function MatchSection({
         </div>
       ) : null}
 
-      {isAdmin ? (
+      {canManage ? (
         <div className="mt-5 border-t border-neutral-200 pt-5">
           <h3 className="text-sm font-semibold text-neutral-900">Video del partido</h3>
           <p className="mt-1 text-xs text-neutral-500">

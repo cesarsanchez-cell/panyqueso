@@ -21,7 +21,7 @@ export default async function NuevaConvocatoriaPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
   const sp = await searchParams;
 
   const supabase = await createClient();

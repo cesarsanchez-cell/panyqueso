@@ -15,7 +15,7 @@ export async function resetProde(
   _prev: ResetProdeState,
   formData: FormData,
 ): Promise<ResetProdeState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const grupoId = String(formData.get("grupo_id") ?? "").trim();
   const year = Number(formData.get("year"));

@@ -17,7 +17,7 @@ const DIA_LABEL = [
 ] as const;
 
 export default async function ImportarGrupoPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
   const { id } = await params;
 
   const supabase = await createClient();

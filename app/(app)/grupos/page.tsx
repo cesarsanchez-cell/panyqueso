@@ -33,7 +33,7 @@ function formatHora(raw: string): string {
 }
 
 export default async function GruposPage() {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const supabase = await createClient();
 

@@ -15,7 +15,7 @@ export async function setPremioPinocho(
   _prev: PremioPinochoState,
   formData: FormData,
 ): Promise<PremioPinochoState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const grupoId = String(formData.get("grupo_id") ?? "").trim();
   const value = String(formData.get("value") ?? "") === "true";

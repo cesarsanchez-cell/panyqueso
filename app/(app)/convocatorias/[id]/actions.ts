@@ -29,7 +29,7 @@ function statusPermiteEdicion(status: string | null): boolean {
 }
 
 export async function setCupo(_prev: MutationState, formData: FormData): Promise<MutationState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
   const nuevoCupo = Number(String(formData.get("cupo") ?? "").trim());
@@ -59,7 +59,7 @@ export async function setCupo(_prev: MutationState, formData: FormData): Promise
 }
 
 export async function addPlayer(_prev: MutationState, formData: FormData): Promise<MutationState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
   const playerId = String(formData.get("player_id") ?? "").trim();
@@ -260,7 +260,7 @@ export async function removePlayer(
   _prev: MutationState,
   formData: FormData,
 ): Promise<MutationState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
   const convocatoriaPlayerId = String(formData.get("convocatoria_player_id") ?? "").trim();
@@ -308,7 +308,7 @@ export async function cancelConvocatoria(
   _prev: MutationState,
   formData: FormData,
 ): Promise<MutationState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const convocatoriaId = String(formData.get("convocatoria_id") ?? "").trim();
   if (!convocatoriaId) {

@@ -35,7 +35,8 @@ const DIA_LABEL = [
 ] as const;
 
 export default async function GrupoDetallePage({ params }: { params: Promise<{ id: string }> }) {
-  await requireRole("admin");
+  const ctx = await requireRole(["admin", "coordinador"]);
+  const isAdmin = ctx.profile.role === "admin";
   const { id } = await params;
 
   const supabase = await createClient();
@@ -256,7 +257,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
               Importar desde WA
             </Link>
           ) : null}
-          <ArchiveGrupoForm grupoId={grupo.id} isActive={isActive} />
+          {isAdmin ? <ArchiveGrupoForm grupoId={grupo.id} isActive={isActive} /> : null}
         </div>
       </div>
 
@@ -279,11 +280,13 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
         </div>
       </section>
 
-      <CoordinadoresSection
-        grupoId={grupo.id}
-        assigned={assignedCoordinadores}
-        eligible={eligibleCoordinadores}
-      />
+      {isAdmin ? (
+        <CoordinadoresSection
+          grupoId={grupo.id}
+          assigned={assignedCoordinadores}
+          eligible={eligibleCoordinadores}
+        />
+      ) : null}
 
       {isActive ? (
         <ConvocatoriaCiclo grupoId={grupo.id} autoRenovar={grupo.auto_renovar} open={openConv} />

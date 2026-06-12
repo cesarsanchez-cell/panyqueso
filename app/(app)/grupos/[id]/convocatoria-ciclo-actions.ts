@@ -30,7 +30,7 @@ export async function closeAndCreateNext(
   _prev: CicloState,
   formData: FormData,
 ): Promise<CicloState> {
-  await requireRole("admin");
+  await requireRole(["admin", "coordinador"]);
 
   const grupoId = String(formData.get("grupo_id") ?? "").trim();
   const convId = String(formData.get("convocatoria_id") ?? "").trim();

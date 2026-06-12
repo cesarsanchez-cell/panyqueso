@@ -71,7 +71,7 @@ export default async function JugadoresPage({
 }: {
   searchParams: Promise<{ status?: string; created?: string; requested?: string }>;
 }) {
-  const ctx = await requireRole(["admin", "veedor"]);
+  const ctx = await requireRole(["admin", "veedor", "coordinador"]);
 
   const params = await searchParams;
   const statusFilter = parseStatus(params.status);
