@@ -162,7 +162,11 @@ export function AgregarJugadorCard({ grupos }: { grupos: AgregarJugadorGrupo[] }
               autoComplete="off"
               placeholder="11 2345 6789"
               value={celularInput}
-              onChange={(e) => setCelularInput(e.target.value)}
+              onChange={(e) =>
+                // Limpia lo que viene de WhatsApp: espacios, guiones, puntos y
+                // paréntesis. Deja dígitos y el "+" (parseArPhone hace el resto).
+                setCelularInput(e.target.value.replace(/[\s().-]/g, ""))
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter" && grupoId && celularInput) {
                   e.preventDefault();

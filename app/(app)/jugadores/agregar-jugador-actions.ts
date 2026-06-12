@@ -15,6 +15,17 @@ function generateToken(): string {
   return randomBytes(24).toString("base64url");
 }
 
+// Mensaje de error de un RPC que no mapeamos explícitamente. Detecta el caso
+// "la función no existe en la base / cache de PostgREST" (típico si falta correr
+// la migración) y, si no, muestra el código para poder diagnosticar.
+function rpcErrorMessage(error: { code?: string; message?: string }, verbo: string): string {
+  // PGRST202 = PostgREST no encuentra la función; 42883 = undefined_function.
+  if (error.code === "PGRST202" || error.code === "42883") {
+    return `No se puede ${verbo}: falta aplicar la migración en la base. Avisá al admin.`;
+  }
+  return `No se pudo ${verbo} (${error.code ?? "?"}). Probá de nuevo.`;
+}
+
 // ---------------------------------------------------------------------------
 // Paso 1: buscar por celular
 // ---------------------------------------------------------------------------
@@ -54,7 +65,7 @@ export async function lookupJugador(grupoId: string, celularRaw: string): Promis
 
   if (error) {
     if (error.code === "P0013") return { ok: false, error: "No gestionás ese grupo." };
-    return { ok: false, error: "No se pudo buscar. Probá de nuevo." };
+    return { ok: false, error: rpcErrorMessage(error, "buscar") };
   }
 
   const r = data as {
@@ -115,7 +126,7 @@ export async function vincularJugador(grupoId: string, celular: string): Promise
       case "P0031":
         return { ok: false, error: "El grupo está archivado." };
       default:
-        return { ok: false, error: "No se pudo vincular. Probá de nuevo." };
+        return { ok: false, error: rpcErrorMessage(error, "vincular") };
     }
   }
 
@@ -170,7 +181,7 @@ export async function invitarJugadorNuevo(
   });
   if (lookErr) {
     if (lookErr.code === "P0013") return { ok: false, error: "No gestionás ese grupo." };
-    return { ok: false, error: "No se pudo invitar. Probá de nuevo." };
+    return { ok: false, error: rpcErrorMessage(lookErr, "invitar") };
   }
   if ((look as { exists?: boolean } | null)?.exists) {
     return {
