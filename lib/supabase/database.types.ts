@@ -237,6 +237,45 @@ export type Database = {
           },
         ];
       };
+      coordinador_grupos: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          grupo_id: string;
+          id: string;
+          profile_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          grupo_id: string;
+          id?: string;
+          profile_id: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          grupo_id?: string;
+          id?: string;
+          profile_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "coordinador_grupos_grupo_id_fkey";
+            columns: ["grupo_id"];
+            isOneToOne: false;
+            referencedRelation: "grupos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "coordinador_grupos_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       grupo_membresias: {
         Row: {
           created_at: string;
@@ -1618,7 +1657,7 @@ export type Database = {
       player_status: "pending" | "approved" | "inactive";
       position_pref: "defensor" | "mediocampista" | "delantero" | "arquero";
       rating_confidence: "baja" | "media" | "alta";
-      user_role: "admin" | "veedor" | "player";
+      user_role: "admin" | "veedor" | "player" | "coordinador";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -1775,7 +1814,7 @@ export const Constants = {
       player_status: ["pending", "approved", "inactive"],
       position_pref: ["defensor", "mediocampista", "delantero", "arquero"],
       rating_confidence: ["baja", "media", "alta"],
-      user_role: ["admin", "veedor", "player"],
+      user_role: ["admin", "veedor", "player", "coordinador"],
     },
   },
 } as const;

@@ -8,6 +8,11 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 
 import { ArchiveGrupoForm } from "./archive-form";
+import {
+  CoordinadoresSection,
+  type AssignedCoordinador,
+  type EligibleCoordinador,
+} from "./coordinadores-section";
 import { ConvocatoriaCiclo } from "./convocatoria-ciclo";
 import { EditGrupoForm } from "./edit-grupo-form";
 import { MembersSections } from "./members-sections";
@@ -55,6 +60,8 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
     { data: players },
     { data: pendingInvitesRaw, error: invitesErr },
     { data: openConvRow },
+    { data: coordRows },
+    { data: coordProfiles },
   ] = await Promise.all([
     supabase
       .from("grupo_membresias")
@@ -84,6 +91,15 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
       .order("fecha", { ascending: true })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("coordinador_grupos")
+      .select("id, profile_id, profile:profiles!profile_id(nombre)")
+      .eq("grupo_id", id),
+    supabase
+      .from("profiles")
+      .select("id, nombre")
+      .eq("role", "coordinador")
+      .order("nombre", { ascending: true }),
   ]);
 
   // Conteos + roster de la convocatoria abierta (si hay).
@@ -174,6 +190,16 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
     .filter((p) => !ocupados.has(p.id))
     .map((p) => ({ id: p.id, nombre: p.apodo ? `${p.nombre} (${p.apodo})` : p.nombre }));
 
+  const assignedCoordinadores: AssignedCoordinador[] = (coordRows ?? []).map((r) => ({
+    id: r.id,
+    profileId: r.profile_id,
+    nombre: r.profile?.nombre?.trim() || "—",
+  }));
+  const assignedProfileIds = new Set(assignedCoordinadores.map((c) => c.profileId));
+  const eligibleCoordinadores: EligibleCoordinador[] = (coordProfiles ?? [])
+    .filter((p) => !assignedProfileIds.has(p.id))
+    .map((p) => ({ profileId: p.id, nombre: p.nombre?.trim() || "—" }));
+
   const isActive = grupo.status === "activo";
 
   // Tabla del Prode 🔮 del grupo (año en curso). El admin puede verla y
@@ -252,6 +278,12 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
           />
         </div>
       </section>
+
+      <CoordinadoresSection
+        grupoId={grupo.id}
+        assigned={assignedCoordinadores}
+        eligible={eligibleCoordinadores}
+      />
 
       {isActive ? (
         <ConvocatoriaCiclo grupoId={grupo.id} autoRenovar={grupo.auto_renovar} open={openConv} />

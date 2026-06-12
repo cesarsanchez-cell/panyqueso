@@ -65,3 +65,35 @@ export async function requireRole(allowed: UserRole | readonly UserRole[]): Prom
   }
   return ctx;
 }
+
+/**
+ * Alcance de gestión por grupo (Fase 11). Espeja en la app la lógica de
+ * `can_manage_grupo` de la DB:
+ *   - admin: gestiona TODOS los grupos -> { all: true }.
+ *   - coordinador: solo los grupos asignados en coordinador_grupos.
+ *   - veedor / player / sin rol: no gestiona ninguno.
+ *
+ * Para FILTRAR listas de lectura, el veedor ve todo (lo decide cada página);
+ * este helper modela la AUTORIDAD de gestión (escritura), no la lectura.
+ */
+export type ManageScope = { all: boolean; grupoIds: string[] };
+
+export const getManageScope = cache(async (): Promise<ManageScope> => {
+  const ctx = await requireUser();
+  if (ctx.profile.role === "admin") return { all: true, grupoIds: [] };
+  if (ctx.profile.role === "coordinador") {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("coordinador_grupos")
+      .select("grupo_id")
+      .eq("profile_id", ctx.userId);
+    return { all: false, grupoIds: (data ?? []).map((r) => r.grupo_id) };
+  }
+  return { all: false, grupoIds: [] };
+});
+
+/** true si el usuario puede gestionar ese grupo (admin o coordinador asignado). */
+export async function canManageGrupo(grupoId: string): Promise<boolean> {
+  const scope = await getManageScope();
+  return scope.all || scope.grupoIds.includes(grupoId);
+}
