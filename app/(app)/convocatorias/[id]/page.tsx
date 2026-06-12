@@ -259,6 +259,12 @@ export default async function ConvocatoriaDetallePage({
 
   const teamDraft = parseTeamDraft(convocatoria.team_draft);
 
+  // FUT-112: con el draft generado la lista queda CONGELADA. Mientras haya draft
+  // no mostramos los controles de editar el roster (sacar / agregar / invitado);
+  // el organizador tiene que borrar el draft primero. El jugador, además, queda
+  // bloqueado en la DB (trigger P0071).
+  const listaEditable = showSelector && !teamDraft;
+
   // Regla de secuencia: si hay una convocatoria anterior del mismo grupo sin
   // jugar, no se puede cerrar esta (el admin debe cargar antes el resultado del
   // partido viejo). Solo importa cuando el admin podría confirmar.
@@ -342,7 +348,7 @@ export default async function ConvocatoriaDetallePage({
     position_pref: PositionPref;
   }> = [];
 
-  if (showSelector) {
+  if (listaEditable) {
     // El catálogo se limita a los miembros ACTIVOS del grupo de esta
     // convocatoria (no a todos los jugadores del sistema). Para convocatorias
     // sueltas (sin grupo) caemos a todos los approved.
@@ -441,9 +447,15 @@ export default async function ConvocatoriaDetallePage({
             convocados={convocados}
             cupoMaximo={convocatoria.cupo_maximo}
             convocatoriaId={convocatoria.id}
-            mostrarSacar={showSelector}
+            mostrarSacar={listaEditable}
           />
         )}
+
+        {showSelector && teamDraft ? (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Equipos generados: la lista quedó bloqueada. Para cambiarla, borrá el draft más abajo.
+          </div>
+        ) : null}
 
         {canManage && isOpen ? (
           <div className="mt-4 border-t border-neutral-200 pt-4">
@@ -455,7 +467,7 @@ export default async function ConvocatoriaDetallePage({
         ) : null}
       </section>
 
-      {showSelector ? (
+      {listaEditable ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
             Agregar jugadores

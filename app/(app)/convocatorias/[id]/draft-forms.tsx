@@ -22,12 +22,20 @@ export function GenerateDraftForm({
     null,
   );
 
+  // FUT-112: al generar por primera vez, la lista de convocados queda bloqueada
+  // (nadie se baja ni se anota hasta que se borre el draft). Avisamos antes.
+  const WARNING =
+    "Al generar los equipos, la lista de convocados queda bloqueada: nadie se podrá bajar ni anotar hasta que borres el draft. ¿Generar?";
+
   return (
     <form action={formAction} className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <input type="hidden" name="convocatoria_id" value={convocatoriaId} />
       <button
         type="submit"
         disabled={pending}
+        onClick={(e) => {
+          if (!hasDraft && !window.confirm(WARNING)) e.preventDefault();
+        }}
         className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending ? "Generando…" : hasDraft ? "Regenerar teams" : "Generar teams"}
