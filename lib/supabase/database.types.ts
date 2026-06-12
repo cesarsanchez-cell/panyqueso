@@ -1021,6 +1021,7 @@ export type Database = {
           fecha_nacimiento: string | null;
           id: string;
           internal_score: number;
+          is_guest: boolean;
           ment_attitude: number | null;
           ment_resilience: number | null;
           ment_tactical: number | null;
@@ -1057,6 +1058,7 @@ export type Database = {
           fecha_nacimiento?: string | null;
           id?: string;
           internal_score?: number;
+          is_guest?: boolean;
           ment_attitude?: number | null;
           ment_resilience?: number | null;
           ment_tactical?: number | null;
@@ -1093,6 +1095,7 @@ export type Database = {
           fecha_nacimiento?: string | null;
           id?: string;
           internal_score?: number;
+          is_guest?: boolean;
           ment_attitude?: number | null;
           ment_resilience?: number | null;
           ment_tactical?: number | null;
@@ -1251,6 +1254,10 @@ export type Database = {
         Returns: undefined;
       };
       _figura_most_voted: { Args: { p_match_id: string }; Returns: string };
+      agregar_invitado_a_convocatoria: {
+        Args: { p_convocatoria_id: string; p_nombre: string; p_score?: number };
+        Returns: Json;
+      };
       _figura_voting_closes_at: {
         Args: { p_match_id: string };
         Returns: string;
