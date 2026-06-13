@@ -3,37 +3,15 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 
-import { AwardVoteForm } from "./award-vote-form";
-import { FiguraVoteForm, type VoteCandidate } from "./figura-vote-form";
-import { HistorialResumen, type HistorialResumenData } from "./historial-resumen";
-import { ProdeTablas, type ProdeTablaGrupo } from "./prode-tabla";
-
-function formatFecha(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("es-AR", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-type Resultado = "ganado" | "empate" | "perdido" | "sin_resultado";
-
-const RESULTADO_META: Record<Resultado, { label: string; className: string }> = {
-  ganado: { label: "Ganado", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
-  empate: { label: "Empate", className: "bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200" },
-  perdido: { label: "Perdido", className: "bg-red-50 text-red-700 ring-1 ring-red-200" },
-  sin_resultado: {
-    label: "Sin resultado",
-    className: "bg-neutral-100 text-neutral-500 ring-1 ring-neutral-200",
-  },
-};
-
-function asResultado(value: string): Resultado {
-  return value === "ganado" || value === "empate" || value === "perdido" ? value : "sin_resultado";
-}
+import { type VoteCandidate } from "./figura-vote-form";
+import {
+  GrupoHistorialCard,
+  type AwardEntry,
+  type HistMatchRow,
+  type MatchEntry,
+} from "./grupo-historial-card";
+import { type HistorialResumenData } from "./historial-resumen";
+import { type ProdeTablaRow } from "./prode-tabla";
 
 export default async function HistorialPage() {
   const ctx = await requireUser();
@@ -70,41 +48,79 @@ export default async function HistorialPage() {
   );
 
   // Estado de los premios votados (carnicero / pinocho) por partido (FUT-102).
-  // Mismo conjunto de partidos que el historial; se mergea por match_id.
   const { data: awardsData } = await supabase.rpc("get_my_match_awards");
-  const awardsByMatch = new Map((awardsData ?? []).map((a) => [a.match_id, a]));
+  const awardsByMatch = new Map<string, AwardEntry>(
+    (awardsData ?? []).map((a) => [a.match_id, a as AwardEntry]),
+  );
 
-  // Resumen ("carné"): se agrega a partir de las MISMAS filas que ya trajimos
-  // para la lista (sin DB nueva). Muestra la realidad: V/E/D + %.
-  const resumen: HistorialResumenData = {
-    jugados: rows.length,
-    ganados: rows.filter((r) => r.resultado === "ganado").length,
-    empates: rows.filter((r) => r.resultado === "empate").length,
-    perdidos: rows.filter((r) => r.resultado === "perdido").length,
-    goles: rows.reduce((acc, r) => acc + (r.goles ?? 0), 0),
-    asistencias: rows.reduce((acc, r) => acc + (r.asistencias ?? 0), 0),
-    golesEnContra: rows.reduce((acc, r) => acc + (r.goles_en_contra ?? 0), 0),
-    figuras: rows.filter((r) => r.figura_es_mia).length,
-  };
-
-  // Tabla anual del Prode 🔮 por grupo. Reutiliza los grupos que ya aparecen en
-  // el historial (la tabla cuenta solo partidos con resultado: mismo conjunto).
-  const year = new Date().getFullYear();
   const { data: myPid } = await supabase.rpc("current_player_id");
-  const gruposEnHistorial = new Map<string, string>();
+  const year = new Date().getFullYear();
+
+  // Agrupar TODO por grupo: cada grupo es su mundo (FUT-115). Mezclar goles /
+  // triunfos / prode de grupos distintos no significa nada. El orden de los
+  // grupos es por su partido más reciente (rows ya viene fecha desc).
+  type GrupoAcc = {
+    grupoId: string;
+    grupoNombre: string;
+    resumen: HistorialResumenData;
+    matches: MatchEntry[];
+    ultimaFecha: string;
+  };
+  const grupos = new Map<string, GrupoAcc>();
+
   for (const r of rows) {
-    if (r.grupo_id) gruposEnHistorial.set(r.grupo_id, r.grupo_nombre ?? "Grupo");
+    if (!r.grupo_id) continue;
+    let g = grupos.get(r.grupo_id);
+    if (!g) {
+      g = {
+        grupoId: r.grupo_id,
+        grupoNombre: r.grupo_nombre ?? "Grupo",
+        resumen: {
+          jugados: 0,
+          ganados: 0,
+          empates: 0,
+          perdidos: 0,
+          goles: 0,
+          asistencias: 0,
+          golesEnContra: 0,
+          figuras: 0,
+        },
+        matches: [],
+        ultimaFecha: r.fecha,
+      };
+      grupos.set(r.grupo_id, g);
+    }
+
+    g.resumen.jugados += 1;
+    if (r.resultado === "ganado") g.resumen.ganados += 1;
+    else if (r.resultado === "empate") g.resumen.empates += 1;
+    else if (r.resultado === "perdido") g.resumen.perdidos += 1;
+    g.resumen.goles += r.goles ?? 0;
+    g.resumen.asistencias += r.asistencias ?? 0;
+    g.resumen.golesEnContra += r.goles_en_contra ?? 0;
+    if (r.figura_es_mia) g.resumen.figuras += 1;
+    if (r.fecha > g.ultimaFecha) g.ultimaFecha = r.fecha;
+
+    const candidates = candidatesByMatch[r.match_id] ?? [];
+    g.matches.push({
+      row: r as HistMatchRow,
+      candidates,
+      award: awardsByMatch.get(r.match_id),
+      votingOpen: r.figura_votacion_abierta && candidates.length > 0,
+    });
   }
-  const prodeGrupos: ProdeTablaGrupo[] = await Promise.all(
-    Array.from(gruposEnHistorial.entries()).map(async ([grupoId, grupoNombre]) => {
+
+  // Tabla anual del Prode 🔮 por grupo (cuenta solo partidos con resultado).
+  const prodeByGrupo = new Map<string, ProdeTablaRow[]>();
+  await Promise.all(
+    Array.from(grupos.keys()).map(async (grupoId) => {
       const { data: tabla } = await supabase.rpc("get_prode_tabla", {
         p_grupo_id: grupoId,
         p_year: year,
       });
-      return {
+      prodeByGrupo.set(
         grupoId,
-        grupoNombre,
-        rows: (tabla ?? []).map((t) => ({
+        (tabla ?? []).map((t) => ({
           playerId: t.player_id,
           nombre: t.nombre ?? "—",
           apodo: t.apodo,
@@ -112,8 +128,12 @@ export default async function HistorialPage() {
           aciertosExactos: t.aciertos_exactos,
           pronosticos: t.pronosticos,
         })),
-      };
+      );
     }),
+  );
+
+  const gruposOrdenados = Array.from(grupos.values()).sort((a, b) =>
+    b.ultimaFecha.localeCompare(a.ultimaFecha),
   );
 
   return (
@@ -121,16 +141,11 @@ export default async function HistorialPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Mi Actividad</h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Tu resumen y tus partidos jugados, por grupo. Con el tiempo se van a sumar más
-          estadísticas.
+          Tu resumen, tu Prode y tus partidos, separados por grupo. Cada grupo es su mundo.
         </p>
       </div>
 
-      {rows.length > 0 ? <HistorialResumen resumen={resumen} /> : null}
-
-      <ProdeTablas year={year} grupos={prodeGrupos} myPlayerId={myPid ?? null} />
-
-      {rows.length === 0 ? (
+      {gruposOrdenados.length === 0 ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
             Todavía no jugaste partidos
@@ -141,109 +156,17 @@ export default async function HistorialPage() {
           </p>
         </section>
       ) : (
-        <ul className="space-y-2">
-          {rows.map((r) => {
-            const meta = RESULTADO_META[asResultado(r.resultado)];
-            const award = awardsByMatch.get(r.match_id);
-            const candidates = candidatesByMatch[r.match_id] ?? [];
-            const votingOpen = r.figura_votacion_abierta && candidates.length > 0;
-            return (
-              <li
-                key={r.match_id}
-                className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-neutral-900">
-                      {r.grupo_nombre ?? "Grupo"}
-                    </p>
-                    <p className="text-xs text-neutral-500">{formatFecha(r.fecha)}</p>
-                    {r.figura_es_mia ? (
-                      <p className="mt-1 text-xs font-semibold text-amber-700">
-                        ⭐ Fuiste la figura del partido
-                      </p>
-                    ) : r.figura_nombre ? (
-                      <p className="mt-1 text-xs text-neutral-500">⭐ Figura: {r.figura_nombre}</p>
-                    ) : null}
-                    {award?.carnicero_nombre ? (
-                      <p className="mt-1 text-xs text-neutral-500">
-                        🔪 Carnicero: {award.carnicero_nombre}
-                      </p>
-                    ) : null}
-                    {award?.pinocho_nombre ? (
-                      <p className="mt-1 text-xs text-neutral-500">
-                        🪵 Pinocho: {award.pinocho_nombre}
-                      </p>
-                    ) : null}
-                    {r.video_resumen_url ? (
-                      <a
-                        href={r.video_resumen_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:underline"
-                      >
-                        🎥 Ver video
-                      </a>
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {r.figura_es_mia ? (
-                      <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
-                        ⭐ Figura
-                      </span>
-                    ) : null}
-                    {r.goles > 0 ? (
-                      <span className="text-xs font-medium text-neutral-700">
-                        {r.goles} {r.goles === 1 ? "gol" : "goles"} ⚽
-                      </span>
-                    ) : null}
-                    {r.asistencias > 0 ? (
-                      <span className="text-xs font-medium text-neutral-700">
-                        {r.asistencias} {r.asistencias === 1 ? "asist." : "asist."} 🅰️
-                      </span>
-                    ) : null}
-                    {r.goles_en_contra > 0 ? (
-                      <span className="text-xs font-medium text-neutral-700">
-                        {r.goles_en_contra} en contra 🙈
-                      </span>
-                    ) : null}
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.className}`}
-                    >
-                      {meta.label}
-                    </span>
-                  </div>
-                </div>
-                {votingOpen ? (
-                  <FiguraVoteForm
-                    matchId={r.match_id}
-                    candidates={candidates}
-                    currentVote={r.mi_voto_player_id}
-                    closesAt={r.figura_votacion_cierra}
-                  />
-                ) : null}
-                {votingOpen ? (
-                  <AwardVoteForm
-                    matchId={r.match_id}
-                    categoria="carnicero"
-                    titulo="🔪 Votá al Carnicero (el más rudo)"
-                    candidates={candidates}
-                    currentVote={award?.mi_voto_carnicero ?? null}
-                  />
-                ) : null}
-                {votingOpen && award?.pinocho_habilitado ? (
-                  <AwardVoteForm
-                    matchId={r.match_id}
-                    categoria="pinocho"
-                    titulo="🪵 Votá al Pinocho (el peor)"
-                    candidates={candidates}
-                    currentVote={award?.mi_voto_pinocho ?? null}
-                  />
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+        gruposOrdenados.map((g) => (
+          <GrupoHistorialCard
+            key={g.grupoId}
+            grupoNombre={g.grupoNombre}
+            resumen={g.resumen}
+            prodeRows={prodeByGrupo.get(g.grupoId) ?? []}
+            myPlayerId={myPid ?? null}
+            year={year}
+            matches={g.matches}
+          />
+        ))
       )}
     </div>
   );
