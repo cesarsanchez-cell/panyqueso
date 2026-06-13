@@ -38,8 +38,16 @@ export function EditGrupoForm({ grupoId, initial, lugares }: Props) {
     null,
   );
 
+  // React 19 resetea el form al terminar el action, y un <select>/<input>
+  // uncontrolled no refleja el nuevo `defaultValue` que llega del revalidate
+  // (solo lo aplica al montar). Sin esto, tras guardar un cambio de lugar el
+  // combo "vuelve" al lugar viejo aunque la DB quedó bien. Keyeando el form con
+  // los valores actuales lo re-montamos cuando `initial` cambia, re-sincronizando
+  // los campos con el dato fresco.
+  const formKey = `${initial.nombre}|${initial.lugar_id}|${initial.dia_semana}|${initial.hora}|${initial.cupo_titulares}`;
+
   return (
-    <form action={formAction} className="space-y-4">
+    <form key={formKey} action={formAction} className="space-y-4">
       <input type="hidden" name="id" value={grupoId} />
 
       <div className="grid gap-3 sm:grid-cols-2">
