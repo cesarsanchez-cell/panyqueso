@@ -106,7 +106,38 @@ export default async function HistorialPage() {
     });
   }
 
-  // Por cada grupo (donde jugué al menos una vez): TODAS sus fechas jugadas
+  // Además de los grupos donde jugué, incluir aquellos donde soy miembro ACTIVO
+  // aunque todavía no haya jugado: igual quiero ver sus fechas (FUT-116). El
+  // resumen V/E/D queda en cero hasta que juegue.
+  if (myPid) {
+    const { data: mems } = await supabase
+      .from("grupo_membresias")
+      .select("grupo_id")
+      .eq("player_id", myPid)
+      .eq("status", "activo");
+    const faltantes = (mems ?? []).map((m) => m.grupo_id).filter((id) => !grupos.has(id));
+    if (faltantes.length > 0) {
+      const { data: gs } = await supabase.from("grupos").select("id, nombre").in("id", faltantes);
+      for (const g of gs ?? []) {
+        grupos.set(g.id, {
+          grupoId: g.id,
+          grupoNombre: g.nombre,
+          resumen: {
+            jugados: 0,
+            ganados: 0,
+            empates: 0,
+            perdidos: 0,
+            goles: 0,
+            asistencias: 0,
+            golesEnContra: 0,
+            figuras: 0,
+          },
+        });
+      }
+    }
+  }
+
+  // Por cada grupo (donde juego o soy miembro): TODAS sus fechas jugadas
   // (FUT-116, group-wide) + la tabla anual del Prode.
   const grupoData = await Promise.all(
     Array.from(grupos.values()).map(async (g) => {
