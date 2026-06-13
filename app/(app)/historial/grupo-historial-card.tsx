@@ -195,7 +195,9 @@ export function GrupoHistorialCard({
                         {r.goles_en_contra} en contra 🙈
                       </span>
                     ) : null}
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.className}`}>
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.className}`}
+                    >
                       {meta.label}
                     </span>
                   </div>
