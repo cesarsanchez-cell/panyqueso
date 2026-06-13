@@ -1411,6 +1411,34 @@ export type Database = {
           votos: number;
         }[];
       };
+      get_grupo_fechas: {
+        Args: { p_grupo_id: string };
+        Returns: {
+          match_id: string;
+          fecha: string;
+          score_a: number | null;
+          score_b: number | null;
+          winner: string | null;
+          figura_nombre: string | null;
+          carnicero_nombre: string | null;
+          pinocho_habilitado: boolean;
+          pinocho_nombre: string | null;
+          video_resumen_url: string | null;
+        }[];
+      };
+      get_grupo_fecha_stats: {
+        Args: { p_match_id: string };
+        Returns: {
+          player_id: string;
+          nombre: string;
+          apodo: string | null;
+          team_label: string | null;
+          is_goalkeeper: boolean;
+          goles: number;
+          asistencias: number;
+          goles_en_contra: number;
+        }[];
+      };
       get_my_match_awards: {
         Args: never;
         Returns: {
