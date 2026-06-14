@@ -108,7 +108,8 @@ export type VarietyResult = {
 
 // Peso del desbalance de posiciones dentro del costo. Los 3 rubros pesan 1 cada
 // uno (suma de diferencias); las posiciones son objetivo secundario.
-const POSITION_WEIGHT = 0.5;
+// Exportado para que el generador multi-equipo (generate-multi.ts) use el mismo peso.
+export const POSITION_WEIGHT = 0.5;
 const EPS = 1e-9;
 
 /**
@@ -156,11 +157,14 @@ function sortByScoreDesc(arr: GeneratorInput[]): GeneratorInput[] {
   });
 }
 
-// Suma de rubros de un equipo (incluye al arquero).
-function teamDimensions(comp: TeamComposition): TeamDimensions {
-  const all = comp.goalkeeper ? [comp.goalkeeper, ...comp.players] : comp.players;
+/**
+ * Suma de rubros (físico efectivo + mental + técnica) de un conjunto de jugadores.
+ * Exportada para reusar en el generador multi-equipo: la unidad de medida del
+ * balance tiene que ser idéntica al generador de 2 equipos.
+ */
+export function dimensionsOf(players: GeneratorInput[]): TeamDimensions {
   const acc: TeamDimensions = { physEff: 0, mental: 0, technical: 0 };
-  for (const p of all) {
+  for (const p of players) {
     const d = playerDims(p);
     acc.physEff += d.physEff;
     acc.mental += d.mental;
@@ -169,10 +173,15 @@ function teamDimensions(comp: TeamComposition): TeamDimensions {
   return acc;
 }
 
+// Suma de rubros de un equipo (incluye al arquero).
+function teamDimensions(comp: TeamComposition): TeamDimensions {
+  return dimensionsOf(comp.goalkeeper ? [comp.goalkeeper, ...comp.players] : comp.players);
+}
+
 // Líneas de campo (el arquero va aparte).
 const FIELD_LINES = ["defensor", "mediocampista", "delantero"] as const;
 type FieldLine = (typeof FIELD_LINES)[number];
-type LineShares = Record<FieldLine, number>;
+export type LineShares = Record<FieldLine, number>;
 
 /**
  * FUT-95: "presencia" de un jugador repartida entre las líneas que puede cubrir.
@@ -198,16 +207,24 @@ export function fieldPositionShares(p: GeneratorInput): LineShares {
   };
 }
 
-// Forma del equipo: suma de la presencia por línea de sus jugadores de campo.
-function teamShape(comp: TeamComposition): LineShares {
+/**
+ * Forma (presencia por línea def/medio/del) de un conjunto de jugadores de campo.
+ * Exportada para reusar en el generador multi-equipo.
+ */
+export function shapeOf(fieldPlayers: GeneratorInput[]): LineShares {
   const acc: LineShares = { defensor: 0, mediocampista: 0, delantero: 0 };
-  for (const p of comp.players) {
+  for (const p of fieldPlayers) {
     const s = fieldPositionShares(p);
     acc.defensor += s.defensor;
     acc.mediocampista += s.mediocampista;
     acc.delantero += s.delantero;
   }
   return acc;
+}
+
+// Forma del equipo: suma de la presencia por línea de sus jugadores de campo.
+function teamShape(comp: TeamComposition): LineShares {
+  return shapeOf(comp.players);
 }
 
 /**
