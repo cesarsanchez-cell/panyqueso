@@ -195,9 +195,7 @@ function distributeField(
     // Entre esos, el que deje el menor costo global. Desempate por índice (menor).
     let best: { idx: number; cost: number } | null = null;
     for (const i of balanced) {
-      const trial = groups.map((g, k) =>
-        k === i ? [...seed[k]!, ...g, p] : [...seed[k]!, ...g],
-      );
+      const trial = groups.map((g, k) => (k === i ? [...seed[k]!, ...g, p] : [...seed[k]!, ...g]));
       const cost = pairwiseCost(trial);
       if (!best || cost < best.cost - EPS) best = { idx: i, cost };
     }
@@ -210,10 +208,7 @@ function distributeField(
 // Búsqueda local: intercambia jugadores de campo entre pares de grupos mientras
 // baje el costo. Determinístico (aplica la mejor mejora estricta por iteración).
 // `seed[i]` se incluye en el costo pero nunca se mueve.
-function refineSwaps(
-  groups: GeneratorInput[][],
-  seed: GeneratorInput[][],
-): GeneratorInput[][] {
+function refineSwaps(groups: GeneratorInput[][], seed: GeneratorInput[][]): GeneratorInput[][] {
   const cur = groups.map((g) => [...g]);
   const withSeed = () => cur.map((g, k) => [...seed[k]!, ...g]);
   let curCost = pairwiseCost(withSeed());

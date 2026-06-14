@@ -38,10 +38,7 @@ function probador(id: string): GeneratorInput {
   return mk(id, { physical: 6, mental: 6, technical: 6 }, { internal_score: 6 });
 }
 
-function teamSize(t: {
-  goalkeeper: GeneratorInput | null;
-  players: GeneratorInput[];
-}): number {
+function teamSize(t: { goalkeeper: GeneratorInput | null; players: GeneratorInput[] }): number {
   return t.players.length + (t.goalkeeper ? 1 : 0);
 }
 
@@ -148,7 +145,11 @@ test("determinístico: mismo input -> mismo output", () => {
   const a = generateMultiTeams(input, { numTeams: 3, teamSize: 5 });
   const b = generateMultiTeams(input, { numTeams: 3, teamSize: 5 });
   const ids = (r: typeof a) =>
-    r.teams.map((t) => [t.goalkeeper?.id ?? "-", t.players.map((p) => p.id), t.bench.map((p) => p.id)]);
+    r.teams.map((t) => [
+      t.goalkeeper?.id ?? "-",
+      t.players.map((p) => p.id),
+      t.bench.map((p) => p.id),
+    ]);
   assert.deepEqual(ids(a), ids(b));
 });
 
