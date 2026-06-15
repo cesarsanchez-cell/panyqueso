@@ -14,6 +14,11 @@
 -- ---------------------------------------------------------------------------
 -- 1. get_group_by_join_token + flag de aprobación
 -- ---------------------------------------------------------------------------
+-- Cambia el tipo de retorno (agrega una columna) → no se puede con CREATE OR
+-- REPLACE; hay que dropear primero. No tiene dependencias en la base (se llama
+-- desde el server action), así que el drop es seguro.
+drop function if exists public.get_group_by_join_token(text);
+
 create or replace function public.get_group_by_join_token(p_token text)
 returns table (
   grupo_id                  uuid,
