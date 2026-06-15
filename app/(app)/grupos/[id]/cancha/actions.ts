@@ -40,6 +40,10 @@ function mapError(code: string | undefined, fallback: string): string {
       return "Esa persona ya está en la cancha.";
     case "P0080":
       return "Esta operación es solo para el modo presentismo.";
+    case "P0082":
+      return "Todavía no armaste los equipos.";
+    case "P0083":
+      return "Esta sesión ya fue confirmada.";
     default:
       return fallback;
   }
@@ -313,6 +317,33 @@ export async function agregarAlArmado(
     };
   }
 
+  revalidatePath(`/grupos/${grupoId}/cancha`);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Confirmar la sesión → crea el partido (cuenta para historial + premios) y
+// cierra la cancha.
+// ---------------------------------------------------------------------------
+export async function confirmarSesion(
+  grupoId: string,
+  convocatoriaId: string,
+): Promise<CanchaResult> {
+  await requireRole(["admin", "coordinador"]);
+  if (!convocatoriaId) return { ok: false, error: "Falta la sesión." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("confirmar_sesion_presentismo", {
+    p_convocatoria_id: convocatoriaId,
+  });
+  if (error) {
+    return {
+      ok: false,
+      error: mapError((error as { code?: string }).code, "No se pudo confirmar la sesión."),
+    };
+  }
+
+  revalidatePath(`/grupos/${grupoId}`);
   revalidatePath(`/grupos/${grupoId}/cancha`);
   return { ok: true };
 }

@@ -1588,6 +1588,10 @@ export type Database = {
         Args: { p_match_id: string };
         Returns: undefined;
       };
+      confirmar_sesion_presentismo: {
+        Args: { p_convocatoria_id: string };
+        Returns: string;
+      };
       create_convocatoria_from_grupo: {
         Args: { p_fecha?: string; p_grupo_id: string };
         Returns: string;
@@ -1974,7 +1978,7 @@ export type Database = {
       convocatoria_status: "abierta" | "cerrada" | "jugada" | "cancelada";
       grupo_modo_confirmacion: "convocatoria" | "presentismo";
       grupo_status: "activo" | "archivado";
-      match_team_label: "A" | "B";
+      match_team_label: "A" | "B" | "C";
       match_winner: "a" | "b" | "empate";
       membresia_status: "activo" | "inactivo";
       membresia_tipo: "titular" | "suplente";
@@ -2132,7 +2136,7 @@ export const Constants = {
       convocatoria_status: ["abierta", "cerrada", "jugada", "cancelada"],
       grupo_modo_confirmacion: ["convocatoria", "presentismo"],
       grupo_status: ["activo", "archivado"],
-      match_team_label: ["A", "B"],
+      match_team_label: ["A", "B", "C"],
       match_winner: ["a", "b", "empate"],
       membresia_status: ["activo", "inactivo"],
       membresia_tipo: ["titular", "suplente"],
