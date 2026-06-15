@@ -369,6 +369,7 @@ export type Database = {
           dia_semana: number;
           hora: string;
           id: string;
+          join_requiere_aprobacion: boolean;
           join_token: string | null;
           lugar_id: string;
           modo_confirmacion: Database["public"]["Enums"]["grupo_modo_confirmacion"];
@@ -387,6 +388,7 @@ export type Database = {
           dia_semana: number;
           hora?: string;
           id?: string;
+          join_requiere_aprobacion?: boolean;
           join_token?: string | null;
           lugar_id: string;
           modo_confirmacion?: Database["public"]["Enums"]["grupo_modo_confirmacion"];
@@ -405,6 +407,7 @@ export type Database = {
           dia_semana?: number;
           hora?: string;
           id?: string;
+          join_requiere_aprobacion?: boolean;
           join_token?: string | null;
           lugar_id?: string;
           modo_confirmacion?: Database["public"]["Enums"]["grupo_modo_confirmacion"];
@@ -1513,6 +1516,10 @@ export type Database = {
         Args: { p_match_team_id: string };
         Returns: boolean;
       };
+      cancelar_sesion_presentismo: {
+        Args: { p_convocatoria_id: string };
+        Returns: undefined;
+      };
       cast_award_vote: {
         Args: {
           p_categoria: Database["public"]["Enums"]["award_category"];
@@ -1584,10 +1591,6 @@ export type Database = {
         };
         Returns: number;
       };
-      cancelar_sesion_presentismo: {
-        Args: { p_convocatoria_id: string };
-        Returns: undefined;
-      };
       confirm_match_cleanup: {
         Args: { p_match_id: string };
         Returns: undefined;
@@ -1656,9 +1659,28 @@ export type Database = {
           grupo_hora: string;
           grupo_id: string;
           grupo_nombre: string;
+          grupo_requiere_aprobacion: boolean;
           lugar_google_maps_url: string;
           lugar_nombre: string;
         }[];
+      };
+      aprobar_join_request: {
+        Args: { p_request_id: string };
+        Returns: string;
+      };
+      listar_join_requests: {
+        Args: { p_grupo_id: string };
+        Returns: {
+          created_at: string;
+          nombre: string;
+          phone: string;
+          player_id: string;
+          request_id: string;
+        }[];
+      };
+      rechazar_join_request: {
+        Args: { p_request_id: string };
+        Returns: undefined;
       };
       get_group_rating: {
         Args: { p_grupo_id: string; p_player_id: string };

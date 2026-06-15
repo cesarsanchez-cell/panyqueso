@@ -180,6 +180,12 @@ export async function joinGroup(
       .eq("id", newPlayerId);
   }
 
+  // 5b. Si el grupo requiere aprobación, el alta queda PENDING: no auto-login.
+  // La persona ingresa recién cuando el organizador la aprueba.
+  if (grupo.grupo_requiere_aprobacion) {
+    redirect(`/g/${token}?pendiente=1`);
+  }
+
   // 6. Auto-login con las credenciales recien creadas.
   const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
   if (signInErr) {

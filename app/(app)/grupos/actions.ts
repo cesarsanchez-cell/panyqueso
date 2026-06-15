@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth/require-role";
+import { notifyGroupWelcome } from "@/lib/push/actions";
 import { createClient } from "@/lib/supabase/server";
 
 type GrupoFormValues = {
@@ -306,6 +307,59 @@ export async function disableGroupJoinLink(formData: FormData): Promise<void> {
 
   const supabase = await createClient();
   await supabase.from("grupos").update({ join_token: null }).eq("id", grupo_id);
+
+  revalidatePath(`/grupos/${grupo_id}`);
+}
+
+// ============================================================================
+// FUT-119: gate de aprobación opcional del link /g.
+// ============================================================================
+
+// Toggle por grupo: si está prendido, los que entran por el link quedan pending
+// y el admin los aprueba antes de que sean miembros.
+export async function setJoinRequiereAprobacion(formData: FormData): Promise<void> {
+  await requireRole(["admin", "coordinador"]);
+
+  const grupo_id = String(formData.get("grupo_id") ?? "").trim();
+  const value = String(formData.get("value") ?? "") === "true";
+  if (!grupo_id) return;
+
+  const supabase = await createClient();
+  await supabase.from("grupos").update({ join_requiere_aprobacion: value }).eq("id", grupo_id);
+
+  revalidatePath(`/grupos/${grupo_id}`);
+}
+
+// Aprobar una solicitud de alta: crea la membresía + jugador approved y avisa
+// (push de bienvenida, best-effort).
+export async function aprobarJoinRequest(formData: FormData): Promise<void> {
+  await requireRole(["admin", "coordinador"]);
+
+  const grupo_id = String(formData.get("grupo_id") ?? "").trim();
+  const request_id = String(formData.get("request_id") ?? "").trim();
+  if (!grupo_id || !request_id) return;
+
+  const supabase = await createClient();
+  const { data: playerId, error } = await supabase.rpc("aprobar_join_request", {
+    p_request_id: request_id,
+  });
+  if (!error && playerId) {
+    await notifyGroupWelcome(playerId as string, grupo_id);
+  }
+
+  revalidatePath(`/grupos/${grupo_id}`);
+}
+
+// Rechazar una solicitud de alta: el jugador queda inactive.
+export async function rechazarJoinRequest(formData: FormData): Promise<void> {
+  await requireRole(["admin", "coordinador"]);
+
+  const grupo_id = String(formData.get("grupo_id") ?? "").trim();
+  const request_id = String(formData.get("request_id") ?? "").trim();
+  if (!grupo_id || !request_id) return;
+
+  const supabase = await createClient();
+  await supabase.rpc("rechazar_join_request", { p_request_id: request_id });
 
   revalidatePath(`/grupos/${grupo_id}`);
 }

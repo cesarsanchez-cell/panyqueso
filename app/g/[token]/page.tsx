@@ -16,8 +16,15 @@ function formatHora(raw: string): string {
   return raw.slice(0, 5);
 }
 
-export default async function GroupJoinPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function GroupJoinPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ token: string }>;
+  searchParams: Promise<{ pendiente?: string }>;
+}) {
   const { token } = await params;
+  const sp = await searchParams;
 
   const supabase = await createClient();
   const { data: rows, error } = await supabase.rpc("get_group_by_join_token", { p_token: token });
@@ -33,6 +40,16 @@ export default async function GroupJoinPage({ params }: { params: Promise<{ toke
       <ErrorShell
         title="Link no válido"
         detail="Este link no está activo o el grupo ya no existe. Pedile al organizador uno nuevo."
+      />
+    );
+  }
+
+  // El alta quedó pendiente de aprobación del organizador (no hay auto-login).
+  if (sp.pendiente === "1") {
+    return (
+      <InfoShell
+        title="¡Listo! Tu solicitud quedó pendiente"
+        detail="El organizador del grupo tiene que aprobarte. Cuando lo haga, ingresá en la app con tu celular y la contraseña que elegiste."
       />
     );
   }
@@ -89,6 +106,12 @@ export default async function GroupJoinPage({ params }: { params: Promise<{ toke
             Completá tus datos y creá tu cuenta. Vas a entrar a la app con tu celular y la
             contraseña que elijas.
           </p>
+          {grupo.grupo_requiere_aprobacion ? (
+            <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Este grupo aprueba a los nuevos: tu alta queda pendiente hasta que el organizador te
+              confirme.
+            </p>
+          ) : null}
           <div className="mt-4">
             <JoinForm token={token} />
           </div>
@@ -117,6 +140,17 @@ function ErrorShell({ title, detail }: { title: string; detail: string }) {
       <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center shadow-sm">
         <h1 className="text-lg font-bold text-red-900">{title}</h1>
         <p className="mt-2 text-sm text-red-800">{detail}</p>
+      </div>
+    </main>
+  );
+}
+
+function InfoShell({ title, detail }: { title: string; detail: string }) {
+  return (
+    <main className="mx-auto max-w-md px-4 py-12">
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-center shadow-sm">
+        <h1 className="text-lg font-bold text-emerald-900">{title}</h1>
+        <p className="mt-2 text-sm text-emerald-800">{detail}</p>
       </div>
     </main>
   );

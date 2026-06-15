@@ -18,6 +18,7 @@ import { EditGrupoForm } from "./edit-grupo-form";
 import { MembersSections } from "./members-sections";
 import { AddMemberForm } from "./membership-forms";
 import { GroupJoinLinkSection } from "./group-join-link";
+import { aprobarJoinRequest, rechazarJoinRequest } from "../actions";
 import { PendingInvitesList, type PendingInvite } from "./pending-invites";
 import { PremioPinochoToggle } from "./premio-pinocho-toggle";
 import { ProdeResetForm } from "./prode-reset-form";
@@ -44,7 +45,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
   const { data: grupo, error: grupoErr } = await supabase
     .from("grupos")
     .select(
-      "id, nombre, lugar_id, dia_semana, hora, cupo_titulares, status, auto_renovar, join_token, premio_pinocho, modo_confirmacion, lugar:lugares!lugar_id(nombre)",
+      "id, nombre, lugar_id, dia_semana, hora, cupo_titulares, status, auto_renovar, join_token, join_requiere_aprobacion, premio_pinocho, modo_confirmacion, lugar:lugares!lugar_id(nombre)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -102,6 +103,9 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
       .eq("role", "coordinador")
       .order("nombre", { ascending: true }),
   ]);
+
+  // Solicitudes de alta pendientes (link /g con aprobación requerida).
+  const { data: joinRequests } = await supabase.rpc("listar_join_requests", { p_grupo_id: id });
 
   // Conteos + roster de la convocatoria abierta (si hay).
   type ConvRosterMember = {
@@ -341,7 +345,57 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
           joinToken={grupo.join_token}
           origin={origin}
           grupoNombre={grupo.nombre}
+          requiereAprobacion={grupo.join_requiere_aprobacion}
         />
+      ) : null}
+
+      {isActive && (joinRequests ?? []).length > 0 ? (
+        <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-700">
+              Solicitudes de alta
+            </h2>
+            <p className="text-sm text-amber-800">{(joinRequests ?? []).length}</p>
+          </div>
+          <p className="mt-1 text-xs text-amber-700">
+            Entraron por el link y esperan tu aprobación para sumarse al grupo.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {(joinRequests ?? []).map((r) => (
+              <li
+                key={r.request_id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-white px-3 py-2"
+              >
+                <span className="min-w-0 text-sm text-neutral-900">
+                  {r.nombre}
+                  <span className="ml-2 font-mono text-xs text-neutral-500">{r.phone}</span>
+                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <form action={aprobarJoinRequest}>
+                    <input type="hidden" name="grupo_id" value={grupo.id} />
+                    <input type="hidden" name="request_id" value={r.request_id} />
+                    <button
+                      type="submit"
+                      className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+                    >
+                      Aprobar
+                    </button>
+                  </form>
+                  <form action={rechazarJoinRequest}>
+                    <input type="hidden" name="grupo_id" value={grupo.id} />
+                    <input type="hidden" name="request_id" value={r.request_id} />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-600 transition hover:bg-red-50 hover:text-red-700"
+                    >
+                      Rechazar
+                    </button>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">

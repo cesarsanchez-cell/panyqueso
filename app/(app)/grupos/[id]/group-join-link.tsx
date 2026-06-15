@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 
-import { disableGroupJoinLink, regenerateGroupJoinLink } from "../actions";
+import {
+  disableGroupJoinLink,
+  regenerateGroupJoinLink,
+  setJoinRequiereAprobacion,
+} from "../actions";
 
 // Sección del "link único del grupo": un solo link reusable que el admin pega
 // una vez en el grupo de WhatsApp. Cada jugador lo abre y se anota solo.
@@ -15,11 +19,13 @@ export function GroupJoinLinkSection({
   joinToken,
   origin,
   grupoNombre,
+  requiereAprobacion,
 }: {
   grupoId: string;
   joinToken: string | null;
   origin: string;
   grupoNombre: string;
+  requiereAprobacion: boolean;
 }) {
   const link = joinToken ? (origin ? `${origin}/g/${joinToken}` : `/g/${joinToken}`) : null;
 
@@ -32,6 +38,8 @@ export function GroupJoinLinkSection({
         Un solo link para pegar una vez en el grupo de WhatsApp. Cualquiera que lo abra se anota
         solo (pone su celu y sus datos) y queda agregado al grupo. No necesitás conocer los números.
       </p>
+
+      <ApprovalToggle grupoId={grupoId} requiereAprobacion={requiereAprobacion} />
 
       {link ? (
         <ActiveLink grupoId={grupoId} link={link} grupoNombre={grupoNombre} />
@@ -49,6 +57,46 @@ export function GroupJoinLinkSection({
         </div>
       )}
     </section>
+  );
+}
+
+function ApprovalToggle({
+  grupoId,
+  requiereAprobacion,
+}: {
+  grupoId: string;
+  requiereAprobacion: boolean;
+}) {
+  return (
+    <div className="mt-4 flex items-start justify-between gap-3 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2.5">
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-neutral-800">Aprobar antes de sumar</p>
+        <p className="mt-0.5 text-xs text-neutral-500">
+          {requiereAprobacion
+            ? "Los que entran por el link quedan pendientes hasta que los aprobás."
+            : "Los que entran por el link se suman directo (sin tu aprobación)."}
+        </p>
+      </div>
+      <form action={setJoinRequiereAprobacion} className="shrink-0">
+        <input type="hidden" name="grupo_id" value={grupoId} />
+        <input type="hidden" name="value" value={requiereAprobacion ? "false" : "true"} />
+        <button
+          type="submit"
+          role="switch"
+          aria-checked={requiereAprobacion}
+          aria-label="Requerir aprobación para sumarse por el link"
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+            requiereAprobacion ? "bg-neutral-900" : "bg-neutral-300"
+          }`}
+        >
+          <span
+            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+              requiereAprobacion ? "translate-x-5" : "translate-x-0.5"
+            }`}
+          />
+        </button>
+      </form>
+    </div>
   );
 }
 
