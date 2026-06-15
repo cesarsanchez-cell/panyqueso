@@ -7,7 +7,7 @@
 --   4.  todos los presentes del armado quedan como participantes (4).
 --   5.  el arquero queda is_goalkeeper = true.
 --   6.  la convocatoria queda 'cerrada'.
---   7.  confirmar de nuevo → ya_confirmada (P0083).
+--   7.  confirmar de nuevo → la conv ya quedó cerrada (P0057).
 --   8.  confirmar una sesión sin armado → sin_armado (P0082).
 --   9.  un armado de 3 equipos crea el match_teams con label 'C'.
 --   10. ...y suma a los 6 participantes.
@@ -116,10 +116,12 @@ select is(
   (select status::text from public.convocatorias where id = (select conv_id from _c1)),
   'cerrada', 'la convocatoria queda cerrada tras confirmar');
 
--- 7. doble confirmación.
+-- 7. doble confirmación: la conv ya quedó cerrada → not_open (P0057). El guard
+--    P0083 (ya_confirmada) queda como defensa para un improbable race con la
+--    conv aún 'abierta'; en el flujo normal el cierre la corta antes.
 select throws_ok(
   $$ select public.confirmar_sesion_presentismo((select conv_id from _c1)) $$,
-  'P0083', null, 'confirmar de nuevo falla (ya_confirmada)');
+  'P0057', null, 'confirmar de nuevo falla (la sesión ya quedó cerrada)');
 
 -- ---- Sesión 2: sin armado --------------------------------------------------
 create temporary table _c2 on commit drop as
