@@ -289,6 +289,58 @@ export type Database = {
           },
         ];
       };
+      grupo_join_requests: {
+        Row: {
+          created_at: string;
+          grupo_id: string;
+          id: string;
+          player_id: string;
+          resolved_at: string | null;
+          resolved_by: string | null;
+          status: Database["public"]["Enums"]["join_request_status"];
+        };
+        Insert: {
+          created_at?: string;
+          grupo_id: string;
+          id?: string;
+          player_id: string;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          status?: Database["public"]["Enums"]["join_request_status"];
+        };
+        Update: {
+          created_at?: string;
+          grupo_id?: string;
+          id?: string;
+          player_id?: string;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          status?: Database["public"]["Enums"]["join_request_status"];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "grupo_join_requests_grupo_id_fkey";
+            columns: ["grupo_id"];
+            isOneToOne: false;
+            referencedRelation: "grupos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "grupo_join_requests_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "grupo_join_requests_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       grupo_membresias: {
         Row: {
           created_at: string;
@@ -1506,6 +1558,7 @@ export type Database = {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
       };
+      aprobar_join_request: { Args: { p_request_id: string }; Returns: string };
       can_manage_convocatoria: {
         Args: { p_convocatoria_id: string };
         Returns: boolean;
@@ -1663,24 +1716,6 @@ export type Database = {
           lugar_google_maps_url: string;
           lugar_nombre: string;
         }[];
-      };
-      aprobar_join_request: {
-        Args: { p_request_id: string };
-        Returns: string;
-      };
-      listar_join_requests: {
-        Args: { p_grupo_id: string };
-        Returns: {
-          created_at: string;
-          nombre: string;
-          phone: string;
-          player_id: string;
-          request_id: string;
-        }[];
-      };
-      rechazar_join_request: {
-        Args: { p_request_id: string };
-        Returns: undefined;
       };
       get_group_rating: {
         Args: { p_grupo_id: string; p_player_id: string };
@@ -1893,6 +1928,18 @@ export type Database = {
         Args: { p_convocatoria_id: string };
         Returns: boolean;
       };
+      listar_join_requests: {
+        Args: { p_grupo_id: string };
+        Returns: {
+          created_at: string;
+          kind: string;
+          nombre: string;
+          phone: string;
+          player_id: string;
+          request_id: string;
+          tiene_login: boolean;
+        }[];
+      };
       lookup_jugador_por_celular: {
         Args: { p_celular: string; p_grupo_id: string };
         Returns: Json;
@@ -1942,11 +1989,19 @@ export type Database = {
         Args: { p_convocatoria_id: string; p_player_id: string };
         Returns: undefined;
       };
+      rechazar_join_request: {
+        Args: { p_request_id: string };
+        Returns: undefined;
+      };
       reject_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
       };
       requiere_veedor: { Args: never; Returns: boolean };
+      solicitar_reclamo_por_link: {
+        Args: { p_phone: string; p_token: string };
+        Returns: string;
+      };
       save_push_subscription: {
         Args: {
           p_auth: string;
@@ -2004,6 +2059,7 @@ export type Database = {
       convocatoria_status: "abierta" | "cerrada" | "jugada" | "cancelada";
       grupo_modo_confirmacion: "convocatoria" | "presentismo";
       grupo_status: "activo" | "archivado";
+      join_request_status: "pendiente" | "aprobada" | "rechazada";
       match_team_label: "A" | "B" | "C";
       match_winner: "a" | "b" | "empate";
       membresia_status: "activo" | "inactivo";
@@ -2162,6 +2218,7 @@ export const Constants = {
       convocatoria_status: ["abierta", "cerrada", "jugada", "cancelada"],
       grupo_modo_confirmacion: ["convocatoria", "presentismo"],
       grupo_status: ["activo", "archivado"],
+      join_request_status: ["pendiente", "aprobada", "rechazada"],
       match_team_label: ["A", "B", "C"],
       match_winner: ["a", "b", "empate"],
       membresia_status: ["activo", "inactivo"],

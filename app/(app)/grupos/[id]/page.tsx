@@ -369,6 +369,11 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
                 <span className="min-w-0 text-sm text-neutral-900">
                   {r.nombre}
                   <span className="ml-2 font-mono text-xs text-neutral-500">{r.phone}</span>
+                  {r.kind === "reclamo" ? (
+                    <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-xs text-sky-800">
+                      ya existía{r.tiene_login ? "" : " · sin login"}
+                    </span>
+                  ) : null}
                 </span>
                 <div className="flex shrink-0 items-center gap-2">
                   <form action={aprobarJoinRequest}>
