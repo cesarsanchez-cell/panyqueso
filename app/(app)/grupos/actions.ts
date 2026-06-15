@@ -135,10 +135,16 @@ export async function updateGrupo(
     return { error: "Cupo de titulares inválido (entre 6 y 24)." };
   }
 
+  const modoRaw = String(formData.get("modo_confirmacion") ?? "convocatoria").trim();
+  if (modoRaw !== "convocatoria" && modoRaw !== "presentismo") {
+    return { error: "Modo de confirmación inválido." };
+  }
+  const modo_confirmacion = modoRaw as "convocatoria" | "presentismo";
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("grupos")
-    .update({ nombre, lugar_id, dia_semana, hora, cupo_titulares })
+    .update({ nombre, lugar_id, dia_semana, hora, cupo_titulares, modo_confirmacion })
     .eq("id", id);
 
   if (error) return { error: `No se pudo actualizar: ${error.message}` };

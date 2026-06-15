@@ -24,6 +24,7 @@ type Props = {
     dia_semana: number;
     hora: string;
     cupo_titulares: number;
+    modo_confirmacion: "convocatoria" | "presentismo";
   };
   lugares: Lugar[];
 };
@@ -44,7 +45,7 @@ export function EditGrupoForm({ grupoId, initial, lugares }: Props) {
   // combo "vuelve" al lugar viejo aunque la DB quedó bien. Keyeando el form con
   // los valores actuales lo re-montamos cuando `initial` cambia, re-sincronizando
   // los campos con el dato fresco.
-  const formKey = `${initial.nombre}|${initial.lugar_id}|${initial.dia_semana}|${initial.hora}|${initial.cupo_titulares}`;
+  const formKey = `${initial.nombre}|${initial.lugar_id}|${initial.dia_semana}|${initial.hora}|${initial.cupo_titulares}|${initial.modo_confirmacion}`;
 
   return (
     <form key={formKey} action={formAction} className="space-y-4">
@@ -132,6 +133,26 @@ export function EditGrupoForm({ grupoId, initial, lugares }: Props) {
             className={inputClass}
           />
         </div>
+      </div>
+
+      <div>
+        <label htmlFor="modo_confirmacion" className={labelClass}>
+          Modo de confirmación
+        </label>
+        <select
+          id="modo_confirmacion"
+          name="modo_confirmacion"
+          required
+          defaultValue={initial.modo_confirmacion}
+          className={inputClass}
+        >
+          <option value="convocatoria">Convocatoria (lista previa)</option>
+          <option value="presentismo">Presentismo (check-in en cancha)</option>
+        </select>
+        <p className="mt-1 text-xs text-neutral-500">
+          Presentismo: sin lista previa; el coordinador registra a los que llegan y arma los equipos
+          en la cancha.
+        </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
