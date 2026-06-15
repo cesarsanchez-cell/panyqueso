@@ -52,12 +52,26 @@ function mapError(code: string | undefined, fallback: string): string {
 // ---------------------------------------------------------------------------
 // Abrir cancha (crea la sesión presentismo)
 // ---------------------------------------------------------------------------
-export async function abrirCancha(grupoId: string): Promise<AbrirResult> {
+export async function abrirCancha(grupoId: string, fecha?: string): Promise<AbrirResult> {
   await requireRole(["admin", "coordinador"]);
   if (!grupoId) return { ok: false, error: "Falta el grupo." };
 
+  // Fecha opcional elegida por el coordinador (feriado / partido adelantado). Si
+  // no viene, la RPC usa el próximo día del grupo. Validamos el formato; la RPC
+  // rechaza fechas pasadas (P0058) usando la TZ de Argentina.
+  let p_fecha: string | undefined;
+  if (fecha) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      return { ok: false, error: "Fecha inválida." };
+    }
+    p_fecha = fecha;
+  }
+
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("abrir_cancha", { p_grupo_id: grupoId });
+  const { data, error } = await supabase.rpc("abrir_cancha", {
+    p_grupo_id: grupoId,
+    ...(p_fecha ? { p_fecha } : {}),
+  });
   if (error) {
     return {
       ok: false,
