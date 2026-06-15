@@ -129,6 +129,19 @@ export async function createConvocatoriaFromGrupo(
   if (!fecha || !isYYYYMMDD(fecha)) return { error: "Fecha inválida." };
 
   const supabase = await createClient();
+
+  // Los grupos presentismo no usan convocatorias normales: arman en la cancha.
+  const { data: grupo } = await supabase
+    .from("grupos")
+    .select("modo_confirmacion")
+    .eq("id", grupoId)
+    .maybeSingle();
+  if (grupo?.modo_confirmacion === "presentismo") {
+    return {
+      error: "Este grupo confirma por presentismo. Abrí la sesión desde “Ir a la cancha”.",
+    };
+  }
+
   const { data: newConvId, error } = await supabase.rpc("create_convocatoria_from_grupo", {
     p_grupo_id: grupoId,
     p_fecha: fecha,

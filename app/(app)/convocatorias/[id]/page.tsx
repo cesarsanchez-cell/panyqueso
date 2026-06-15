@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { requireRole } from "@/lib/auth/require-role";
 import { playerLabel } from "@/lib/players/label";
@@ -138,9 +138,9 @@ export default async function ConvocatoriaDetallePage({
   const { data: convocatoria, error } = await supabase
     .from("convocatorias")
     .select(
-      `id, fecha, hora, status, cupo_maximo, notas, created_at, team_draft, grupo_id,
+      `id, fecha, hora, status, cupo_maximo, notas, created_at, team_draft, grupo_id, modo,
        lugar:lugares!lugar_id(id, nombre),
-       grupo:grupos!grupo_id(nombre, premio_pinocho),
+       grupo:grupos!grupo_id(nombre, premio_pinocho, modo_confirmacion),
        creator:profiles!created_by(nombre)`,
     )
     .eq("id", id)
@@ -151,6 +151,17 @@ export default async function ConvocatoriaDetallePage({
   }
   if (!convocatoria) {
     notFound();
+  }
+
+  // Modo presentismo: la convocatoria se gestiona en la cancha, no acá. Para no
+  // duplicar el flujo (ni mostrar el draft/freeze del flujo normal), redirigimos
+  // a la cancha del grupo. Vale tanto si la conv es presentismo como si el grupo
+  // pasó a presentismo y quedaron convocatorias normales viejas.
+  if (
+    convocatoria.grupo_id &&
+    (convocatoria.modo === "presentismo" || convocatoria.grupo?.modo_confirmacion === "presentismo")
+  ) {
+    redirect(`/grupos/${convocatoria.grupo_id}/cancha`);
   }
 
   const { data: convocadosRaw, error: convError } = await supabase

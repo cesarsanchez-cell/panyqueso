@@ -23,7 +23,7 @@ async function loadConvocatoriaWithDraft(
 ) {
   const { data } = await supabase
     .from("convocatorias")
-    .select("status, team_draft")
+    .select("status, team_draft, modo, grupo_id")
     .eq("id", convocatoriaId)
     .maybeSingle();
   return data;
@@ -107,6 +107,11 @@ export async function generateDraft(
   const supabase = await createClient();
   const row = await loadConvocatoriaWithDraft(supabase, convocatoriaId);
   if (!row) return { error: "Convocatoria no encontrada." };
+  if (row.modo === "presentismo") {
+    return {
+      error: "Este grupo arma los equipos en la cancha. Entrá a “Ir a la cancha” desde el grupo.",
+    };
+  }
   if (row.status !== "abierta") {
     return { error: "Solo se puede generar el draft si la convocatoria está abierta." };
   }
