@@ -108,6 +108,10 @@ export default async function CanchaPage({ params }: { params: Promise<{ id: str
         </p>
       ) : (
         <CanchaLive
+          // Remonta al cruzar el borde sesión↔sin-sesión: así, al volver de
+          // confirmar/cancelar, el selector toma la fecha sugerida nueva (la
+          // próxima libre) en vez de quedarse con la última usada.
+          key={conv?.id ?? "abrir"}
           grupoId={grupo.id}
           convocatoriaId={conv?.id ?? null}
           present={present}
