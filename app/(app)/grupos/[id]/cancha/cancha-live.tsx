@@ -11,6 +11,7 @@ import {
   armarEquipos,
   checkinMiembro,
   checkinProbador,
+  confirmarSesion,
   quitarCheckin,
   type CanchaResult,
 } from "./actions";
@@ -268,14 +269,32 @@ export function CanchaLive({ grupoId, convocatoriaId, present, membersAvailable,
         <section className={card}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className={h2}>Equipos armados</h2>
-            <a
-              href={`/grupos/${grupoId}/cancha/equipos`}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-sm transition hover:bg-neutral-50"
-            >
-              📷 Imagen para WhatsApp
-            </a>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href={`/grupos/${grupoId}/cancha/equipos`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-sm transition hover:bg-neutral-50"
+              >
+                📷 Imagen para WhatsApp
+              </a>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Confirmar registra el partido (cuenta para historial y premios votados) y cierra la cancha. ¿Confirmás?",
+                    )
+                  ) {
+                    run(() => confirmarSesion(grupoId, convId));
+                  }
+                }}
+                className={primaryBtn}
+              >
+                ✓ Confirmar sesión
+              </button>
+            </div>
           </div>
           <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {armado.teams.map((t) => (
