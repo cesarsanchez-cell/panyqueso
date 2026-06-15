@@ -72,7 +72,7 @@ export default async function ConvocatoriasPage({
   let query = supabase
     .from("convocatorias")
     .select(
-      `id, fecha, hora, status, cupo_maximo, notas, created_at,
+      `id, fecha, hora, status, cupo_maximo, notas, created_at, modo, grupo_id,
        grupo:grupos!grupo_id(nombre),
        lugar:lugares!lugar_id(nombre),
        creator:profiles!created_by(nombre)`,
@@ -139,36 +139,54 @@ export default async function ConvocatoriasPage({
         </div>
       ) : (
         <ul className="space-y-3">
-          {convocatorias.map((c) => (
-            <li key={c.id}>
-              <Link
-                href={`/convocatorias/${c.id}`}
-                className="block rounded-lg border border-neutral-200 bg-white p-4 shadow-sm transition hover:border-neutral-300 hover:shadow-md"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-neutral-900">
-                      {c.grupo?.nombre ?? "Convocatoria suelta"}
-                    </p>
-                    <p className="mt-0.5 text-sm text-neutral-600">
-                      {formatDate(c.fecha)} · {formatHora(c.hora)}
-                    </p>
-                    <p className="mt-0.5 text-xs text-neutral-500">
-                      {c.lugar?.nombre ?? "Lugar sin definir"} · cupo {c.cupo_maximo}
-                    </p>
-                    {c.notas ? (
-                      <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{c.notas}</p>
-                    ) : null}
+          {convocatorias.map((c) => {
+            const esPresentismo = c.modo === "presentismo";
+            // Las sesiones presentismo viven en la cancha en vivo: linkeamos
+            // directo (el redirect ya lo haría, pero así evitamos el rebote) y
+            // no mostramos "cupo" porque no aplica (la confirmación es llegar).
+            const href =
+              esPresentismo && c.grupo_id
+                ? `/grupos/${c.grupo_id}/cancha`
+                : `/convocatorias/${c.id}`;
+            return (
+              <li key={c.id}>
+                <Link
+                  href={href}
+                  className="block rounded-lg border border-neutral-200 bg-white p-4 shadow-sm transition hover:border-neutral-300 hover:shadow-md"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-neutral-900">
+                        {c.grupo?.nombre ?? "Convocatoria suelta"}
+                      </p>
+                      <p className="mt-0.5 text-sm text-neutral-600">
+                        {formatDate(c.fecha)} · {formatHora(c.hora)}
+                      </p>
+                      <p className="mt-0.5 text-xs text-neutral-500">
+                        {c.lugar?.nombre ?? "Lugar sin definir"}
+                        {esPresentismo ? " · sesión en cancha" : ` · cupo ${c.cupo_maximo}`}
+                      </p>
+                      {c.notas ? (
+                        <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{c.notas}</p>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[c.status]}`}
+                      >
+                        {STATUS_LABEL[c.status]}
+                      </span>
+                      {esPresentismo ? (
+                        <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-200">
+                          🟢 Cancha
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[c.status]}`}
-                  >
-                    {STATUS_LABEL[c.status]}
-                  </span>
-                </div>
-              </Link>
-            </li>
-          ))}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
