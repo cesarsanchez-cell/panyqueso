@@ -361,3 +361,30 @@ export async function confirmarSesion(
   revalidatePath(`/grupos/${grupoId}/cancha`);
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------------
+// Cancelar la sesión abierta (sin confirmar) → la elimina y vuelve a "Abrir la
+// cancha". Para abrir por error o cambiar la fecha sin pasar por SQL.
+// ---------------------------------------------------------------------------
+export async function cancelarSesion(
+  grupoId: string,
+  convocatoriaId: string,
+): Promise<CanchaResult> {
+  await requireRole(["admin", "coordinador"]);
+  if (!convocatoriaId) return { ok: false, error: "Falta la sesión." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("cancelar_sesion_presentismo", {
+    p_convocatoria_id: convocatoriaId,
+  });
+  if (error) {
+    return {
+      ok: false,
+      error: mapError((error as { code?: string }).code, "No se pudo cancelar la sesión."),
+    };
+  }
+
+  revalidatePath(`/grupos/${grupoId}`);
+  revalidatePath(`/grupos/${grupoId}/cancha`);
+  return { ok: true };
+}

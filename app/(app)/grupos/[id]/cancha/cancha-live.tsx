@@ -9,6 +9,7 @@ import {
   abrirCancha,
   agregarAlArmado,
   armarEquipos,
+  cancelarSesion,
   checkinMiembro,
   checkinProbador,
   confirmarSesion,
@@ -370,6 +371,31 @@ export function CanchaLive({
       ) : null}
 
       {error ? <ErrorMsg msg={error} /> : null}
+
+      {/* Cancelar la sesión abierta (todavía sin confirmar) */}
+      <section className={card}>
+        <h2 className={h2}>¿Abriste por error o querés cambiar la fecha?</h2>
+        <p className="mt-1 text-sm text-neutral-600">
+          Cancelar elimina esta sesión (todavía no la confirmaste) y borra el check-in. Después
+          podés abrir otra con la fecha que quieras.
+        </p>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            if (
+              window.confirm(
+                "Esto cancela la sesión abierta y borra el check-in. No quedó confirmada, así que no afecta historial ni premios. ¿Cancelar la sesión?",
+              )
+            ) {
+              run(() => cancelarSesion(grupoId, convId));
+            }
+          }}
+          className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Cancelar sesión
+        </button>
+      </section>
     </div>
   );
 }

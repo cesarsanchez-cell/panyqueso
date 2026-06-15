@@ -1584,6 +1584,10 @@ export type Database = {
         };
         Returns: number;
       };
+      cancelar_sesion_presentismo: {
+        Args: { p_convocatoria_id: string };
+        Returns: undefined;
+      };
       confirm_match_cleanup: {
         Args: { p_match_id: string };
         Returns: undefined;
