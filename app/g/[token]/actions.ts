@@ -114,10 +114,13 @@ export async function joinGroup(
     .eq("phone", phone!)
     .maybeSingle();
   if (existingPlayer) {
-    return {
-      error:
-        "Ya hay una cuenta con este teléfono. Ingresá desde /login con tu celular y contraseña.",
-    };
+    // El teléfono ya existe → no creamos cuenta: registramos un RECLAMO para que
+    // el organizador confirme que es esta persona (FUT-120).
+    const { data: estado } = await supabase.rpc("solicitar_reclamo_por_link", {
+      p_token: token,
+      p_phone: phone!,
+    });
+    redirect(`/g/${token}?reclamo=${estado ?? "creado"}`);
   }
 
   // 3. Crear auth user via admin API.
@@ -158,9 +161,13 @@ export async function joinGroup(
     await admin.auth.admin.deleteUser(authUserId);
     const code = (claimErr as { code?: string }).code;
     if (code === "P0024") {
-      return {
-        error: "Ya hay una cuenta con este teléfono. Ingresá desde /login con tu celular.",
-      };
+      // El teléfono ya existía (jugador creado a mano o de otro grupo) → en vez
+      // de cortar, registramos un RECLAMO para que el organizador lo confirme.
+      const { data: estado } = await supabase.rpc("solicitar_reclamo_por_link", {
+        p_token: token,
+        p_phone: phone!,
+      });
+      redirect(`/g/${token}?reclamo=${estado ?? "creado"}`);
     }
     if (code === "P0030") return { error: "El link ya no es válido." };
     if (code === "P0031")

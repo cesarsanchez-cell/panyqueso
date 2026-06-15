@@ -21,7 +21,7 @@ export default async function GroupJoinPage({
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ pendiente?: string }>;
+  searchParams: Promise<{ pendiente?: string; reclamo?: string }>;
 }) {
   const { token } = await params;
   const sp = await searchParams;
@@ -50,6 +50,32 @@ export default async function GroupJoinPage({
       <InfoShell
         title="¡Listo! Tu solicitud quedó pendiente"
         detail="El organizador del grupo tiene que aprobarte. Cuando lo haga, ingresá en la app con tu celular y la contraseña que elegiste."
+      />
+    );
+  }
+
+  // El teléfono ya existía → se registró un reclamo (FUT-120).
+  if (sp.reclamo === "creado") {
+    return (
+      <InfoShell
+        title="Ese número ya estaba registrado"
+        detail="Te anotamos para este grupo. El organizador tiene que confirmar que sos vos; cuando lo haga, vas a poder entrar con tu celular."
+      />
+    );
+  }
+  if (sp.reclamo === "ya_pendiente") {
+    return (
+      <InfoShell
+        title="Ya tenés una solicitud pendiente"
+        detail="El organizador ya recibió tu pedido para este grupo. Esperá a que lo confirme."
+      />
+    );
+  }
+  if (sp.reclamo === "ya_miembro") {
+    return (
+      <InfoShell
+        title="Ya estás en este grupo"
+        detail="Tu número ya es parte del grupo. Ingresá en la app con tu celular y tu contraseña."
       />
     );
   }
