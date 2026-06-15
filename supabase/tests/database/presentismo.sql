@@ -69,7 +69,7 @@ begin
 end;
 $$;
 
-select plan(10);
+select plan(12);
 
 -- Actuamos como el coordinador de e1.
 select _as('00000000-0000-0000-0000-0000000000a2');
