@@ -36,6 +36,8 @@ type Props = {
   present: PresentRow[];
   membersAvailable: MemberRow[];
   armado: PresentismoArmado | null;
+  fechaSugerida: string;
+  fechaMinima: string;
 };
 
 const card = "rounded-lg border border-neutral-200 bg-white p-5 shadow-sm";
@@ -51,13 +53,30 @@ function nombreCompleto(nombre: string, apodo: string | null): string {
   return apodo ? `${nombre} (${apodo})` : nombre;
 }
 
-export function CanchaLive({ grupoId, convocatoriaId, present, membersAvailable, armado }: Props) {
+function formatFechaLarga(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-AR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+  });
+}
+
+export function CanchaLive({
+  grupoId,
+  convocatoriaId,
+  present,
+  membersAvailable,
+  armado,
+  fechaSugerida,
+  fechaMinima,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [probador, setProbador] = useState("");
   const [numTeams, setNumTeams] = useState(2);
   const [teamSize, setTeamSize] = useState(7);
+  const [fecha, setFecha] = useState(fechaSugerida);
 
   function run(fn: () => Promise<CanchaResult | { ok: boolean; error?: string }>) {
     setError(null);
@@ -74,14 +93,31 @@ export function CanchaLive({ grupoId, convocatoriaId, present, membersAvailable,
       <section className={card}>
         <h2 className={h2}>Abrir la cancha</h2>
         <p className="mt-1 text-sm text-neutral-600">
-          Todavía no hay una sesión abierta. Abrila y empezá a registrar a los que llegan.
+          Todavía no hay una sesión abierta. Elegí la fecha (por defecto, el próximo día del grupo)
+          y empezá a registrar a los que llegan.
         </p>
+        <div className="mt-4 max-w-xs">
+          <label htmlFor="fecha" className="block text-xs font-medium text-neutral-700">
+            Fecha de la jornada
+          </label>
+          <input
+            id="fecha"
+            type="date"
+            value={fecha}
+            min={fechaMinima}
+            onChange={(e) => setFecha(e.target.value)}
+            className={`mt-1 ${inputClass}`}
+          />
+          <p className="mt-1 text-xs text-neutral-500 first-letter:uppercase">
+            {fecha ? formatFechaLarga(fecha) : "Elegí una fecha"}
+          </p>
+        </div>
         <button
           type="button"
-          disabled={pending}
+          disabled={pending || !fecha}
           onClick={() =>
             run(async () => {
-              const r = await abrirCancha(grupoId);
+              const r = await abrirCancha(grupoId, fecha);
               return r.ok ? { ok: true } : { ok: false, error: r.error };
             })
           }

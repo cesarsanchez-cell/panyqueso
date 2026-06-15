@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
+import { suggestNextSessionDate, todayInArgentina } from "@/lib/presentismo/suggest-date";
 import type { PresentismoArmado } from "@/lib/teams/presentismo";
 
 import { CanchaLive, type PresentRow, type MemberRow } from "./cancha-live";
@@ -14,7 +15,7 @@ export default async function CanchaPage({ params }: { params: Promise<{ id: str
 
   const { data: grupo } = await supabase
     .from("grupos")
-    .select("id, nombre, status, modo_confirmacion")
+    .select("id, nombre, status, modo_confirmacion, dia_semana, hora")
     .eq("id", id)
     .maybeSingle();
   if (!grupo) notFound();
@@ -29,6 +30,20 @@ export default async function CanchaPage({ params }: { params: Promise<{ id: str
     .order("fecha", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  // Para sugerir la fecha de la próxima sesión: hoy (TZ Argentina) + las fechas
+  // ya ocupadas del grupo (convocatorias no canceladas).
+  const hoy = todayInArgentina();
+  const { data: takenRows } = await supabase
+    .from("convocatorias")
+    .select("fecha")
+    .eq("grupo_id", id)
+    .neq("status", "cancelada");
+  const fechaSugerida = suggestNextSessionDate(
+    hoy,
+    grupo.dia_semana,
+    (takenRows ?? []).map((r) => r.fecha),
+  );
 
   let present: PresentRow[] = [];
   let membersAvailable: MemberRow[] = [];
@@ -98,6 +113,8 @@ export default async function CanchaPage({ params }: { params: Promise<{ id: str
           present={present}
           membersAvailable={membersAvailable}
           armado={armado}
+          fechaSugerida={fechaSugerida}
+          fechaMinima={hoy}
         />
       )}
     </div>
