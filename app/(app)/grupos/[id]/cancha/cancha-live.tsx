@@ -266,7 +266,17 @@ export function CanchaLive({ grupoId, convocatoriaId, present, membersAvailable,
       {/* Armado */}
       {armado ? (
         <section className={card}>
-          <h2 className={h2}>Equipos armados</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className={h2}>Equipos armados</h2>
+            <a
+              href={`/grupos/${grupoId}/cancha/equipos`}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-sm transition hover:bg-neutral-50"
+            >
+              📷 Imagen para WhatsApp
+            </a>
+          </div>
           <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {armado.teams.map((t) => (
               <div key={t.label} className="rounded-md border border-neutral-200 p-3">
