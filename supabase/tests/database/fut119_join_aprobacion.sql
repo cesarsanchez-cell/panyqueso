@@ -14,8 +14,9 @@
 --   11. un no-gestor que intenta aprobar → P0013.
 --
 -- Nota: grupo_join_requests tiene RLS deny-all (acceso solo por RPC). Por eso las
--- aserciones que leen la tabla directo corren como superuser (reset role), y los
--- RPCs gateados se llaman con _as(<uuid>).
+-- aserciones que leen la tabla directo corren como superuser (reset role); los
+-- ids de las solicitudes se "guardan" en GUCs locales (set_config/current_setting,
+-- que persisten entre cambios de rol) para pasarlos a los RPCs gateados (_as).
 -- ============================================================================
 
 begin;
@@ -84,6 +85,13 @@ select is(
     where p.phone = '+5491155551001' and r.status = 'pendiente'),
   1, 'queda una solicitud pendiente');
 
+-- Guardamos el id de la solicitud (superuser) en un GUC local.
+select set_config('test.req1',
+  (select r.id::text from public.grupo_join_requests r
+     join public.players p on p.id = r.player_id
+    where p.phone = '+5491155551001' and r.status = 'pendiente'),
+  true);
+
 -- ---- Admin: ve y aprueba (RPCs gateados) -----------------------------------
 select _as('00000000-0000-0000-0000-0000000000c1');
 
@@ -92,11 +100,7 @@ select is(
   1, 'listar_join_requests devuelve la solicitud al admin');
 
 select lives_ok(
-  $$ select public.aprobar_join_request(
-       (select r.id from public.grupo_join_requests r
-          join public.players p on p.id = r.player_id
-         where p.phone = '+5491155551001' and r.status = 'pendiente')
-     ) $$,
+  $$ select public.aprobar_join_request(current_setting('test.req1')::uuid) $$,
   'aprobar_join_request corre sin error');
 
 reset role;
@@ -126,11 +130,14 @@ select public.claim_group_join(
   'jugador_campo'::public.player_role_field, 'defensor'::public.position_pref
 );
 
-select _as('00000000-0000-0000-0000-0000000000c1');
-select public.rechazar_join_request(
-  (select r.id from public.grupo_join_requests r
+select set_config('test.req2',
+  (select r.id::text from public.grupo_join_requests r
      join public.players p on p.id = r.player_id
-    where p.phone = '+5491155551002' and r.status = 'pendiente'));
+    where p.phone = '+5491155551002' and r.status = 'pendiente'),
+  true);
+
+select _as('00000000-0000-0000-0000-0000000000c1');
+select public.rechazar_join_request(current_setting('test.req2')::uuid);
 reset role;
 
 select is(
@@ -138,13 +145,14 @@ select is(
   'inactive', 'tras rechazar, el player queda inactive');
 
 -- ---- Gate: un no-gestor no puede aprobar (P0013) ---------------------------
-create temporary table _gate_req on commit drop as
-  select id from public.grupo_join_requests
-   where grupo_id = '00000000-0000-0000-0000-00000000cc01' limit 1;
+select set_config('test.gate',
+  (select id::text from public.grupo_join_requests
+    where grupo_id = '00000000-0000-0000-0000-00000000cc01' limit 1),
+  true);
 
 select _as('00000000-0000-0000-0000-0000000000c4');
 select throws_ok(
-  $$ select public.aprobar_join_request((select id from _gate_req)) $$,
+  $$ select public.aprobar_join_request(current_setting('test.gate')::uuid) $$,
   'P0013', null, 'un no-gestor no puede aprobar (P0013)');
 
 select * from finish();
