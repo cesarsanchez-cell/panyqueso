@@ -189,7 +189,7 @@ set search_path = ''
 stable
 as $$
 begin
-  if not public.can_manage_grupo(p_grupo_id) then
+  if not coalesce(public.can_manage_grupo(p_grupo_id), false) then
     raise exception 'not_authorized' using errcode = 'P0013';
   end if;
 
@@ -227,7 +227,9 @@ begin
   if not found then
     raise exception 'request_not_found' using errcode = 'P0053';
   end if;
-  if not public.can_manage_grupo(v_req.grupo_id) then
+  -- coalesce: can_manage_grupo devuelve NULL si el usuario no tiene rol; lo
+  -- tratamos como "no puede" (NULL no debe colarse como autorizado).
+  if not coalesce(public.can_manage_grupo(v_req.grupo_id), false) then
     raise exception 'not_authorized' using errcode = 'P0013';
   end if;
   if v_req.status <> 'pendiente' then
@@ -290,7 +292,9 @@ begin
   if not found then
     raise exception 'request_not_found' using errcode = 'P0053';
   end if;
-  if not public.can_manage_grupo(v_req.grupo_id) then
+  -- coalesce: can_manage_grupo devuelve NULL si el usuario no tiene rol; lo
+  -- tratamos como "no puede" (NULL no debe colarse como autorizado).
+  if not coalesce(public.can_manage_grupo(v_req.grupo_id), false) then
     raise exception 'not_authorized' using errcode = 'P0013';
   end if;
   if v_req.status <> 'pendiente' then
