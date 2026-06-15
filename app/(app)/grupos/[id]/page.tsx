@@ -44,7 +44,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
   const { data: grupo, error: grupoErr } = await supabase
     .from("grupos")
     .select(
-      "id, nombre, lugar_id, dia_semana, hora, cupo_titulares, status, auto_renovar, join_token, premio_pinocho, lugar:lugares!lugar_id(nombre)",
+      "id, nombre, lugar_id, dia_semana, hora, cupo_titulares, status, auto_renovar, join_token, premio_pinocho, modo_confirmacion, lugar:lugares!lugar_id(nombre)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -274,6 +274,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
               dia_semana: grupo.dia_semana,
               hora: grupo.hora,
               cupo_titulares: grupo.cupo_titulares,
+              modo_confirmacion: grupo.modo_confirmacion,
             }}
             lugares={lugares ?? []}
           />
@@ -288,7 +289,25 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
         />
       ) : null}
 
-      {isActive ? (
+      {isActive && grupo.modo_confirmacion === "presentismo" ? (
+        <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+            Cancha en vivo
+          </h2>
+          <p className="mt-1 text-sm text-emerald-900">
+            Este grupo confirma por presentismo: el check-in se hace en la cancha por orden de
+            llegada y los equipos se arman ahí.
+          </p>
+          <Link
+            href={`/grupos/${grupo.id}/cancha`}
+            className="mt-3 inline-block rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800"
+          >
+            Ir a la cancha →
+          </Link>
+        </section>
+      ) : null}
+
+      {isActive && grupo.modo_confirmacion !== "presentismo" ? (
         <ConvocatoriaCiclo grupoId={grupo.id} autoRenovar={grupo.auto_renovar} open={openConv} />
       ) : null}
 
