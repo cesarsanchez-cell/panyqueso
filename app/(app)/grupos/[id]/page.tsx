@@ -221,7 +221,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
       profileId: m.player!.auth_user_id as string,
       nombre: m.player?.apodo
         ? `${m.player.nombre} (${m.player.apodo})`
-        : (m.player?.nombre?.trim() || "—"),
+        : m.player?.nombre?.trim() || "—",
     }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
