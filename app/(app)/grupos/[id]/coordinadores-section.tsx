@@ -44,8 +44,8 @@ export function CoordinadoresSection({
         Coordinadores
       </h2>
       <p className="mt-1 text-xs text-neutral-500">
-        Un coordinador gestiona este grupo con las mismas funciones que vos, pero acotado a él. El
-        rol se asigna en Supabase; acá lo vinculás al grupo.
+        Un coordinador gestiona este grupo con las mismas funciones que vos, pero acotado a él.
+        Elegí a un miembro del grupo y, al asignarlo, le das el rango de coordinador.
       </p>
 
       {assigned.length === 0 ? (
@@ -76,9 +76,8 @@ export function CoordinadoresSection({
       <div className="mt-4 border-t border-neutral-100 pt-4">
         {eligible.length === 0 ? (
           <p className="text-xs text-neutral-500">
-            No hay perfiles con rol coordinador disponibles para asignar. Asigná el rol{" "}
-            <span className="font-medium">coordinador</span> a un usuario en Supabase y volvé a esta
-            pantalla.
+            No hay miembros disponibles para asignar. La persona tiene que ser{" "}
+            <span className="font-medium">miembro del grupo</span> y tener cuenta en la app.
           </p>
         ) : (
           <form action={formAction} className="flex flex-col gap-3 sm:flex-row sm:items-end">

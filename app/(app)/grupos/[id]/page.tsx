@@ -63,11 +63,10 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
     { data: pendingInvitesRaw, error: invitesErr },
     { data: openConvRow },
     { data: coordRows },
-    { data: coordProfiles },
   ] = await Promise.all([
     supabase
       .from("grupo_membresias")
-      .select("id, status, joined_at, player:players!player_id(id, nombre, apodo)")
+      .select("id, status, joined_at, player:players!player_id(id, nombre, apodo, auth_user_id)")
       .eq("grupo_id", id)
       .eq("status", "activo")
       .order("joined_at", { ascending: true }),
@@ -97,11 +96,6 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
       .from("coordinador_grupos")
       .select("id, profile_id, profile:profiles!profile_id(nombre)")
       .eq("grupo_id", id),
-    supabase
-      .from("profiles")
-      .select("id, nombre")
-      .eq("role", "coordinador")
-      .order("nombre", { ascending: true }),
   ]);
 
   // Solicitudes de alta pendientes (link /g con aprobación requerida).
@@ -201,9 +195,35 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
     nombre: r.profile?.nombre?.trim() || "—",
   }));
   const assignedProfileIds = new Set(assignedCoordinadores.map((c) => c.profileId));
-  const eligibleCoordinadores: EligibleCoordinador[] = (coordProfiles ?? [])
-    .filter((p) => !assignedProfileIds.has(p.id))
-    .map((p) => ({ profileId: p.id, nombre: p.nombre?.trim() || "—" }));
+
+  // Elegibles a coordinador: miembros del grupo que tienen cuenta (auth_user_id)
+  // y cuyo rol se puede promover (player / sin rol / ya coordinador). Se excluyen
+  // admin y veedor (rangos excluyentes) y quien ya coordina este grupo.
+  const memberAuthIds = memList
+    .map((m) => m.player?.auth_user_id)
+    .filter((v): v is string => Boolean(v));
+  const roleByProfile = new Map<string, string | null>();
+  if (memberAuthIds.length > 0) {
+    const { data: memberProfiles } = await supabase
+      .from("profiles")
+      .select("id, role")
+      .in("id", memberAuthIds);
+    for (const p of memberProfiles ?? []) roleByProfile.set(p.id, p.role);
+  }
+  const eligibleCoordinadores: EligibleCoordinador[] = memList
+    .filter((m) => {
+      const authId = m.player?.auth_user_id;
+      if (!authId || assignedProfileIds.has(authId)) return false;
+      const r = roleByProfile.get(authId);
+      return r == null || r === "player" || r === "coordinador";
+    })
+    .map((m) => ({
+      profileId: m.player!.auth_user_id as string,
+      nombre: m.player?.apodo
+        ? `${m.player.nombre} (${m.player.apodo})`
+        : (m.player?.nombre?.trim() || "—"),
+    }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
   const isActive = grupo.status === "activo";
 
