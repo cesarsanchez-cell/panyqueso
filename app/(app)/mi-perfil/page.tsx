@@ -482,14 +482,16 @@ export default async function MiPerfilPage({
   const ctx = await requireUser();
   const sp = await searchParams;
 
-  if (ctx.profile.role !== "player") {
-    redirect("/");
-  }
-
   const supabase = await createClient();
 
   const { data: playerRows } = await supabase.rpc("get_my_player_summary");
   const player = playerRows && playerRows.length > 0 ? playerRows[0] : null;
+
+  // El player siempre entra; admin/coordinador/veedor solo si tienen ficha de
+  // jugador (ellos también juegan). Sin ficha → su home real.
+  if (!player && ctx.profile.role !== "player") {
+    redirect("/");
+  }
 
   let lineups: GrupoLineup[] = [];
   if (player) {
