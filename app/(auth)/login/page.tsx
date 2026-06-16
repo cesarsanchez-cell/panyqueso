@@ -18,8 +18,32 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
         </div>
         <div className="space-y-1 text-center">
           <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Pan y Queso</h1>
-          <p className="text-sm text-neutral-600">Ingresá con tu cuenta para continuar.</p>
+          <p className="text-sm font-medium text-emerald-700">
+            El fútbol con amigos, ordenado y divertido.
+          </p>
         </div>
+      </div>
+
+      <div className="rounded-lg border border-neutral-200 bg-white p-4 text-center shadow-sm">
+        <p className="text-sm text-neutral-600">
+          Convocá los partidos, armá{" "}
+          <span className="font-medium text-neutral-900">equipos parejos</span> al toque y seguí
+          todo en un solo lugar.
+        </p>
+        <ul className="mt-3 flex flex-wrap justify-center gap-2 text-xs">
+          <li className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 ring-1 ring-emerald-100">
+            📋 Convocatorias
+          </li>
+          <li className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 ring-1 ring-emerald-100">
+            ⚖️ Equipos parejos
+          </li>
+          <li className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 ring-1 ring-emerald-100">
+            📊 Estadísticas
+          </li>
+          <li className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 ring-1 ring-emerald-100">
+            🔮 Prode y premios
+          </li>
+        </ul>
       </div>
 
       {recovery_error ? (
@@ -31,6 +55,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
           El link de recuperación venció o ya fue usado. Pedí uno nuevo.
         </p>
       ) : null}
+
+      <p className="text-center text-sm text-neutral-600">Ingresá con tu cuenta para continuar.</p>
 
       <LoginForm redirectTo={redirectTo} />
 
