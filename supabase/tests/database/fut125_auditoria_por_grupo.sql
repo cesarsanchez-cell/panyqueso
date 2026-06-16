@@ -3,7 +3,7 @@
 -- ============================================================================
 --   1. grupo_requiere_veedor(grupo con veedor) = true.
 --   2. grupo_requiere_veedor(grupo sin veedor) = false.
---   3. requiere_veedor() (global) = false (deprecado).
+--   3. requiere_veedor() (global, datos del jugador) = false por defecto.
 --   4. is_veedor_de_grupo(su grupo) = true.
 --   5. is_veedor_de_grupo(otro grupo) = false.
 --   6. approve de un request de OTRO grupo → P0003.
@@ -48,16 +48,16 @@ insert into public.veedor_grupos (profile_id, grupo_id, created_by) values
 
 -- Un jugador para colgarle los requests.
 insert into public.players (id, nombre, edad, role_field, position_pref, technical, physical, mental, status, phone, created_by) values
-  ('00000000-0000-0000-0000-0000000000fp', 'Pepe Aud', 30, 'jugador_campo', 'mediocampista', 6, 6, 6, 'approved',
+  ('00000000-0000-0000-0000-0000000000af', 'Pepe Aud', 30, 'jugador_campo', 'mediocampista', 6, 6, 6, 'approved',
    '+5491155554001', '00000000-0000-0000-0000-0000000000f1');
 
 -- Requests pendientes: uno del Grupo A, otro del Grupo B (requested_by admin).
 -- Sin sesión (auth.uid() null) el trigger normalize respeta requested_by.
 insert into public.player_change_requests (id, player_id, grupo_id, action_type, requested_by, proposed_values, reason, status) values
-  ('00000000-0000-0000-0000-00000000fa01', '00000000-0000-0000-0000-0000000000fp',
+  ('00000000-0000-0000-0000-00000000fa01', '00000000-0000-0000-0000-0000000000af',
    '00000000-0000-0000-0000-0000000000fa', 'update_sensitive_fields',
    '00000000-0000-0000-0000-0000000000f1', '{"technical": 7}'::jsonb, 'test A', 'pending'),
-  ('00000000-0000-0000-0000-00000000fb01', '00000000-0000-0000-0000-0000000000fp',
+  ('00000000-0000-0000-0000-00000000fb01', '00000000-0000-0000-0000-0000000000af',
    '00000000-0000-0000-0000-0000000000fb', 'update_sensitive_fields',
    '00000000-0000-0000-0000-0000000000f1', '{"technical": 8}'::jsonb, 'test B', 'pending');
 
@@ -79,7 +79,7 @@ select is(public.grupo_requiere_veedor('00000000-0000-0000-0000-0000000000fb'),
   false, 'grupo_requiere_veedor false en el grupo sin veedor');
 
 -- 3. requiere_veedor() global deprecado
-select is(public.requiere_veedor(), false, 'requiere_veedor() global devuelve false');
+select is(public.requiere_veedor(), false, 'requiere_veedor() global viene en false por defecto');
 
 -- 4/5. is_veedor_de_grupo segun el grupo
 select _as('00000000-0000-0000-0000-0000000000f2');

@@ -1,26 +1,25 @@
 -- ============================================================================
--- FUT-125 (Fase 2): la auditoría pasa a ser POR GRUPO (modelo fusionado)
+-- FUT-125 (Fase 2): la auditoría de RATINGS pasa a ser por grupo
 -- ============================================================================
 --
--- Con el veedor ya por grupo (FUT-124), acá se rescopea el camino de auditoría:
+-- Con el veedor ya por grupo (FUT-124), acá se rescopea el camino de auditoría
+-- DE RATINGS al modelo fusionado, SIN tocar el camino de datos del jugador:
 --
---   1. "¿este grupo audita sus ratings?" = "¿el grupo tiene un veedor asignado?"
---      → grupo_requiere_veedor() pasa a leer veedor_grupos (no grupos.veedor_activo).
---   2. El gate GLOBAL (requiere_veedor()) se depreca: ya no hay veedor global, así
---      que los cambios sin grupo se aplican directo. Pasa a devolver false.
---   3. approve/reject/flag: ahora lo hace el veedor DE ESE GRUPO (no cualquier
---      veedor). Gate is_veedor_de_grupo(grupo del request).
---   4. La cola (RLS de player_change_requests): el veedor ve solo los requests de
---      SUS grupos.
---   5. get_group_rating: lectura del rating acotada a admin / coordinador / veedor
---      DE ESE grupo (antes cualquier veedor leía cualquier grupo).
+--   - Rating por grupo: un grupo audita sus ratings iff tiene un veedor asignado
+--     (grupo_requiere_veedor lee veedor_grupos, no grupos.veedor_activo). Los
+--     cambios de rating de un grupo los aprueba el veedor DE ESE GRUPO.
+--   - Datos del jugador (alta/baja/campos base, requests sin grupo): se mantiene
+--     el camino existente — el admin tiene autoridad directa (gate global de la
+--     feature "veedor opcional", default off). NO se toca.
 --
--- grupos.veedor_activo y app_settings.requiere_veedor quedan en la base pero sin
--- uso (la UI que los toca se saca en la Fase 3).
+-- approve/reject/flag despachan según el request: si tiene grupo, gatea el veedor
+-- de ese grupo (is_veedor_de_grupo); si no, sigue el gate global (role 'veedor').
+--
+-- grupos.veedor_activo queda sin uso (la UI que lo toca se saca en la Fase 3).
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
--- 0. Helper: ¿el usuario logueado es veedor DE este grupo? (sin incluir admin)
+-- 0. Helper: ¿el usuario logueado es veedor DE este grupo?
 -- ---------------------------------------------------------------------------
 create or replace function public.is_veedor_de_grupo(p_grupo_id uuid)
 returns boolean
@@ -38,7 +37,7 @@ as $$
 $$;
 
 comment on function public.is_veedor_de_grupo(uuid) is
-  'FUT-125: true si el usuario logueado es veedor asignado a ese grupo (no incluye admin). Gate de approve/reject/flag y de la lectura de la cola.';
+  'FUT-125: true si el usuario logueado es veedor asignado a ese grupo. Gate de approve/reject/flag y de la lectura de la cola para los requests CON grupo.';
 
 revoke all on function public.is_veedor_de_grupo(uuid) from public;
 grant execute on function public.is_veedor_de_grupo(uuid) to authenticated;
@@ -65,27 +64,10 @@ revoke all on function public.grupo_requiere_veedor(uuid) from public;
 grant execute on function public.grupo_requiere_veedor(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 2. requiere_veedor (global): deprecado → false (ya no hay veedor global)
+-- 2. approve / reject / flag: gate por grupo para requests CON grupo
 -- ---------------------------------------------------------------------------
-create or replace function public.requiere_veedor()
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select false;
-$$;
-
-comment on function public.requiere_veedor() is
-  'FUT-125: deprecado. El veedor es por grupo (ver grupo_requiere_veedor). Sin veedor global, los cambios sin grupo se aplican directo → devuelve false.';
-
-revoke all on function public.requiere_veedor() from public;
-grant execute on function public.requiere_veedor() to authenticated;
-
--- ---------------------------------------------------------------------------
--- 3. approve / reject / flag: ahora gatean al veedor DE ESE GRUPO
--- ---------------------------------------------------------------------------
+-- Gate compartido: para un request de grupo lo decide el veedor de ese grupo;
+-- para un request global (datos del jugador) sigue el gate viejo (role veedor).
 create or replace function public.approve_player_change_request(
   p_request_id uuid,
   p_comment    text default null
@@ -113,10 +95,15 @@ begin
     raise exception 'request_not_found' using errcode = 'P0002';
   end if;
 
-  -- FUT-125: lo aprueba el veedor DE ESE GRUPO (no cualquier veedor). Los
-  -- requests sin grupo no pasan por veedor (gate global deprecado).
-  if v_request.grupo_id is null or not public.is_veedor_de_grupo(v_request.grupo_id) then
-    raise exception 'not_a_veedor' using errcode = 'P0003';
+  -- FUT-125: request de grupo → veedor DE ESE grupo; request global → gate viejo.
+  if v_request.grupo_id is not null then
+    if not public.is_veedor_de_grupo(v_request.grupo_id) then
+      raise exception 'not_a_veedor' using errcode = 'P0003';
+    end if;
+  else
+    if coalesce(public.current_user_role(), 'player') <> 'veedor' then
+      raise exception 'not_a_veedor' using errcode = 'P0003';
+    end if;
   end if;
 
   if v_request.status not in ('pending', 'flagged') then
@@ -127,7 +114,11 @@ begin
     raise exception 'cannot_approve_own_request' using errcode = 'P0005';
   end if;
 
-  perform public._apply_group_rating_request(p_request_id, v_caller_id, p_comment, 'approve_change_request');
+  if v_request.grupo_id is not null then
+    perform public._apply_group_rating_request(p_request_id, v_caller_id, p_comment, 'approve_change_request');
+  else
+    perform public._apply_change_request(p_request_id, v_caller_id, p_comment, 'approve_change_request');
+  end if;
 end;
 $$;
 
@@ -158,8 +149,14 @@ begin
     raise exception 'request_not_found' using errcode = 'P0002';
   end if;
 
-  if v_request.grupo_id is null or not public.is_veedor_de_grupo(v_request.grupo_id) then
-    raise exception 'not_a_veedor' using errcode = 'P0003';
+  if v_request.grupo_id is not null then
+    if not public.is_veedor_de_grupo(v_request.grupo_id) then
+      raise exception 'not_a_veedor' using errcode = 'P0003';
+    end if;
+  else
+    if coalesce(public.current_user_role(), 'player') <> 'veedor' then
+      raise exception 'not_a_veedor' using errcode = 'P0003';
+    end if;
   end if;
 
   if v_request.status not in ('pending', 'flagged') then
@@ -224,8 +221,14 @@ begin
     raise exception 'request_not_found' using errcode = 'P0002';
   end if;
 
-  if v_request.grupo_id is null or not public.is_veedor_de_grupo(v_request.grupo_id) then
-    raise exception 'not_a_veedor' using errcode = 'P0003';
+  if v_request.grupo_id is not null then
+    if not public.is_veedor_de_grupo(v_request.grupo_id) then
+      raise exception 'not_a_veedor' using errcode = 'P0003';
+    end if;
+  else
+    if coalesce(public.current_user_role(), 'player') <> 'veedor' then
+      raise exception 'not_a_veedor' using errcode = 'P0003';
+    end if;
   end if;
 
   if v_request.status <> 'pending' then
@@ -264,18 +267,23 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 4. RLS de la cola: el veedor ve solo los requests de SUS grupos
+-- 3. RLS de la cola: el veedor ve los requests de SUS grupos (+ los globales)
 -- ---------------------------------------------------------------------------
 drop policy if exists player_change_requests_select_all_veedor on public.player_change_requests;
 create policy player_change_requests_select_all_veedor
   on public.player_change_requests
   for select
   to authenticated
-  using (grupo_id is not null and public.is_veedor_de_grupo(grupo_id));
+  using (
+    (grupo_id is not null and public.is_veedor_de_grupo(grupo_id))
+    or (grupo_id is null and public.current_user_role() = 'veedor')
+  );
 
 -- ---------------------------------------------------------------------------
--- 5. get_group_rating: lectura acotada a quien gestiona o audita ESE grupo
+-- 4. get_group_rating: lectura acotada a quien gestiona o audita ESE grupo
 -- ---------------------------------------------------------------------------
+-- Antes: admin/veedor (global) o coordinador. Ahora: admin/coordinador o veedor
+-- DE ESE grupo (un veedor no lee ratings de grupos ajenos).
 create or replace function public.get_group_rating(p_player_id uuid, p_grupo_id uuid)
 returns table (
   player_id          uuid,
