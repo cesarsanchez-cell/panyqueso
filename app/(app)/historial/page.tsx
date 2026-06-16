@@ -11,12 +11,17 @@ import { type ProdeTablaRow } from "./prode-tabla";
 
 export default async function HistorialPage() {
   const ctx = await requireUser();
+  const supabase = await createClient();
 
+  // El player siempre entra; admin/coordinador/veedor solo si tienen ficha de
+  // jugador (ellos también juegan). Sin ficha → su home real.
   if (ctx.profile.role !== "player") {
-    redirect("/");
+    const { data: me } = await supabase.rpc("get_my_player_summary");
+    if (!me || me.length === 0) {
+      redirect("/");
+    }
   }
 
-  const supabase = await createClient();
   const { data, error } = await supabase.rpc("get_my_match_history");
 
   if (error) {
