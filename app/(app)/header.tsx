@@ -20,6 +20,7 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
     { label: "Convocatorias", href: "/convocatorias" },
     { label: "Grupos", href: "/grupos" },
     { label: "Lugares", href: "/lugares" },
+    { label: "Veedores", href: "/veedores" },
     { label: "Configuración", href: "/configuracion" },
     // El admin/coordinador también juega: accesos a su vista de jugador.
     { label: "Mi Actividad", href: "/historial" },
@@ -30,6 +31,9 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
     { label: "Jugadores", href: "/jugadores" },
     { label: "Convocatorias", href: "/convocatorias" },
     { label: "Auditoría", href: "/auditoria", key: "auditoria" },
+    // El veedor también juega: accesos a su vista de jugador.
+    { label: "Mi Actividad", href: "/historial" },
+    { label: "Mi perfil", href: "/mi-perfil" },
   ],
   player: [
     { label: "Mi perfil", href: "/mi-perfil" },

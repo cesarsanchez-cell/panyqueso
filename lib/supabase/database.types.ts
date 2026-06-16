@@ -1944,6 +1944,15 @@ export type Database = {
           tiene_login: boolean;
         }[];
       };
+      listar_perfiles_para_veedor: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          profile_id: string;
+          nombre: string;
+          phone: string;
+          es_veedor: boolean;
+        }[];
+      };
       lookup_jugador_por_celular: {
         Args: { p_celular: string; p_grupo_id: string };
         Returns: Json;
@@ -2028,6 +2037,10 @@ export type Database = {
         Returns: undefined;
       };
       set_requiere_veedor: { Args: { p_value: boolean }; Returns: undefined };
+      set_veedor: {
+        Args: { p_es_veedor: boolean; p_profile_id: string };
+        Returns: undefined;
+      };
       update_my_player_data: {
         Args: {
           p_apodo: string;
