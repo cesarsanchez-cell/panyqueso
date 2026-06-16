@@ -55,7 +55,7 @@ begin
 end;
 $$;
 
-select plan(8);
+select plan(9);
 
 -- 1. asignar (admin) otorga el rango coordinador
 select _as('00000000-0000-0000-0000-0000000000c1');
