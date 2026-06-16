@@ -47,13 +47,16 @@ insert into public.players (
 insert into public.lugares (id, nombre, created_by) values
   ('00000000-0000-0000-0000-00000000000a', 'Cancha', '00000000-0000-0000-0000-0000000000a1');
 
--- e1 SIN gate (veedor_activo default false). e2 CON gate.
+-- e1 SIN veedor (no se audita). e2 CON veedor → se auditan sus ratings (FUT-125:
+-- el gate es "el grupo tiene veedor", no grupos.veedor_activo).
 insert into public.grupos (id, nombre, lugar_id, dia_semana, hora, cupo_titulares, owner_id) values
   ('00000000-0000-0000-0000-0000000000e1', 'Grupo e1', '00000000-0000-0000-0000-00000000000a', 2, '20:00', 6,
    '00000000-0000-0000-0000-0000000000a1'),
   ('00000000-0000-0000-0000-0000000000e2', 'Grupo e2', '00000000-0000-0000-0000-00000000000a', 4, '21:00', 6,
    '00000000-0000-0000-0000-0000000000a1');
-update public.grupos set veedor_activo = true where id = '00000000-0000-0000-0000-0000000000e2';
+-- El veedor (a3) audita el grupo e2.
+insert into public.veedor_grupos (profile_id, grupo_id, created_by) values
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000a1');
 
 -- b1 entra a los dos grupos -> el seed crea su rating en cada uno.
 insert into public.grupo_membresias (grupo_id, player_id, tipo, status) values
