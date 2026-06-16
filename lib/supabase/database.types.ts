@@ -1616,11 +1616,11 @@ export type Database = {
         Args: { p_grupo_id: string; p_profile_id: string };
         Returns: undefined;
       };
+      can_audit_grupo: { Args: { p_grupo_id: string }; Returns: boolean };
       can_manage_convocatoria: {
         Args: { p_convocatoria_id: string };
         Returns: boolean;
       };
-      can_audit_grupo: { Args: { p_grupo_id: string }; Returns: boolean };
       can_manage_grupo: { Args: { p_grupo_id: string }; Returns: boolean };
       can_manage_match: { Args: { p_match_id: string }; Returns: boolean };
       can_manage_match_team: {
@@ -1986,6 +1986,7 @@ export type Database = {
         Args: { p_convocatoria_id: string };
         Returns: boolean;
       };
+      is_veedor_de_grupo: { Args: { p_grupo_id: string }; Returns: boolean };
       listar_join_requests: {
         Args: { p_grupo_id: string };
         Returns: {
