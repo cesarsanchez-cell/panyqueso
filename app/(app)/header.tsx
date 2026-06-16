@@ -11,7 +11,10 @@ const ROLE_LABEL: Record<NonNullable<AuthContext["profile"]["role"]>, string> = 
   coordinador: "Coordinador",
 };
 
-type NavItem = { label: string; href: string; key?: string };
+// playerView: accesos a la vista de jugador (Mi Actividad / Mi perfil). El admin/
+// veedor/coordinador solo los ve si tiene ficha (juega); si no, /mi-perfil y
+// /historial rebotan a Inicio, así que los filtramos abajo.
+type NavItem = { label: string; href: string; key?: string; playerView?: boolean };
 
 const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, NavItem[]> = {
   admin: [
@@ -21,8 +24,8 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
     { label: "Grupos", href: "/grupos" },
     { label: "Lugares", href: "/lugares" },
     // El admin/coordinador también juega: accesos a su vista de jugador.
-    { label: "Mi Actividad", href: "/historial" },
-    { label: "Mi perfil", href: "/mi-perfil" },
+    { label: "Mi Actividad", href: "/historial", playerView: true },
+    { label: "Mi perfil", href: "/mi-perfil", playerView: true },
   ],
   veedor: [
     { label: "Inicio", href: "/" },
@@ -30,8 +33,8 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
     { label: "Convocatorias", href: "/convocatorias" },
     { label: "Auditoría", href: "/auditoria", key: "auditoria" },
     // El veedor también juega: accesos a su vista de jugador.
-    { label: "Mi Actividad", href: "/historial" },
-    { label: "Mi perfil", href: "/mi-perfil" },
+    { label: "Mi Actividad", href: "/historial", playerView: true },
+    { label: "Mi perfil", href: "/mi-perfil", playerView: true },
   ],
   player: [
     { label: "Mi perfil", href: "/mi-perfil" },
@@ -46,20 +49,25 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
     { label: "Convocatorias", href: "/convocatorias" },
     { label: "Grupos", href: "/grupos" },
     // El coordinador también juega: accesos a su vista de jugador.
-    { label: "Mi Actividad", href: "/historial" },
-    { label: "Mi perfil", href: "/mi-perfil" },
+    { label: "Mi Actividad", href: "/historial", playerView: true },
+    { label: "Mi perfil", href: "/mi-perfil", playerView: true },
   ],
 };
 
 export function AppHeader({
   ctx,
   pendingAuditCount,
+  hasPlayerFicha,
 }: {
   ctx: AuthContext;
   pendingAuditCount: number;
+  hasPlayerFicha: boolean;
 }) {
   const displayName = ctx.profile.nombre?.trim() || ctx.email;
   const roleLabel = ctx.profile.role ? ROLE_LABEL[ctx.profile.role] : null;
+  const navItems = (ctx.profile.role ? NAV_ITEMS_BY_ROLE[ctx.profile.role] : []).filter(
+    (item) => !item.playerView || hasPlayerFicha,
+  );
 
   return (
     <header className="border-b border-neutral-200 bg-white">
@@ -78,7 +86,7 @@ export function AppHeader({
         </form>
       </div>
       <nav className="mx-auto flex max-w-5xl gap-1 overflow-x-auto border-t border-neutral-100 px-2 sm:px-4">
-        {(ctx.profile.role ? NAV_ITEMS_BY_ROLE[ctx.profile.role] : []).map((item) => {
+        {navItems.map((item) => {
           const showBadge = item.key === "auditoria" && pendingAuditCount > 0;
           return (
             <Link
