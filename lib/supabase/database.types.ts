@@ -1559,6 +1559,10 @@ export type Database = {
         Returns: undefined;
       };
       aprobar_join_request: { Args: { p_request_id: string }; Returns: string };
+      asignar_coordinador_a_grupo: {
+        Args: { p_grupo_id: string; p_profile_id: string };
+        Returns: undefined;
+      };
       can_manage_convocatoria: {
         Args: { p_convocatoria_id: string };
         Returns: boolean;
@@ -1987,6 +1991,10 @@ export type Database = {
       };
       quitar_checkin: {
         Args: { p_convocatoria_id: string; p_player_id: string };
+        Returns: undefined;
+      };
+      quitar_coordinador_de_grupo: {
+        Args: { p_coordinador_grupo_id: string };
         Returns: undefined;
       };
       rechazar_join_request: {
