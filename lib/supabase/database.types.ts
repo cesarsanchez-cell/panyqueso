@@ -294,6 +294,7 @@ export type Database = {
           created_at: string;
           grupo_id: string;
           id: string;
+          kind: string;
           player_id: string;
           resolved_at: string | null;
           resolved_by: string | null;
@@ -303,6 +304,7 @@ export type Database = {
           created_at?: string;
           grupo_id: string;
           id?: string;
+          kind?: string;
           player_id: string;
           resolved_at?: string | null;
           resolved_by?: string | null;
@@ -312,6 +314,7 @@ export type Database = {
           created_at?: string;
           grupo_id?: string;
           id?: string;
+          kind?: string;
           player_id?: string;
           resolved_at?: string | null;
           resolved_by?: string | null;
@@ -1430,6 +1433,52 @@ export type Database = {
           },
         ];
       };
+      veedor_grupos: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          grupo_id: string;
+          id: string;
+          profile_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          grupo_id: string;
+          id?: string;
+          profile_id: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          grupo_id?: string;
+          id?: string;
+          profile_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "veedor_grupos_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "veedor_grupos_grupo_id_fkey";
+            columns: ["grupo_id"];
+            isOneToOne: false;
+            referencedRelation: "grupos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "veedor_grupos_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       players_public: {
@@ -1563,10 +1612,15 @@ export type Database = {
         Args: { p_grupo_id: string; p_profile_id: string };
         Returns: undefined;
       };
+      asignar_veedor_a_grupo: {
+        Args: { p_grupo_id: string; p_profile_id: string };
+        Returns: undefined;
+      };
       can_manage_convocatoria: {
         Args: { p_convocatoria_id: string };
         Returns: boolean;
       };
+      can_audit_grupo: { Args: { p_grupo_id: string }; Returns: boolean };
       can_manage_grupo: { Args: { p_grupo_id: string }; Returns: boolean };
       can_manage_match: { Args: { p_match_id: string }; Returns: boolean };
       can_manage_match_team: {
@@ -1945,12 +1999,12 @@ export type Database = {
         }[];
       };
       listar_perfiles_para_veedor: {
-        Args: Record<PropertyKey, never>;
+        Args: never;
         Returns: {
-          profile_id: string;
+          es_veedor: boolean;
           nombre: string;
           phone: string;
-          es_veedor: boolean;
+          profile_id: string;
         }[];
       };
       lookup_jugador_por_celular: {
@@ -2006,6 +2060,10 @@ export type Database = {
         Args: { p_coordinador_grupo_id: string };
         Returns: undefined;
       };
+      quitar_veedor_de_grupo: {
+        Args: { p_veedor_grupo_id: string };
+        Returns: undefined;
+      };
       rechazar_join_request: {
         Args: { p_request_id: string };
         Returns: undefined;
@@ -2015,10 +2073,6 @@ export type Database = {
         Returns: undefined;
       };
       requiere_veedor: { Args: never; Returns: boolean };
-      solicitar_reclamo_por_link: {
-        Args: { p_phone: string; p_token: string };
-        Returns: string;
-      };
       save_push_subscription: {
         Args: {
           p_auth: string;
@@ -2040,6 +2094,10 @@ export type Database = {
       set_veedor: {
         Args: { p_es_veedor: boolean; p_profile_id: string };
         Returns: undefined;
+      };
+      solicitar_reclamo_por_link: {
+        Args: { p_phone: string; p_token: string };
+        Returns: string;
       };
       update_my_player_data: {
         Args: {
