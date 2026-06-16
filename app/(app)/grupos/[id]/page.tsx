@@ -13,6 +13,7 @@ import {
   type AssignedCoordinador,
   type EligibleCoordinador,
 } from "./coordinadores-section";
+import { VeedoresSection, type AssignedVeedor, type EligibleVeedor } from "./veedores-section";
 import { ConvocatoriaCiclo } from "./convocatoria-ciclo";
 import { EditGrupoForm } from "./edit-grupo-form";
 import { MembersSections } from "./members-sections";
@@ -63,6 +64,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
     { data: pendingInvitesRaw, error: invitesErr },
     { data: openConvRow },
     { data: coordRows },
+    { data: veedorRows },
   ] = await Promise.all([
     supabase
       .from("grupo_membresias")
@@ -94,6 +96,10 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
       .maybeSingle(),
     supabase
       .from("coordinador_grupos")
+      .select("id, profile_id, profile:profiles!profile_id(nombre)")
+      .eq("grupo_id", id),
+    supabase
+      .from("veedor_grupos")
       .select("id, profile_id, profile:profiles!profile_id(nombre)")
       .eq("grupo_id", id),
   ]);
@@ -225,6 +231,29 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
     }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
+  // Veedores del grupo (mismo patrón que coordinadores): asignados + elegibles
+  // (miembros con cuenta, rol promovible player/sin rol/ya veedor).
+  const assignedVeedores: AssignedVeedor[] = (veedorRows ?? []).map((r) => ({
+    id: r.id,
+    profileId: r.profile_id,
+    nombre: r.profile?.nombre?.trim() || "—",
+  }));
+  const assignedVeedorIds = new Set(assignedVeedores.map((v) => v.profileId));
+  const eligibleVeedores: EligibleVeedor[] = memList
+    .filter((m) => {
+      const authId = m.player?.auth_user_id;
+      if (!authId || assignedVeedorIds.has(authId)) return false;
+      const r = roleByProfile.get(authId);
+      return r == null || r === "player" || r === "veedor";
+    })
+    .map((m) => ({
+      profileId: m.player!.auth_user_id as string,
+      nombre: m.player?.apodo
+        ? `${m.player.nombre} (${m.player.apodo})`
+        : m.player?.nombre?.trim() || "—",
+    }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+
   const isActive = grupo.status === "activo";
 
   // Tabla del Prode 🔮 del grupo (año en curso). El admin puede verla y
@@ -312,6 +341,8 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
           eligible={eligibleCoordinadores}
         />
       ) : null}
+
+      <VeedoresSection grupoId={grupo.id} assigned={assignedVeedores} eligible={eligibleVeedores} />
 
       {isActive && grupo.modo_confirmacion === "presentismo" ? (
         <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">

@@ -43,18 +43,6 @@ const CARDS: CardLink[] = [
     roles: ["admin"],
   },
   {
-    href: "/veedores",
-    title: "Veedores",
-    description: "Otorgar o quitar el rango de veedor (revisa cambios de rating). Rango global.",
-    roles: ["admin"],
-  },
-  {
-    href: "/configuracion",
-    title: "Configuración",
-    description: "Auditoría del veedor on/off y otros ajustes del grupo.",
-    roles: ["admin"],
-  },
-  {
     href: "/perfil",
     title: "Perfil",
     description: "Cambio de password.",
