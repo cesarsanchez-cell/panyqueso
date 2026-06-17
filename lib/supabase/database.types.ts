@@ -1608,6 +1608,10 @@ export type Database = {
         Returns: undefined;
       };
       aprobar_join_request: { Args: { p_request_id: string }; Returns: string };
+      activar_jugador_existente: {
+        Args: { p_auth_user_id: string; p_player_id: string; p_token: string };
+        Returns: undefined;
+      };
       asignar_coordinador_a_grupo: {
         Args: { p_grupo_id: string; p_profile_id: string };
         Returns: undefined;
@@ -2006,6 +2010,14 @@ export type Database = {
           nombre: string;
           phone: string;
           profile_id: string;
+        }[];
+      };
+      lookup_join_phone_state: {
+        Args: { p_phone: string; p_token: string };
+        Returns: {
+          estado: string;
+          nombre: string;
+          player_id: string;
         }[];
       };
       lookup_jugador_por_celular: {

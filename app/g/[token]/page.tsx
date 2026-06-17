@@ -129,8 +129,8 @@ export default async function GroupJoinPage({
             Anotate
           </h2>
           <p className="mt-1 text-xs text-neutral-500">
-            Completá tus datos y creá tu cuenta. Vas a entrar a la app con tu celular y la
-            contraseña que elijas.
+            Ingresá tu celular para empezar. Si sos nuevo te damos de alta; si ya jugás con
+            nosotros, solo creás tu clave. Entrás a la app con tu celular.
           </p>
           {grupo.grupo_requiere_aprobacion ? (
             <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
