@@ -19,6 +19,10 @@
 -- close_and_create_next_convocatoria NO se toca: llama a create_next por nombre,
 -- así que hereda este gate (y deja de fallar para el coordinador en el botón
 -- manual "Cerrar y crear siguiente").
+--
+-- El cuerpo conserva la versión vigente (Fase 10,
+-- 20260607110000_fase10_convocatoria_cupo_y_fecha): la fecha de la siguiente
+-- snapea al día habitual del grupo (no un +7 ciego). Solo cambia el gate.
 -- ============================================================================
 
 create or replace function public.create_next_convocatoria(
@@ -70,7 +74,16 @@ begin
     return null;
   end if;
 
-  v_next_fecha := v_conv.fecha + 7;
+  -- Fecha: proxima ocurrencia de dia_semana ESTRICTAMENTE posterior a la
+  -- fecha origen. Si la origen ya cae en el dia del grupo -> +7. Si estaba
+  -- corrida (fecha manual) -> vuelve al dia del grupo en vez de arrastrar el
+  -- desfase. (Fase 10: 20260607110000_fase10_convocatoria_cupo_y_fecha.)
+  v_next_fecha := v_conv.fecha
+    + (((v_grupo.dia_semana - extract(dow from v_conv.fecha)::int + 7) % 7))::int;
+  if v_next_fecha <= v_conv.fecha then
+    v_next_fecha := v_next_fecha + 7;
+  end if;
+
   v_next_at := (v_next_fecha + v_grupo.hora)::timestamptz;
   v_next_cierre := v_next_at + (v_grupo.cierre_minutes_after_start || ' minutes')::interval;
 
