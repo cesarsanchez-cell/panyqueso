@@ -5,11 +5,13 @@ import type { Database, Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
 import { AgregarJugadorCard, type AgregarJugadorGrupo } from "./agregar-jugador-card";
+import { GrupoFilter } from "./grupo-filter";
 import { PlayersListFilterable } from "./players-list-filterable";
 
 type PlayerStatus = Database["public"]["Enums"]["player_status"];
 type PlayerRoleField = Database["public"]["Enums"]["player_role_field"];
 type ChangeRequestStatus = Database["public"]["Enums"]["change_request_status"];
+type RatingConfidence = Database["public"]["Enums"]["rating_confidence"];
 
 const STATUS_LABEL: Record<PlayerStatus, string> = {
   pending: "Pendiente",
@@ -70,12 +72,19 @@ function readRoleField(obj: Json): PlayerRoleField | null {
 export default async function JugadoresPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; created?: string; requested?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    grupo?: string;
+    sin_calificar?: string;
+    created?: string;
+    requested?: string;
+  }>;
 }) {
   const ctx = await requireRole(["admin", "veedor", "coordinador"]);
 
   const params = await searchParams;
   const statusFilter = parseStatus(params.status);
+  const sinCalificarFilter = params.sin_calificar === "1";
   const isAdmin = ctx.profile.role === "admin";
   const isCoordinador = ctx.profile.role === "coordinador";
   // Admin y coordinador gestionan rosters (el veedor solo audita). La card de
@@ -85,26 +94,82 @@ export default async function JugadoresPage({
   const showRequestedFlash = params.requested === "1";
 
   const supabase = await createClient();
-  let playersQuery = supabase
-    .from("players")
-    .select("id, nombre, apodo, edad, status, role_field, avatar_url, club_id")
-    .eq("is_guest", false) // los invitados puntuales no son jugadores del sistema
+
+  // Grupos para el filtro (y para la card de alta). La RLS de grupos los acota:
+  // admin ve todos; coordinador/veedor solo los suyos.
+  const { data: gruposData } = await supabase
+    .from("grupos")
+    .select("id, nombre")
+    .eq("status", "activo")
     .order("nombre", { ascending: true });
+  const gruposFiltro = gruposData ?? [];
+  const grupoFilter =
+    params.grupo && gruposFiltro.some((g) => g.id === params.grupo) ? params.grupo : null;
 
-  if (statusFilter) {
-    playersQuery = playersQuery.eq("status", statusFilter);
+  // Si se filtra por grupo, acotamos a sus miembros activos.
+  let memberIds: string[] | null = null;
+  if (grupoFilter) {
+    const { data: members } = await supabase
+      .from("grupo_membresias")
+      .select("player_id")
+      .eq("grupo_id", grupoFilter)
+      .eq("status", "activo");
+    memberIds = (members ?? []).map((m) => m.player_id).filter((id): id is string => Boolean(id));
   }
 
-  const { data: players, error } = await playersQuery;
+  type PlayerRow = {
+    id: string;
+    nombre: string;
+    apodo: string | null;
+    edad: number;
+    status: PlayerStatus;
+    role_field: PlayerRoleField;
+    avatar_url: string | null;
+    club_id: string | null;
+    rating_confidence: RatingConfidence;
+  };
 
-  if (error) {
-    throw new Error(`No se pudieron cargar los jugadores: ${error.message}`);
+  let players: PlayerRow[] = [];
+  // memberIds vacío = el grupo no tiene miembros: no hay nada que listar.
+  if (!(memberIds !== null && memberIds.length === 0)) {
+    let playersQuery = supabase
+      .from("players")
+      .select("id, nombre, apodo, edad, status, role_field, avatar_url, club_id, rating_confidence")
+      .eq("is_guest", false) // los invitados puntuales no son jugadores del sistema
+      .order("nombre", { ascending: true });
+
+    if (statusFilter) playersQuery = playersQuery.eq("status", statusFilter);
+    if (memberIds !== null) playersQuery = playersQuery.in("id", memberIds);
+
+    const { data, error } = await playersQuery;
+    if (error) throw new Error(`No se pudieron cargar los jugadores: ${error.message}`);
+    players = data ?? [];
   }
 
-  // En la tab Pendientes incluimos las solicitudes create_player en
-  // pending/flagged: son "jugadores propuestos" que todavia no existen como
-  // row en players. RLS segrega: admin ve solo las propias, veedor ve todas.
-  const includeCreateRequests = statusFilter === "pending";
+  // "Sin calificar" = confianza del rating en 'baja'. Si hay grupo, usamos la
+  // confianza POR GRUPO (player_group_ratings); si no, la base del jugador.
+  const grupoConf = new Map<string, RatingConfidence>();
+  if (grupoFilter && players.length > 0) {
+    const { data: pgr } = await supabase
+      .from("player_group_ratings")
+      .select("player_id, rating_confidence")
+      .eq("grupo_id", grupoFilter)
+      .in(
+        "player_id",
+        players.map((p) => p.id),
+      );
+    for (const r of pgr ?? []) grupoConf.set(r.player_id, r.rating_confidence);
+  }
+
+  const withFlag = players.map((p) => ({
+    ...p,
+    sinCalificar: (grupoConf.get(p.id) ?? p.rating_confidence) === "baja",
+  }));
+  const visiblePlayers = sinCalificarFilter ? withFlag.filter((p) => p.sinCalificar) : withFlag;
+
+  // Las solicitudes create_player son propuestas globales (no por grupo ni con
+  // rating): solo tienen sentido en la vista Pendientes "pura".
+  const includeCreateRequests = statusFilter === "pending" && !grupoFilter && !sinCalificarFilter;
   let createRequests: {
     id: string;
     proposed_values: Json;
@@ -123,19 +188,22 @@ export default async function JugadoresPage({
     createRequests = data ?? [];
   }
 
-  // Para la card "Agregar jugador": grupos activos gestionables. La RLS de grupos
-  // los filtra (admin ve todos, coordinador solo los suyos).
-  let gruposGestionables: AgregarJugadorGrupo[] = [];
-  if (canManage) {
-    const { data: grupos } = await supabase
-      .from("grupos")
-      .select("id, nombre")
-      .eq("status", "activo")
-      .order("nombre", { ascending: true });
-    gruposGestionables = grupos ?? [];
-  }
+  // Para la card "Agregar jugador": los mismos grupos gestionables (RLS).
+  const gruposGestionables: AgregarJugadorGrupo[] = canManage ? gruposFiltro : [];
 
-  const isEmpty = players.length === 0 && createRequests.length === 0;
+  // Hrefs que preservan los filtros activos (status + grupo + sin_calificar).
+  const makeHref = (over: { status?: PlayerStatus | null; sin?: boolean }): string => {
+    const sp = new URLSearchParams();
+    const st = over.status !== undefined ? over.status : statusFilter;
+    if (st) sp.set("status", st);
+    if (grupoFilter) sp.set("grupo", grupoFilter);
+    const sin = over.sin !== undefined ? over.sin : sinCalificarFilter;
+    if (sin) sp.set("sin_calificar", "1");
+    const qs = sp.toString();
+    return qs ? `/jugadores?${qs}` : "/jugadores";
+  };
+
+  const isEmpty = visiblePlayers.length === 0 && createRequests.length === 0;
 
   return (
     <div className="space-y-6">
@@ -157,10 +225,29 @@ export default async function JugadoresPage({
 
       {canManage ? <AgregarJugadorCard grupos={gruposGestionables} /> : null}
 
+      <div className="flex flex-wrap items-center gap-3">
+        <GrupoFilter
+          grupos={gruposFiltro}
+          value={grupoFilter}
+          status={statusFilter}
+          sin={sinCalificarFilter}
+        />
+        <Link
+          href={makeHref({ sin: !sinCalificarFilter })}
+          className={`rounded-full px-3 py-1.5 text-sm font-medium ring-1 transition ${
+            sinCalificarFilter
+              ? "bg-amber-100 text-amber-800 ring-amber-300"
+              : "bg-white text-neutral-600 ring-neutral-300 hover:bg-neutral-50"
+          }`}
+        >
+          Sin calificar
+        </Link>
+      </div>
+
       <nav className="-mb-px flex gap-2 overflow-x-auto border-b border-neutral-200">
         {FILTERS.map((opt) => {
           const active = opt.value === "all" ? !statusFilter : statusFilter === opt.value;
-          const href = opt.value === "all" ? "/jugadores" : `/jugadores?status=${opt.value}`;
+          const href = makeHref({ status: opt.value === "all" ? null : opt.value });
           return (
             <Link
               key={opt.value}
@@ -179,9 +266,13 @@ export default async function JugadoresPage({
 
       {isEmpty ? (
         <div className="rounded-lg border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-500">
-          {statusFilter
-            ? `Sin jugadores en estado "${STATUS_LABEL[statusFilter]}".`
-            : "Aún no hay jugadores cargados."}
+          {sinCalificarFilter
+            ? "No hay jugadores sin calificar con estos filtros."
+            : grupoFilter
+              ? "Este grupo no tiene jugadores con estos filtros."
+              : statusFilter
+                ? `Sin jugadores en estado "${STATUS_LABEL[statusFilter]}".`
+                : "Aún no hay jugadores cargados."}
         </div>
       ) : (
         <>
@@ -218,7 +309,7 @@ export default async function JugadoresPage({
               })}
             </ul>
           ) : null}
-          <PlayersListFilterable players={players} />
+          <PlayersListFilterable players={visiblePlayers} />
         </>
       )}
     </div>

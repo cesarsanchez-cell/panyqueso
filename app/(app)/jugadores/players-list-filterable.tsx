@@ -21,6 +21,7 @@ type Player = {
   role_field: PlayerRoleField;
   avatar_url: string | null;
   club_id: string | null;
+  sinCalificar?: boolean;
 };
 
 const STATUS_LABEL: Record<PlayerStatus, string> = {
@@ -98,11 +99,18 @@ export function PlayersListFilterable({ players }: { players: Player[] }) {
                     </p>
                   </div>
                 </div>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[p.status]}`}
-                >
-                  {STATUS_LABEL[p.status]}
-                </span>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {p.sinCalificar ? (
+                    <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
+                      Sin calificar
+                    </span>
+                  ) : null}
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[p.status]}`}
+                  >
+                    {STATUS_LABEL[p.status]}
+                  </span>
+                </div>
               </Link>
             </li>
           ))}
