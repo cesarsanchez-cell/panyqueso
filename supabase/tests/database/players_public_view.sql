@@ -74,6 +74,27 @@ insert into public.grupo_membresias (grupo_id, player_id, tipo, orden, status) v
   ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000b2', 'titular',  null, 'activo'),
   ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000b3', 'titular',  null, 'activo');
 
+-- Coordinador CON ficha, miembro activo de Grupo B (regresión: debe ver a sus
+-- companeros igual que un player). Se mete en Grupo B para no alterar los counts
+-- de Grupo A que asertan los tests del player.
+insert into auth.users (
+  id, instance_id, email, encrypted_password,
+  aud, role, email_confirmed_at, created_at, updated_at,
+  raw_app_meta_data, raw_user_meta_data
+) values
+  ('00000000-0000-0000-0000-0000000000a6',
+   '00000000-0000-0000-0000-000000000000',
+   'coord-ppv@test.local', '', 'authenticated', 'authenticated',
+   now(), now(), now(), '{}'::jsonb, '{}'::jsonb);
+update public.profiles set role = 'coordinador', nombre = 'Coord' where id = '00000000-0000-0000-0000-0000000000a6';
+insert into public.players (
+  id, nombre, edad, role_field, position_pref,
+  technical, physical, mental, status, created_by, auth_user_id
+) values
+  ('00000000-0000-0000-0000-0000000000b4', 'Coord', 35, 'jugador_campo', 'mediocampista', 6, 6, 6, 'approved', '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000a6');
+insert into public.grupo_membresias (grupo_id, player_id, tipo, orden, status) values
+  ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000b4', 'titular', null, 'activo');
+
 create or replace function _as(p_id uuid)
 returns void
 language plpgsql as $$
@@ -87,22 +108,22 @@ begin
 end;
 $$;
 
-select plan(10);
+select plan(12);
 
--- 1. Admin ve todos los players via la view.
+-- 1. Admin ve todos los players via la view (P1, P2, P3 + Coord = 4).
 select _as('00000000-0000-0000-0000-0000000000a1');
 select is(
   (select count(*)::int from public.players_public),
-  3,
-  'admin: ve 3 players en players_public'
+  4,
+  'admin: ve 4 players en players_public (incluye al coordinador)'
 );
 
--- 2. Veedor ve todos los players via la view.
+-- 2. Veedor ve todos los players via la view (P1, P2, P3 + Coord = 4).
 select _as('00000000-0000-0000-0000-0000000000a2');
 select is(
   (select count(*)::int from public.players_public),
-  3,
-  'veedor: ve 3 players en players_public'
+  4,
+  'veedor: ve 4 players en players_public (incluye al coordinador)'
 );
 
 -- 3. Player1 ve a si mismo + Player2 (companeros de Grupo A) = 2 rows.
@@ -152,6 +173,20 @@ select is(
 select is_empty(
   $$select 1 from public.grupo_membresias where grupo_id = '00000000-0000-0000-0000-0000000000e2'$$,
   'player1: NO ve membresias de Grupo B'
+);
+
+-- 7. Coordinador CON ficha ve su propio row + companeros de su grupo (fix).
+--    Coord esta en Grupo B con Player3 => ve 2 (Coord + Player3).
+select _as('00000000-0000-0000-0000-0000000000a6');
+select is(
+  (select count(*)::int from public.players_public),
+  2,
+  'coordinador: ve a Coord (si mismo) y Player3 (companero de Grupo B) = 2'
+);
+
+select isnt_empty(
+  $$select 1 from public.players_public where id = '00000000-0000-0000-0000-0000000000b3'$$,
+  'coordinador: SI ve a Player3 (companero de grupo)'
 );
 
 select * from finish();
