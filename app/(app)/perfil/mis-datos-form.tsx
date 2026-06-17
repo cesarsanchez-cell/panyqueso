@@ -44,6 +44,7 @@ const PIERNAS: { value: PiernaHabil; label: string }[] = [
   { value: "derecha", label: "Derecha" },
   { value: "izquierda", label: "Izquierda" },
   { value: "ambas", label: "Ambas" },
+  { value: "ninguna", label: "Ninguna" },
 ];
 
 export function MisDatosForm({ initial }: { initial: MisDatosInitial }) {

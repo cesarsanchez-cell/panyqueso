@@ -26,7 +26,7 @@ export type UpdatePlayerState =
 const ROLES: readonly PlayerRoleField[] = ["arquero", "jugador_campo", "mixto"];
 const POSITIONS: readonly PositionPref[] = ["arquero", "defensor", "mediocampista", "delantero"];
 const ADMIN_STATUSES: readonly PlayerStatus[] = ["approved", "inactive"];
-const PIERNA_VALUES: readonly PiernaHabil[] = ["derecha", "izquierda", "ambas"];
+const PIERNA_VALUES: readonly PiernaHabil[] = ["derecha", "izquierda", "ambas", "ninguna"];
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;

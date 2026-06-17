@@ -37,6 +37,7 @@ const PIERNA_OPTIONS = [
   { value: "derecha", label: "Derecha" },
   { value: "izquierda", label: "Izquierda" },
   { value: "ambas", label: "Ambas" },
+  { value: "ninguna", label: "Ninguna" },
 ];
 
 function ErrorLine({ msg }: { msg: string | null }) {
