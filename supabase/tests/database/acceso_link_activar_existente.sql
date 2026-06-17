@@ -59,7 +59,7 @@ values ('00000000-0000-0000-0000-00000000000a', 'Cancha', '00000000-0000-0000-00
 
 insert into public.grupos (id, nombre, lugar_id, dia_semana, hora, owner_id, join_token, cupo_titulares)
 values ('00000000-0000-0000-0000-0000000000e1', 'Grupo Test', '00000000-0000-0000-0000-00000000000a',
-        2, '20:00', '00000000-0000-0000-0000-0000000000a0', 'TESTTOKEN', 5);
+        2, '20:00', '00000000-0000-0000-0000-0000000000a0', 'TESTTOKEN', 6);
 
 select plan(8);
 
