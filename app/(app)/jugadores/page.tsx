@@ -146,49 +146,34 @@ export default async function JugadoresPage({
     players = data ?? [];
   }
 
-  // "Sin calificar" = nadie evaluó al jugador. Hay DOS vías de calificación con
-  // señales distintas, así que combinamos ambas (OR):
-  //  1. Confianza ≠ 'baja': cubre a los calificados "a la vieja" (la base se
-  //     calificó con confianza y el seed la copia al rating por grupo). Si hay
-  //     grupo usamos la confianza POR GRUPO; si no, la base.
-  //  2. Existe un cambio de rating no-rechazado (player_change_requests,
-  //     'update_sensitive_fields'): cubre al editor de rating por grupo, que
-  //     cambia los subs pero NO toca la confianza (quedaría 'baja' igual).
-  // Ninguna sola alcanza; el OR es retroactivo y cubre las dos vías.
+  // "Sin calificar" es a NIVEL JUGADOR (no por grupo): ¿alguien lo evaluó alguna
+  // vez, en cualquier lado? El rating es por grupo, pero al entrar a un grupo
+  // nuevo se HEREDA el de un grupo previo; entonces "calificado en un grupo" ⇒
+  // "calificado" a secas. Si lo calculáramos por grupo, el general y el grupo se
+  // contradicen (calificado en general, sin calificar en el grupo heredado). El
+  // filtro de grupo solo decide A QUIÉN listar, no si está calificado.
+  //
+  // Calificado = confianza base ≠ 'baja'  (vía base, que setea confianza)
+  //           OR existe un cambio de rating no-rechazado en cualquier grupo/base
+  //              (vía editor por grupo, que cambia los subs pero deja confianza
+  //              en 'baja'). El OR es retroactivo y cubre ambas vías + la herencia.
   const ids = players.map((p) => p.id);
-
-  const grupoConf = new Map<string, RatingConfidence>();
-  if (grupoFilter && ids.length > 0) {
-    const { data: pgr } = await supabase
-      .from("player_group_ratings")
-      .select("player_id, rating_confidence")
-      .eq("grupo_id", grupoFilter)
-      .in("player_id", ids);
-    for (const r of pgr ?? []) grupoConf.set(r.player_id, r.rating_confidence);
-  }
 
   const ratedIds = new Set<string>();
   if (ids.length > 0) {
-    let ratedQuery = supabase
+    const { data: rated } = await supabase
       .from("player_change_requests")
       .select("player_id")
       .eq("action_type", "update_sensitive_fields")
       .neq("status", "rejected")
       .in("player_id", ids);
-    // Con grupo, cuentan los cambios DE ese grupo Y los de la base (grupo_id
-    // null): la base siembra el rating del grupo, así que calificar en la base
-    // también cuenta como calificado en el grupo. (grupoFilter es un UUID ya
-    // validado contra los grupos del usuario.)
-    if (grupoFilter) ratedQuery = ratedQuery.or(`grupo_id.eq.${grupoFilter},grupo_id.is.null`);
-    const { data: rated } = await ratedQuery;
     for (const r of rated ?? []) if (r.player_id) ratedIds.add(r.player_id);
   }
 
-  const withFlag = players.map((p) => {
-    const conf = (grupoFilter ? grupoConf.get(p.id) : null) ?? p.rating_confidence;
-    const calificado = conf !== "baja" || ratedIds.has(p.id);
-    return { ...p, sinCalificar: !calificado };
-  });
+  const withFlag = players.map((p) => ({
+    ...p,
+    sinCalificar: p.rating_confidence === "baja" && !ratedIds.has(p.id),
+  }));
   const visiblePlayers = sinCalificarFilter ? withFlag.filter((p) => p.sinCalificar) : withFlag;
 
   // Las solicitudes create_player son propuestas globales (no por grupo ni con
