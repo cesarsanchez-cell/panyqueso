@@ -11,7 +11,6 @@ import { PlayersListFilterable } from "./players-list-filterable";
 type PlayerStatus = Database["public"]["Enums"]["player_status"];
 type PlayerRoleField = Database["public"]["Enums"]["player_role_field"];
 type ChangeRequestStatus = Database["public"]["Enums"]["change_request_status"];
-type RatingConfidence = Database["public"]["Enums"]["rating_confidence"];
 
 const STATUS_LABEL: Record<PlayerStatus, string> = {
   pending: "Pendiente",
@@ -126,7 +125,6 @@ export default async function JugadoresPage({
     role_field: PlayerRoleField;
     avatar_url: string | null;
     club_id: string | null;
-    rating_confidence: RatingConfidence;
   };
 
   let players: PlayerRow[] = [];
@@ -134,7 +132,7 @@ export default async function JugadoresPage({
   if (!(memberIds !== null && memberIds.length === 0)) {
     let playersQuery = supabase
       .from("players")
-      .select("id, nombre, apodo, edad, status, role_field, avatar_url, club_id, rating_confidence")
+      .select("id, nombre, apodo, edad, status, role_field, avatar_url, club_id")
       .eq("is_guest", false) // los invitados puntuales no son jugadores del sistema
       .order("nombre", { ascending: true });
 
@@ -146,25 +144,30 @@ export default async function JugadoresPage({
     players = data ?? [];
   }
 
-  // "Sin calificar" = confianza del rating en 'baja'. Si hay grupo, usamos la
-  // confianza POR GRUPO (player_group_ratings); si no, la base del jugador.
-  const grupoConf = new Map<string, RatingConfidence>();
-  if (grupoFilter && players.length > 0) {
-    const { data: pgr } = await supabase
-      .from("player_group_ratings")
-      .select("player_id, rating_confidence")
-      .eq("grupo_id", grupoFilter)
+  // "Sin calificar" = nadie aplicó (ni propuso) todavía un cambio de rating para
+  // el jugador. La señal vive en player_change_requests (action_type
+  // 'update_sensitive_fields'), no en rating_confidence: el editor de rating por
+  // grupo nunca toca la confianza, así que esta señal es la real y además
+  // retroactiva (los ya calificados aparecen como calificados). Si hay grupo,
+  // miramos los cambios DE ese grupo; si no, cualquiera (grupo o base).
+  // 'rejected' no cuenta (el veedor lo rechazó → sigue sin calificar).
+  const ratedIds = new Set<string>();
+  if (players.length > 0) {
+    let ratedQuery = supabase
+      .from("player_change_requests")
+      .select("player_id")
+      .eq("action_type", "update_sensitive_fields")
+      .neq("status", "rejected")
       .in(
         "player_id",
         players.map((p) => p.id),
       );
-    for (const r of pgr ?? []) grupoConf.set(r.player_id, r.rating_confidence);
+    if (grupoFilter) ratedQuery = ratedQuery.eq("grupo_id", grupoFilter);
+    const { data: rated } = await ratedQuery;
+    for (const r of rated ?? []) if (r.player_id) ratedIds.add(r.player_id);
   }
 
-  const withFlag = players.map((p) => ({
-    ...p,
-    sinCalificar: (grupoConf.get(p.id) ?? p.rating_confidence) === "baja",
-  }));
+  const withFlag = players.map((p) => ({ ...p, sinCalificar: !ratedIds.has(p.id) }));
   const visiblePlayers = sinCalificarFilter ? withFlag.filter((p) => p.sinCalificar) : withFlag;
 
   // Las solicitudes create_player son propuestas globales (no por grupo ni con
