@@ -59,41 +59,41 @@ values ('00000000-0000-0000-0000-00000000000a', 'Cancha', '00000000-0000-0000-00
 
 insert into public.grupos (id, nombre, lugar_id, dia_semana, hora, owner_id, join_token, cupo_titulares)
 values ('00000000-0000-0000-0000-0000000000e1', 'Grupo Test', '00000000-0000-0000-0000-00000000000a',
-        2, '20:00', '00000000-0000-0000-0000-0000000000a0', 'TESTTOKEN', 6);
+        2, '20:00', '00000000-0000-0000-0000-0000000000a0', 'TESTTOKEN0000001', 6);
 
 select plan(8);
 
 -- 1. Celular desconocido → 'nuevo'.
 select is(
-  (select estado from public.lookup_join_phone_state('TESTTOKEN', '+5491199999999')),
+  (select estado from public.lookup_join_phone_state('TESTTOKEN0000001', '+5491199999999')),
   'nuevo',
   'lookup: celular no en la base → nuevo'
 );
 
 -- 2. Ficha con cuenta YA logueada → 'login'.
 select is(
-  (select estado from public.lookup_join_phone_state('TESTTOKEN', '+5491100000002')),
+  (select estado from public.lookup_join_phone_state('TESTTOKEN0000001', '+5491100000002')),
   'login',
   'lookup: cuenta ya logueada → login'
 );
 
 -- 3. Ficha con cuenta que NUNCA logueó → 'activar'.
 select is(
-  (select estado from public.lookup_join_phone_state('TESTTOKEN', '+5491100000001')),
+  (select estado from public.lookup_join_phone_state('TESTTOKEN0000001', '+5491100000001')),
   'activar',
   'lookup: cuenta nunca logueada → activar'
 );
 
 -- 4. Ficha SIN cuenta de auth → 'activar'.
 select is(
-  (select estado from public.lookup_join_phone_state('TESTTOKEN', '+5491100000003')),
+  (select estado from public.lookup_join_phone_state('TESTTOKEN0000001', '+5491100000003')),
   'activar',
   'lookup: ficha sin cuenta → activar'
 );
 
 -- 5/6/7. Activar a la ficha sin cuenta (b3) vinculándola a la cuenta a3.
 select activar_jugador_existente(
-  'TESTTOKEN',
+  'TESTTOKEN0000001',
   '00000000-0000-0000-0000-0000000000b3',
   '00000000-0000-0000-0000-0000000000a3'
 );
@@ -122,7 +122,7 @@ select is(
 -- 8. Defensa: ficha ya vinculada a OTRA cuenta → P0091.
 select throws_ok(
   $$select public.activar_jugador_existente(
-      'TESTTOKEN',
+      'TESTTOKEN0000001',
       '00000000-0000-0000-0000-0000000000b2',
       '00000000-0000-0000-0000-0000000000a3'
     )$$,
