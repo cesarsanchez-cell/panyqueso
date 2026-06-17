@@ -19,6 +19,7 @@ export type Club = {
 
 export const CLUBS: readonly Club[] = [
   // --- Primera División Argentina --------------------------------------------
+  { id: "all-boys", nombre: "All Boys", grupo: "Argentina" },
   { id: "argentinos", nombre: "Argentinos Juniors", grupo: "Argentina" },
   { id: "atletico-tucuman", nombre: "Atlético Tucumán", grupo: "Argentina" },
   { id: "banfield", nombre: "Banfield", grupo: "Argentina" },
@@ -26,6 +27,7 @@ export const CLUBS: readonly Club[] = [
   { id: "belgrano", nombre: "Belgrano", grupo: "Argentina" },
   { id: "boca", nombre: "Boca Juniors", grupo: "Argentina" },
   { id: "central-cordoba", nombre: "Central Córdoba (SdE)", grupo: "Argentina" },
+  { id: "chacarita", nombre: "Chacarita Juniors", grupo: "Argentina" },
   { id: "defensa-y-justicia", nombre: "Defensa y Justicia", grupo: "Argentina" },
   { id: "riestra", nombre: "Deportivo Riestra", grupo: "Argentina" },
   { id: "estudiantes", nombre: "Estudiantes (LP)", grupo: "Argentina" },
@@ -37,6 +39,7 @@ export const CLUBS: readonly Club[] = [
   { id: "instituto", nombre: "Instituto", grupo: "Argentina" },
   { id: "lanus", nombre: "Lanús", grupo: "Argentina" },
   { id: "newells", nombre: "Newell's Old Boys", grupo: "Argentina" },
+  { id: "nueva-chicago", nombre: "Nueva Chicago", grupo: "Argentina" },
   { id: "platense", nombre: "Platense", grupo: "Argentina" },
   { id: "racing", nombre: "Racing Club", grupo: "Argentina" },
   { id: "river", nombre: "River Plate", grupo: "Argentina" },
