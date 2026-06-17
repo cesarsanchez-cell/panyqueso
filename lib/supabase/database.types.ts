@@ -2156,7 +2156,7 @@ export type Database = {
       match_winner: "a" | "b" | "empate";
       membresia_status: "activo" | "inactivo";
       membresia_tipo: "titular" | "suplente";
-      pierna_habil_enum: "derecha" | "izquierda" | "ambas";
+      pierna_habil_enum: "derecha" | "izquierda" | "ambas" | "ninguna";
       player_role_field: "arquero" | "jugador_campo" | "mixto";
       player_status: "pending" | "approved" | "inactive";
       position_pref: "defensor" | "mediocampista" | "delantero" | "arquero";
@@ -2315,7 +2315,7 @@ export const Constants = {
       match_winner: ["a", "b", "empate"],
       membresia_status: ["activo", "inactivo"],
       membresia_tipo: ["titular", "suplente"],
-      pierna_habil_enum: ["derecha", "izquierda", "ambas"],
+      pierna_habil_enum: ["derecha", "izquierda", "ambas", "ninguna"],
       player_role_field: ["arquero", "jugador_campo", "mixto"],
       player_status: ["pending", "approved", "inactive"],
       position_pref: ["defensor", "mediocampista", "delantero", "arquero"],

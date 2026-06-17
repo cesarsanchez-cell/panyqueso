@@ -44,6 +44,7 @@ const PIERNA_OPTIONS: { value: PiernaHabil | ""; label: string }[] = [
   { value: "derecha", label: "Derecha" },
   { value: "izquierda", label: "Izquierda" },
   { value: "ambas", label: "Ambas" },
+  { value: "ninguna", label: "Ninguna" },
 ];
 
 const STATUS_OPTIONS: { value: PlayerStatus; label: string; desc: string }[] = [

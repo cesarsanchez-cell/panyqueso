@@ -20,7 +20,7 @@ export type MisDatosState =
 
 const ROLES: readonly PlayerRoleField[] = ["arquero", "jugador_campo", "mixto"];
 const POSITIONS: readonly PositionPref[] = ["arquero", "defensor", "mediocampista", "delantero"];
-const PIERNA_VALUES: readonly PiernaHabil[] = ["derecha", "izquierda", "ambas"];
+const PIERNA_VALUES: readonly PiernaHabil[] = ["derecha", "izquierda", "ambas", "ninguna"];
 const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_NOMBRE = 80;
