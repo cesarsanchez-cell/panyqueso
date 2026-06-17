@@ -7,5 +7,5 @@ Un PNG por club, nombre exacto **`<slug>.png`** (el slug es el `id` del catálog
 - **Formato:** PNG · ~16–128 px (se muestra a ~16–22 px).
 - Escudos = marcas registradas; uso para app privada.
 
-Están los 48 clubes del catálogo. Para reemplazar uno, pisá el `<slug>.png`
+Están los 51 clubes del catálogo. Para reemplazar uno, pisá el `<slug>.png`
 correspondiente.
