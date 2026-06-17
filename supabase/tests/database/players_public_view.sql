@@ -110,20 +110,20 @@ $$;
 
 select plan(12);
 
--- 1. Admin ve todos los players via la view.
+-- 1. Admin ve todos los players via la view (P1, P2, P3 + Coord = 4).
 select _as('00000000-0000-0000-0000-0000000000a1');
 select is(
   (select count(*)::int from public.players_public),
-  3,
-  'admin: ve 3 players en players_public'
+  4,
+  'admin: ve 4 players en players_public (incluye al coordinador)'
 );
 
--- 2. Veedor ve todos los players via la view.
+-- 2. Veedor ve todos los players via la view (P1, P2, P3 + Coord = 4).
 select _as('00000000-0000-0000-0000-0000000000a2');
 select is(
   (select count(*)::int from public.players_public),
-  3,
-  'veedor: ve 3 players en players_public'
+  4,
+  'veedor: ve 4 players en players_public (incluye al coordinador)'
 );
 
 -- 3. Player1 ve a si mismo + Player2 (companeros de Grupo A) = 2 rows.
