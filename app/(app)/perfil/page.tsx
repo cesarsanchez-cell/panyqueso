@@ -10,41 +10,41 @@ const ROLE_LABEL: Record<string, string> = {
   admin: "Admin",
   veedor: "Veedor",
   player: "Jugador",
+  coordinador: "Coordinador",
 };
 
 export default async function PerfilPage() {
   const { email, profile } = await requireUser();
   const roleLabel = profile.role ? ROLE_LABEL[profile.role] : "—";
-  const isPlayer = profile.role === "player";
 
-  // Solo para players: cargamos el row de players via RPC SECURITY DEFINER
-  // (el rol player no tiene SELECT directo sobre public.players).
+  // Cargamos la ficha para CUALQUIER cuenta que juegue (player o admin/
+  // coordinador/veedor con ficha): los RPC se autodescubren por auth.uid(),
+  // no por rol. Sin ficha no hay datos de jugador que mostrar.
   let playerData: MisDatosInitial | null = null;
   let playerAvatar: string | null = null;
   let playerNombre = "";
-  if (isPlayer) {
-    const supabase = await createClient();
-    const { data: rows, error } = await supabase.rpc("get_my_player_full");
-    if (error) {
-      throw new Error(`No se pudieron cargar tus datos: ${error.message}`);
-    }
-    const row = Array.isArray(rows) ? rows[0] : null;
-    if (row) {
-      playerData = {
-        nombre: row.nombre,
-        apodo: row.apodo,
-        fecha_nacimiento: row.fecha_nacimiento,
-        email: row.email,
-        phone: row.phone,
-        pierna_habil: row.pierna_habil,
-        role_field: row.role_field,
-        position_pref: row.position_pref,
-        positions_possible: row.positions_possible ?? [],
-        ubicacion_maps_url: row.ubicacion_maps_url,
-        club_id: row.club_id,
-      };
-      playerNombre = row.nombre;
-    }
+  const supabase = await createClient();
+  const { data: rows, error } = await supabase.rpc("get_my_player_full");
+  if (error) {
+    throw new Error(`No se pudieron cargar tus datos: ${error.message}`);
+  }
+  const row = Array.isArray(rows) ? rows[0] : null;
+  const hasFicha = !!row;
+  if (row) {
+    playerData = {
+      nombre: row.nombre,
+      apodo: row.apodo,
+      fecha_nacimiento: row.fecha_nacimiento,
+      email: row.email,
+      phone: row.phone,
+      pierna_habil: row.pierna_habil,
+      role_field: row.role_field,
+      position_pref: row.position_pref,
+      positions_possible: row.positions_possible ?? [],
+      ubicacion_maps_url: row.ubicacion_maps_url,
+      club_id: row.club_id,
+    };
+    playerNombre = row.nombre;
 
     // avatar_url no viene en get_my_player_full; lo trae el summary.
     const { data: sumRows } = await supabase.rpc("get_my_player_summary");
@@ -58,7 +58,7 @@ export default async function PerfilPage() {
       <header className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Mi cuenta</h1>
         <p className="text-sm text-neutral-600">
-          {isPlayer
+          {hasFicha
             ? "Tus datos personales y cambio de contraseña."
             : "Información de tu cuenta y cambio de contraseña."}
         </p>
@@ -71,10 +71,10 @@ export default async function PerfilPage() {
             {/* El jugador ingresa con su celular; su email interno es sintético
                 (...@phone.fdlm.local) y no tiene sentido mostrárselo. */}
             <dt className="text-neutral-500">
-              {isPlayer && playerData?.phone ? "Celular de ingreso" : "Email de ingreso"}
+              {playerData?.phone ? "Celular de ingreso" : "Email de ingreso"}
             </dt>
             <dd className="truncate text-neutral-900">
-              {isPlayer && playerData?.phone ? formatArLocal(playerData.phone) : email}
+              {playerData?.phone ? formatArLocal(playerData.phone) : email}
             </dd>
           </div>
           <div className="flex justify-between gap-3">
@@ -82,14 +82,14 @@ export default async function PerfilPage() {
             <dd className="text-neutral-900">{roleLabel}</dd>
           </div>
         </dl>
-        {!isPlayer ? (
+        {!hasFicha ? (
           <p className="mt-4 text-xs text-neutral-500">
             El nombre y rol los gestiona el admin. Si necesitás cambios, pedíselos.
           </p>
         ) : null}
       </section>
 
-      {isPlayer && playerData ? (
+      {playerData ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
             Foto de perfil
@@ -103,7 +103,7 @@ export default async function PerfilPage() {
         </section>
       ) : null}
 
-      {isPlayer && playerData ? (
+      {playerData ? (
         <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
             Mis datos
@@ -118,7 +118,7 @@ export default async function PerfilPage() {
         </section>
       ) : null}
 
-      {isPlayer && !playerData ? (
+      {profile.role === "player" && !playerData ? (
         <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           Todavía no tenemos tus datos de jugador vinculados. Hablá con el admin.
         </section>

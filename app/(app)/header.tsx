@@ -11,9 +11,9 @@ const ROLE_LABEL: Record<NonNullable<AuthContext["profile"]["role"]>, string> = 
   coordinador: "Coordinador",
 };
 
-// playerView: accesos a la vista de jugador (Mi Actividad / Mi perfil). El admin/
-// veedor/coordinador solo los ve si tiene ficha (juega); si no, /mi-perfil y
-// /historial rebotan a Inicio, así que los filtramos abajo.
+// playerView: accesos a la vista de jugador (Mi Actividad / Mi perfil / Mi cuenta).
+// El admin/veedor/coordinador solo los ve si tiene ficha (juega); si no, esas
+// páginas rebotan a Inicio o no muestran datos de jugador, así que los filtramos.
 type NavItem = { label: string; href: string; key?: string; playerView?: boolean };
 
 const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, NavItem[]> = {
@@ -26,6 +26,7 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
     // El admin/coordinador también juega: accesos a su vista de jugador.
     { label: "Mi Actividad", href: "/historial", playerView: true },
     { label: "Mi perfil", href: "/mi-perfil", playerView: true },
+    { label: "Mi cuenta", href: "/perfil", playerView: true },
   ],
   veedor: [
     { label: "Inicio", href: "/" },
@@ -35,6 +36,7 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
     // El veedor también juega: accesos a su vista de jugador.
     { label: "Mi Actividad", href: "/historial", playerView: true },
     { label: "Mi perfil", href: "/mi-perfil", playerView: true },
+    { label: "Mi cuenta", href: "/perfil", playerView: true },
   ],
   player: [
     { label: "Mi perfil", href: "/mi-perfil" },
@@ -51,6 +53,7 @@ const NAV_ITEMS_BY_ROLE: Record<NonNullable<AuthContext["profile"]["role"]>, Nav
     // El coordinador también juega: accesos a su vista de jugador.
     { label: "Mi Actividad", href: "/historial", playerView: true },
     { label: "Mi perfil", href: "/mi-perfil", playerView: true },
+    { label: "Mi cuenta", href: "/perfil", playerView: true },
   ],
 };
 
