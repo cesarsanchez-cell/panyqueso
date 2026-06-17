@@ -204,3 +204,143 @@ export async function joinGroup(
 
   redirect("/mi-perfil?welcome=1");
 }
+
+// ============================================================================
+// checkPhone: paso 1 del acceso unificado. Dado el celular, decide el camino:
+//   'nuevo'   -> no está en la base       -> alta nueva (joinGroup).
+//   'activar' -> existe pero nunca logueó -> setea su clave (activateExisting).
+//   'login'   -> ya tiene cuenta activa   -> va a /login.
+// No crea ni toca nada: solo consulta.
+// ============================================================================
+export type CheckPhoneState =
+  | null
+  | { error: string }
+  | { ok: true; estado: "nuevo" | "activar" | "login"; nombre: string | null; phone: string };
+
+export async function checkPhone(
+  _prev: CheckPhoneState,
+  formData: FormData,
+): Promise<CheckPhoneState> {
+  const token = String(formData.get("token") ?? "").trim();
+  if (!token) return { error: "Falta el token." };
+
+  const phone = parseArPhone(String(formData.get("phone") ?? "").trim());
+  if (!phone) return { error: "Celular inválido. Ingresá los 10 dígitos (ej: 1155551234)." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("lookup_join_phone_state", {
+    p_token: token,
+    p_phone: phone,
+  });
+  if (error) return { error: "El link ya no es válido. Pedile uno nuevo al organizador." };
+
+  const row = data && data.length > 0 ? data[0] : null;
+  if (!row) return { error: "No se pudo verificar el celular. Probá de nuevo." };
+
+  const estado = row.estado;
+  if (estado !== "nuevo" && estado !== "activar" && estado !== "login") {
+    return { error: "Respuesta inesperada del servidor." };
+  }
+  return { ok: true, estado, nombre: row.nombre, phone };
+}
+
+// ============================================================================
+// activateExisting: camino 'activar'. El jugador ya existe en la base pero su
+// cuenta nunca se activó. Setea la clave que eligió, vincula el login a su ficha
+// y le asegura la membresía — conservando todo su historial. Auto-login.
+// ============================================================================
+export type ActivateState = null | { error: string } | { fieldErrors: Record<string, string> };
+
+export async function activateExisting(
+  _prev: ActivateState,
+  formData: FormData,
+): Promise<ActivateState> {
+  const token = String(formData.get("token") ?? "").trim();
+  if (!token) return { error: "Falta el token." };
+
+  const phone = parseArPhone(String(formData.get("phone") ?? "").trim());
+  if (!phone) return { error: "Celular inválido." };
+
+  const errors: Record<string, string> = {};
+  const password = String(formData.get("password") ?? "");
+  const passwordConfirm = String(formData.get("password_confirm") ?? "");
+  if (password.length < 8) errors.password = "Mínimo 8 caracteres.";
+  else if (password !== passwordConfirm) errors.password_confirm = "Las contraseñas no coinciden.";
+  if (Object.keys(errors).length > 0) return { fieldErrors: errors };
+
+  // Re-chequeo del estado (defensa ante carreras o un form manipulado): solo
+  // 'activar' habilita este camino. A las cuentas activas no las pisa nadie.
+  const supabase = await createClient();
+  const { data: lk } = await supabase.rpc("lookup_join_phone_state", {
+    p_token: token,
+    p_phone: phone,
+  });
+  const estado = lk?.[0]?.estado ?? null;
+  if (estado === "nuevo") {
+    return { error: "No encontramos tu ficha. Volvé e ingresá tu celular de nuevo." };
+  }
+  if (estado === "login") {
+    return { error: "Ya tenés una cuenta activa. Entrá desde panyqueso.ar/login con tu celular." };
+  }
+  if (estado !== "activar") {
+    return { error: "El link ya no es válido. Pedile uno nuevo al organizador." };
+  }
+
+  // La ficha existe: resolvemos id + si ya tiene cuenta (service role).
+  const admin = createAdminClient();
+  const { data: player, error: playerErr } = await admin
+    .from("players")
+    .select("id, auth_user_id, nombre")
+    .eq("phone", phone)
+    .maybeSingle();
+  if (playerErr || !player) {
+    return { error: "No encontramos tu ficha. Hablá con el organizador." };
+  }
+
+  const email = syntheticEmailFromPhone(phone);
+  let authUserId = player.auth_user_id;
+
+  if (!authUserId) {
+    // Cat. sin cuenta: la creamos con la clave que eligió.
+    const { data: created, error: createErr } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { phone, nombre: player.nombre },
+    });
+    if (createErr || !created.user) {
+      if (createErr?.message.toLowerCase().includes("already")) {
+        return { error: "Ya existe una cuenta con ese celular. Entrá desde panyqueso.ar/login." };
+      }
+      return { error: `No se pudo crear tu cuenta: ${createErr?.message ?? "sin detalle"}` };
+    }
+    authUserId = created.user.id;
+  } else {
+    // Cat. con cuenta nunca usada: le seteamos la clave que eligió.
+    const { error: updErr } = await admin.auth.admin.updateUserById(authUserId, {
+      email,
+      password,
+    });
+    if (updErr) return { error: `No se pudo guardar tu contraseña: ${updErr.message}` };
+  }
+
+  // Vincular ficha <-> cuenta + asegurar membresía (sin tocar datos/historial).
+  const { error: actErr } = await admin.rpc("activar_jugador_existente", {
+    p_token: token,
+    p_player_id: player.id,
+    p_auth_user_id: authUserId,
+  });
+  if (actErr) {
+    return { error: `No se pudo activar tu cuenta: ${actErr.message}` };
+  }
+
+  const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+  if (signInErr) {
+    return {
+      error:
+        "Tu cuenta quedó lista, pero no pudimos iniciar sesión. Entrá desde panyqueso.ar/login con tu celular y tu clave.",
+    };
+  }
+
+  redirect("/mi-perfil?welcome=1");
+}
