@@ -46,7 +46,17 @@ jobs:
           version: 2.101.0
 
       - name: Start Supabase local stack
-        run: supabase start
+        # El pull de imágenes del stack a veces devuelve 502 del registry (flake
+        # de infra, no del código). Reintentamos antes de fallar.
+        run: |
+          for i in 1 2 3; do
+            if supabase start; then exit 0; fi
+            echo "::warning::supabase start falló (intento $i/3), reintento…"
+            supabase stop --no-backup || true
+            sleep 20
+          done
+          echo "::error::supabase start falló tras 3 intentos"
+          exit 1
 
       - name: Run pgTAP tests
         run: supabase test db
