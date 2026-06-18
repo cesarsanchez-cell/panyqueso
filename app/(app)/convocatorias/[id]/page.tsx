@@ -182,7 +182,15 @@ export default async function ConvocatoriaDetallePage({
   }
 
   const convocados = convocadosRaw ?? [];
-  const convocadoIds = new Set(convocados.map((cp) => cp.player?.id).filter(Boolean) as string[]);
+  // Para la lista de candidatos a "Agregar jugador" no contamos a los que
+  // declinaron: un jugador que se bajó de la convocatoria tiene que poder
+  // volver a incluirse desde candidatos (addPlayer reactiva su row declinado).
+  const convocadoIds = new Set(
+    convocados
+      .filter((cp) => cp.attendance_status !== "declinado")
+      .map((cp) => cp.player?.id)
+      .filter(Boolean) as string[],
+  );
 
   const isOpen = convocatoria.status === "abierta";
   const isClosed = convocatoria.status === "cerrada";

@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PlayerAvatar } from "../player-avatar";
 import { DeclineButton } from "./decline-button";
 import { JoinConvocatoriaButton } from "./join-convocatoria-button";
+import { LeaveGrupoButton } from "./leave-grupo-button";
 import { NotificationsCard } from "./notifications-card";
 import { ProdeForm, type ProdeInfo } from "./prode-form";
 import { UndoDeclineButton } from "./undo-decline-button";
@@ -702,6 +703,10 @@ function ConfirmedMatchCard({ lineup, teams }: { lineup: GrupoLineup; teams: Con
       ) : null}
 
       {lineup.prode ? <ProdeForm info={lineup.prode} /> : null}
+
+      <div className="mt-4 border-t border-neutral-100 pt-3">
+        <LeaveGrupoButton grupoId={grupo.id} grupoNombre={grupo.nombre} />
+      </div>
     </section>
   );
 }
@@ -902,6 +907,10 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
           </div>
         </div>
       ) : null}
+
+      <div className="mt-4 border-t border-neutral-100 pt-3">
+        <LeaveGrupoButton grupoId={grupo.id} grupoNombre={grupo.nombre} />
+      </div>
     </section>
   );
 }
