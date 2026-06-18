@@ -36,24 +36,24 @@ export type Database = {
       app_settings: {
         Row: {
           id: boolean;
-          liderazgo_coef_alto: number;
-          liderazgo_coef_medio: number;
+          liderazgo_coef_negativo: number;
+          liderazgo_coef_positivo: number;
           requiere_veedor: boolean;
           updated_at: string;
           updated_by: string | null;
         };
         Insert: {
           id?: boolean;
-          liderazgo_coef_alto?: number;
-          liderazgo_coef_medio?: number;
+          liderazgo_coef_negativo?: number;
+          liderazgo_coef_positivo?: number;
           requiere_veedor?: boolean;
           updated_at?: string;
           updated_by?: string | null;
         };
         Update: {
           id?: boolean;
-          liderazgo_coef_alto?: number;
-          liderazgo_coef_medio?: number;
+          liderazgo_coef_negativo?: number;
+          liderazgo_coef_positivo?: number;
           requiere_veedor?: boolean;
           updated_at?: string;
           updated_by?: string | null;
@@ -2114,7 +2114,7 @@ export type Database = {
         Returns: undefined;
       };
       set_liderazgo_coeficientes: {
-        Args: { p_alto: number; p_medio: number };
+        Args: { p_negativo: number; p_positivo: number };
         Returns: undefined;
       };
       set_requiere_veedor: { Args: { p_value: boolean }; Returns: undefined };
@@ -2166,7 +2166,7 @@ export type Database = {
       grupo_modo_confirmacion: "convocatoria" | "presentismo";
       grupo_status: "activo" | "archivado";
       join_request_status: "pendiente" | "aprobada" | "rechazada";
-      liderazgo_nivel: "ninguno" | "medio" | "alto";
+      liderazgo_nivel: "negativo" | "ninguno" | "positivo";
       match_team_label: "A" | "B" | "C";
       match_winner: "a" | "b" | "empate";
       membresia_status: "activo" | "inactivo";
@@ -2175,7 +2175,7 @@ export type Database = {
       player_role_field: "arquero" | "jugador_campo" | "mixto";
       player_status: "pending" | "approved" | "inactive";
       position_pref: "defensor" | "mediocampista" | "delantero" | "arquero";
-      rating_confidence: "baja" | "media" | "alta";
+      rating_confidence: "inicial" | "baja" | "media" | "alta";
       user_role: "admin" | "veedor" | "player" | "coordinador";
     };
     CompositeTypes: {
@@ -2326,7 +2326,7 @@ export const Constants = {
       grupo_modo_confirmacion: ["convocatoria", "presentismo"],
       grupo_status: ["activo", "archivado"],
       join_request_status: ["pendiente", "aprobada", "rechazada"],
-      liderazgo_nivel: ["ninguno", "medio", "alto"],
+      liderazgo_nivel: ["negativo", "ninguno", "positivo"],
       match_team_label: ["A", "B", "C"],
       match_winner: ["a", "b", "empate"],
       membresia_status: ["activo", "inactivo"],
@@ -2335,7 +2335,7 @@ export const Constants = {
       player_role_field: ["arquero", "jugador_campo", "mixto"],
       player_status: ["pending", "approved", "inactive"],
       position_pref: ["defensor", "mediocampista", "delantero", "arquero"],
-      rating_confidence: ["baja", "media", "alta"],
+      rating_confidence: ["inicial", "baja", "media", "alta"],
       user_role: ["admin", "veedor", "player", "coordinador"],
     },
   },

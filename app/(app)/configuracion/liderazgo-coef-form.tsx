@@ -7,7 +7,7 @@ import { updateLiderazgoCoefs, type CoefState } from "./actions";
 const inputClass =
   "mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900";
 
-export function LiderazgoCoefForm({ medio, alto }: { medio: number; alto: number }) {
+export function LiderazgoCoefForm({ positivo, negativo }: { positivo: number; negativo: number }) {
   const [state, formAction, pending] = useActionState<CoefState, FormData>(
     updateLiderazgoCoefs,
     null,
@@ -17,27 +17,27 @@ export function LiderazgoCoefForm({ medio, alto }: { medio: number; alto: number
     <form action={formAction} className="mt-4 space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-xs text-neutral-600">
-          Coeficiente líder medio
+          Coef. positivo (líder) — entre 1.00 y 5.00
           <input
             type="number"
-            name="liderazgo_coef_medio"
+            name="liderazgo_coef_positivo"
             min={1}
             max={5}
             step={0.05}
-            defaultValue={medio.toFixed(2)}
+            defaultValue={positivo.toFixed(2)}
             required
             className={inputClass}
           />
         </label>
         <label className="block text-xs text-neutral-600">
-          Coeficiente líder alto
+          Coef. negativo (quejoso) — entre 0.10 y 1.00
           <input
             type="number"
-            name="liderazgo_coef_alto"
-            min={1}
-            max={5}
+            name="liderazgo_coef_negativo"
+            min={0.1}
+            max={1}
             step={0.05}
-            defaultValue={alto.toFixed(2)}
+            defaultValue={negativo.toFixed(2)}
             required
             className={inputClass}
           />

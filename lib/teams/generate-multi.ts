@@ -21,13 +21,13 @@
 import {
   type GeneratorInput,
   type LeaderCoefs,
-  type LeaderInfo,
   type LineShares,
   type TeamDimensions,
+  type TeamLeadership,
   NO_LEADER_BOOST,
   POSITION_WEIGHT,
   dimensionsOf,
-  leaderOf,
+  leadershipOf,
   shapeOf,
 } from "./generate.ts";
 
@@ -54,8 +54,8 @@ export type MultiTeam = {
   startersScore: number;
   // Totales por rubro de los titulares (para mostrar el balance).
   dimensions: TeamDimensions;
-  // FUT-127: líder efectivo de los titulares (nivel 'ninguno'/coef 1 = sin líder).
-  leader: LeaderInfo;
+  // FUT-127: liderazgo agregado de los titulares (positivo + negativos + coef).
+  leadership: TeamLeadership;
 };
 
 export type MultiBalanceSummary = {
@@ -115,7 +115,7 @@ function pairwiseCost(groups: GeneratorInput[][], coefs: LeaderCoefs): number {
   // FUT-127: cada grupo se mide a "puntuación final" = rubros × coef de su líder
   // (no acumulativo). Con coef 1 (default) es el balance por rubro de siempre.
   const dims = groups.map((g) => {
-    const c = leaderOf(g, coefs).coef;
+    const c = leadershipOf(g, coefs).coef;
     const d = dimensionsOf(g);
     return { physEff: d.physEff * c, mental: d.mental * c, technical: d.technical * c };
   });
@@ -318,7 +318,7 @@ export function generateMultiTeams(
       bench,
       startersScore,
       dimensions: dimensionsOf(starters),
-      leader: leaderOf(starters, coefs),
+      leadership: leadershipOf(starters, coefs),
     });
   }
 

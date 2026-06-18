@@ -42,15 +42,16 @@ const POSITION_OPTIONS: { value: PositionPref; label: string }[] = [
 ];
 
 const CONFIDENCE_OPTIONS: { value: RatingConfidence; label: string }[] = [
+  { value: "inicial", label: "Inicial (sin evaluar)" },
   { value: "baja", label: "Baja" },
   { value: "media", label: "Media" },
   { value: "alta", label: "Alta" },
 ];
 
 const LIDERAZGO_OPTIONS: { value: Liderazgo; label: string }[] = [
+  { value: "negativo", label: "Negativo (quejoso)" },
   { value: "ninguno", label: "Ninguno" },
-  { value: "medio", label: "Medio" },
-  { value: "alto", label: "Alto" },
+  { value: "positivo", label: "Positivo (líder)" },
 ];
 
 const GROUPS: { titulo: string; subs: { key: keyof GroupRatingInitial; label: string }[] }[] = [
@@ -197,9 +198,10 @@ export function GroupRatingEditor({
       </div>
 
       <p className="mt-2 text-xs text-neutral-500">
-        El <strong>liderazgo</strong> no cambia el score del jugador: es un potenciador de equipo
-        (un líder organiza y mejora al resto). En el armado, el equipo que tiene un líder multiplica
-        su balance por el coeficiente que fija el admin en Configuración.
+        El <strong>liderazgo</strong> no cambia el score del jugador: ajusta el balance del equipo.
+        Un <strong>positivo</strong> organiza y mejora al resto (potencia); un{" "}
+        <strong>negativo</strong> (quejoso) molesta a sus compañeros (penaliza). Los coeficientes
+        los fija el admin en Configuración.
       </p>
 
       <label className="mt-3 block text-xs text-neutral-600">

@@ -48,48 +48,44 @@ export type GeneratorInput = {
 };
 
 /**
- * FUT-127: coeficientes de potenciación por nivel de líder (vienen de
- * app_settings). 1.00 = sin efecto. 'ninguno' siempre es 1.
+ * FUT-127: coeficientes de liderazgo (vienen de app_settings). 1.00 = sin efecto.
+ *   - positivo ≥ 1: un líder potencia a su equipo (no acumulativo).
+ *   - negativo ≤ 1: un "quejoso" penaliza a su equipo (acumulativo).
  */
-export type LeaderCoefs = { medio: number; alto: number };
+export type LeaderCoefs = { positivo: number; negativo: number };
 
-/** Sin potenciación: el default mientras el admin no ajusta los coeficientes. */
-export const NO_LEADER_BOOST: LeaderCoefs = { medio: 1, alto: 1 };
-
-export type LeaderInfo = { nivel: LiderazgoNivel; coef: number };
-
-const LEVEL_RANK: Record<LiderazgoNivel, number> = { ninguno: 0, medio: 1, alto: 2 };
-
-function leaderCoef(nivel: LiderazgoNivel | undefined, coefs: LeaderCoefs): number {
-  if (nivel === "alto") return coefs.alto;
-  if (nivel === "medio") return coefs.medio;
-  return 1;
-}
+/** Sin efecto: el default mientras el admin no ajusta los coeficientes. */
+export const NO_LEADER_BOOST: LeaderCoefs = { positivo: 1, negativo: 1 };
 
 /**
- * Líder "que cuenta" de un conjunto de jugadores: el de MAYOR coeficiente (no
- * acumulativo, si hay dos líderes solo puntúa uno; empate de coef → el de mayor
- * nivel). Sin líder, nivel 'ninguno'/coef 1. Exportado para reusar en el
+ * Liderazgo agregado de un equipo: si tiene al menos un líder positivo (no
+ * acumulativo) y cuántos negativos (acumulativos), con el coeficiente resultante
+ * que multiplica el score del equipo en el balance:
+ *   coef = (positivo ? coef_positivo : 1) × coef_negativo ^ (#negativos)
+ */
+export type TeamLeadership = { positivo: boolean; negativos: number; coef: number };
+
+/**
+ * Calcula el liderazgo de un conjunto de jugadores. Exportado para reusar en el
  * generador multi-equipo (la unidad de potenciación tiene que ser idéntica).
  */
-export function leaderOf(players: GeneratorInput[], coefs: LeaderCoefs): LeaderInfo {
-  let best: LeaderInfo = { nivel: "ninguno", coef: 1 };
+export function leadershipOf(players: GeneratorInput[], coefs: LeaderCoefs): TeamLeadership {
+  let positivo = false;
+  let negativos = 0;
   for (const p of players) {
-    const nivel = p.liderazgo ?? "ninguno";
-    const coef = leaderCoef(nivel, coefs);
-    if (coef > best.coef || (coef === best.coef && LEVEL_RANK[nivel] > LEVEL_RANK[best.nivel])) {
-      best = { nivel, coef };
-    }
+    if (p.liderazgo === "positivo") positivo = true;
+    else if (p.liderazgo === "negativo") negativos++;
   }
-  return best;
+  const coef = (positivo ? coefs.positivo : 1) * Math.pow(coefs.negativo, negativos);
+  return { positivo, negativos, coef };
 }
 
-function teamLeader(comp: TeamComposition, coefs: LeaderCoefs): LeaderInfo {
-  return leaderOf(comp.goalkeeper ? [comp.goalkeeper, ...comp.players] : comp.players, coefs);
+function teamLeadership(comp: TeamComposition, coefs: LeaderCoefs): TeamLeadership {
+  return leadershipOf(comp.goalkeeper ? [comp.goalkeeper, ...comp.players] : comp.players, coefs);
 }
 
 function teamLeaderCoef(comp: TeamComposition, coefs: LeaderCoefs): number {
-  return teamLeader(comp, coefs).coef;
+  return teamLeadership(comp, coefs).coef;
 }
 
 export type TeamLabel = "A" | "B";
@@ -121,12 +117,12 @@ export type BalanceSummary = {
     A: TeamDimensions;
     B: TeamDimensions;
   };
-  // FUT-127: líder efectivo de cada equipo (el de mayor coef) y su coeficiente.
-  // nivel 'ninguno'/coef 1 = el equipo no tiene líder. Con coeficientes en 1.00
-  // (default) coef siempre es 1 pero nivel refleja igual si hay líder.
+  // FUT-127: liderazgo agregado de cada equipo (líder positivo + cantidad de
+  // negativos + coef resultante). Con coeficientes en 1.00 (default) el coef es
+  // 1 pero igual refleja si hay líderes/quejosos.
   leaders: {
-    A: { nivel: LiderazgoNivel; coef: number };
-    B: { nivel: LiderazgoNivel; coef: number };
+    A: TeamLeadership;
+    B: TeamLeadership;
   };
   warnings: string[];
   // FUT-87: metadata de variedad vs la fecha anterior. Solo presente cuando se
@@ -460,11 +456,11 @@ function assembleSummary(
   for (const p of teamA.players) positionDist.A[p.position_pref]++;
   for (const p of teamB.players) positionDist.B[p.position_pref]++;
 
-  const leaderA = teamLeader(teamA, coefs);
-  const leaderB = teamLeader(teamB, coefs);
+  const leaderA = teamLeadership(teamA, coefs);
+  const leaderB = teamLeadership(teamB, coefs);
 
   const totalDiff = Math.abs(teamA.totalScore - teamB.totalScore);
-  // FUT-127: la diferencia "efectiva" pondera el score por el coef del líder.
+  // FUT-127: la diferencia "efectiva" pondera el score por el coef de liderazgo.
   // Con coeficientes en 1.00 coincide con totalDiff (comportamiento de FUT-95).
   const effDiff = Math.abs(teamA.totalScore * leaderA.coef - teamB.totalScore * leaderB.coef);
 
@@ -482,10 +478,7 @@ function assembleSummary(
     totalDiff,
     positionDist,
     dimensions: { A: teamDimensions(teamA), B: teamDimensions(teamB) },
-    leaders: {
-      A: { nivel: leaderA.nivel, coef: leaderA.coef },
-      B: { nivel: leaderB.nivel, coef: leaderB.coef },
-    },
+    leaders: { A: leaderA, B: leaderB },
     warnings,
   };
 }

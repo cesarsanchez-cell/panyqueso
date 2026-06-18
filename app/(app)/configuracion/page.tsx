@@ -11,11 +11,11 @@ export default async function ConfiguracionPage() {
   const supabase = await createClient();
   const { data: settings } = await supabase
     .from("app_settings")
-    .select("liderazgo_coef_medio, liderazgo_coef_alto")
+    .select("liderazgo_coef_positivo, liderazgo_coef_negativo")
     .maybeSingle();
 
-  const medio = Number(settings?.liderazgo_coef_medio ?? 1);
-  const alto = Number(settings?.liderazgo_coef_alto ?? 1);
+  const positivo = Number(settings?.liderazgo_coef_positivo ?? 1);
+  const negativo = Number(settings?.liderazgo_coef_negativo ?? 1);
 
   return (
     <div className="space-y-6">
@@ -29,13 +29,14 @@ export default async function ConfiguracionPage() {
           Liderazgo: potenciación de equipo
         </h2>
         <p className="mt-1 text-xs text-neutral-500">
-          Un jugador con liderazgo (medio/alto) organiza y mejora a su equipo. En el armado, el
-          equipo que tiene un líder multiplica su score por este coeficiente (no acumulativo: si hay
-          dos líderes, solo cuenta el de mayor coeficiente). <strong>1.00</strong> = sin efecto.
-          Empezá en 1.00 y ajustá de a poco a medida que veas cómo influye.
+          Un líder <strong>positivo</strong> organiza y mejora a su equipo: multiplica su score por
+          el coef positivo (no acumulativo, si hay dos cuenta uno). Un <strong>negativo</strong>{" "}
+          (quejoso) molesta a sus compañeros: multiplica por el coef negativo y{" "}
+          <strong>sí acumula</strong> (dos quejosos = coef²). <strong>1.00</strong> en ambos = sin
+          efecto. Empezá en 1.00 y ajustá de a poco a medida que veas cómo influye.
         </p>
 
-        <LiderazgoCoefForm medio={medio} alto={alto} />
+        <LiderazgoCoefForm positivo={positivo} negativo={negativo} />
       </section>
     </div>
   );

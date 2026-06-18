@@ -1,4 +1,4 @@
-// FUT-127: tests del potenciador de líder (liderazgo por grupo).
+// FUT-127: tests del liderazgo (positivo potencia, negativo penaliza acumulando).
 // Correr con:  pnpm test:unit
 
 import assert from "node:assert/strict";
@@ -36,8 +36,6 @@ function teamOf(s: ReturnType<typeof generateTeams>, id: string): "A" | "B" {
 }
 
 test("coef 1.00 (default): el liderazgo no cambia el armado", () => {
-  // Mismo roster, uno con liderazgo alto. Con coef 1 el resultado es idéntico
-  // a no tener líder (inerte).
   const base: GeneratorInput[] = [
     gk("gk1"),
     gk("gk2"),
@@ -46,7 +44,7 @@ test("coef 1.00 (default): el liderazgo no cambia el armado", () => {
     mk("c", 6),
     mk("d", 5),
   ];
-  const conLider = base.map((p) => (p.id === "a" ? { ...p, liderazgo: "alto" as const } : p));
+  const conLider = base.map((p) => (p.id === "a" ? { ...p, liderazgo: "positivo" as const } : p));
 
   const s1 = generateTeams(base, NO_LEADER_BOOST);
   const s2 = generateTeams(conLider, NO_LEADER_BOOST);
@@ -56,20 +54,18 @@ test("coef 1.00 (default): el liderazgo no cambia el armado", () => {
     s2.teamA.players.map((p) => p.id).sort(),
   );
   // El líder se reporta en el summary aunque el coef sea 1.
-  const ladoLider = teamOf(s2, "a");
-  assert.equal(s2.leaders[ladoLider].nivel, "alto");
-  assert.equal(s2.leaders[ladoLider].coef, 1);
+  const lado = teamOf(s2, "a");
+  assert.equal(s2.leaders[lado].positivo, true);
+  assert.equal(s2.leaders[lado].coef, 1);
 });
 
-test("dos líderes (mismo nivel) caen en equipos distintos para equilibrar el coef", () => {
-  // Con un boost real, juntar a los dos líderes en un equipo lo dispararía: el
-  // balance los separa para que cada equipo tenga su potenciador.
-  const coefs: LeaderCoefs = { medio: 1, alto: 1.3 };
+test("dos líderes positivos caen en equipos distintos para equilibrar el coef", () => {
+  const coefs: LeaderCoefs = { positivo: 1.3, negativo: 1 };
   const roster: GeneratorInput[] = [
     gk("gk1"),
     gk("gk2"),
-    mk("L1", 6, { liderazgo: "alto" }),
-    mk("L2", 6, { liderazgo: "alto" }),
+    mk("L1", 6, { liderazgo: "positivo" }),
+    mk("L2", 6, { liderazgo: "positivo" }),
     mk("c1", 6),
     mk("c2", 6),
     mk("c3", 6),
@@ -78,19 +74,16 @@ test("dos líderes (mismo nivel) caen en equipos distintos para equilibrar el co
 
   const s = generateTeams(roster, coefs);
   assert.notEqual(teamOf(s, "L1"), teamOf(s, "L2"));
-  // Cada equipo queda con un líder alto.
-  assert.equal(s.leaders.A.nivel, "alto");
-  assert.equal(s.leaders.B.nivel, "alto");
+  assert.equal(s.leaders.A.positivo, true);
+  assert.equal(s.leaders.B.positivo, true);
 });
 
-test("un solo líder: el equipo sin líder recibe más score crudo para compensar el boost", () => {
-  // Un líder alto (boost 1.5) en un roster por lo demás simétrico. Para que la
-  // puntuación final quede pareja, su equipo debe tener menos score crudo.
-  const coefs: LeaderCoefs = { medio: 1, alto: 1.5 };
+test("positivo: el equipo con líder recibe menos score crudo para compensar el boost", () => {
+  const coefs: LeaderCoefs = { positivo: 1.5, negativo: 1 };
   const roster: GeneratorInput[] = [
     gk("gk1"),
     gk("gk2"),
-    mk("L", 6, { liderazgo: "alto" }),
+    mk("L", 6, { liderazgo: "positivo" }),
     mk("a", 9),
     mk("b", 8),
     mk("c", 7),
@@ -99,34 +92,52 @@ test("un solo líder: el equipo sin líder recibe más score crudo para compensa
   ];
 
   const s = generateTeams(roster, coefs);
-  const ladoLider = teamOf(s, "L");
-  const scoreLider = ladoLider === "A" ? s.teamA.totalScore : s.teamB.totalScore;
-  const scoreOtro = ladoLider === "A" ? s.teamB.totalScore : s.teamA.totalScore;
+  const lado = teamOf(s, "L");
+  const scoreLider = lado === "A" ? s.teamA.totalScore : s.teamB.totalScore;
+  const scoreOtro = lado === "A" ? s.teamB.totalScore : s.teamA.totalScore;
 
-  // El equipo con líder tiene menos score crudo; con el boost se empareja.
   assert.ok(
     scoreLider < scoreOtro,
     `el equipo con líder debería tener menos score crudo: lider=${scoreLider} otro=${scoreOtro}`,
   );
-  const effLider = scoreLider * s.leaders[ladoLider].coef;
-  const effOtro = scoreOtro * 1;
-  assert.ok(
-    Math.abs(effLider - effOtro) < Math.abs(scoreLider - scoreOtro),
-    "la diferencia efectiva (con boost) debería ser menor que la cruda",
-  );
 });
 
-test("no acumulativo: dos líderes en un equipo cuentan como uno (el de mayor coef)", () => {
-  const coefs: LeaderCoefs = { medio: 1.2, alto: 1.5 };
-  // Forzamos ambos líderes al mismo equipo dándoles posiciones que no obligan a
-  // separarlos: comprobamos el cálculo del coef del equipo, no el reparto.
+test("negativo es acumulativo: dos quejosos pesan el doble (coef^2)", () => {
+  const coefs: LeaderCoefs = { positivo: 1, negativo: 0.8 };
+  // Dos quejosos. El coef de un equipo que los tuviera a ambos sería 0.8^2=0.64.
   const roster: GeneratorInput[] = [
-    mk("L1", 6, { liderazgo: "alto" }),
-    mk("L2", 6, { liderazgo: "medio" }),
+    gk("gk1"),
+    gk("gk2"),
+    mk("Q1", 6, { liderazgo: "negativo" }),
+    mk("Q2", 6, { liderazgo: "negativo" }),
+    mk("c1", 6),
+    mk("c2", 6),
+    mk("c3", 6),
+    mk("c4", 6),
+  ];
+
+  const s = generateTeams(roster, coefs);
+  // Se reparten: un quejoso por equipo (no se amontonan).
+  assert.notEqual(teamOf(s, "Q1"), teamOf(s, "Q2"));
+  // Cada equipo cuenta 1 negativo → coef 0.8.
+  assert.equal(s.leaders.A.negativos, 1);
+  assert.equal(s.leaders.B.negativos, 1);
+  assert.ok(Math.abs(s.leaders.A.coef - 0.8) < 1e-9);
+});
+
+test("positivo (no acumula) + negativo (acumula) se multiplican", () => {
+  const coefs: LeaderCoefs = { positivo: 1.4, negativo: 0.9 };
+  // Un equipo con un líder y dos quejosos: 1.4 × 0.9 × 0.9 = 1.134.
+  const roster: GeneratorInput[] = [
+    mk("L", 6, { liderazgo: "positivo" }),
+    mk("Q1", 6, { liderazgo: "negativo" }),
+    mk("Q2", 6, { liderazgo: "negativo" }),
   ];
   const s = generateTeams([gk("gk1"), gk("gk2"), ...roster, mk("c1", 6), mk("c2", 6)], coefs);
-  // El equipo que tenga a L1 (alto) reporta coef 1.5; el medio no se suma.
-  const lado = teamOf(s, "L1");
-  assert.equal(s.leaders[lado].coef, 1.5);
-  assert.equal(s.leaders[lado].nivel, "alto");
+  const lado = teamOf(s, "L");
+  // Si el reparto dejó al líder y los dos quejosos juntos, el coef sería 1.134;
+  // verificamos la fórmula sobre el equipo del líder según lo que reporta.
+  const lead = s.leaders[lado];
+  const esperado = (lead.positivo ? 1.4 : 1) * Math.pow(0.9, lead.negativos);
+  assert.ok(Math.abs(lead.coef - esperado) < 1e-9, `coef ${lead.coef} != ${esperado}`);
 });

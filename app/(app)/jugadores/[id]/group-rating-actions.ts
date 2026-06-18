@@ -22,8 +22,8 @@ const SUB_KEYS = [
 
 const ROLES = new Set(["arquero", "jugador_campo", "mixto"]);
 const POSITIONS = new Set(["arquero", "defensor", "mediocampista", "delantero"]);
-const CONFIDENCES = new Set(["baja", "media", "alta"]);
-const LIDERAZGOS = new Set(["ninguno", "medio", "alto"]);
+const CONFIDENCES = new Set(["inicial", "baja", "media", "alta"]);
+const LIDERAZGOS = new Set(["negativo", "ninguno", "positivo"]);
 
 function parseSub(raw: FormDataEntryValue | null): number | null {
   const n = Number(String(raw ?? "").trim());

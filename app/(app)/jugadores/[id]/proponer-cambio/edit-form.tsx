@@ -52,6 +52,7 @@ const DIMENSIONS: { label: string; subs: { name: SubKey; label: string }[] }[] =
 ];
 
 const CONFIDENCE_OPTIONS = [
+  { value: "inicial", label: "Inicial (sin evaluar)" },
   { value: "baja", label: "Baja" },
   { value: "media", label: "Media" },
   { value: "alta", label: "Alta" },

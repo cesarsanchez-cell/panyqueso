@@ -1190,30 +1190,35 @@ function RubrosBalance({ draft, infoById }: { draft: TeamDraft; infoById: Player
   );
 }
 
-// FUT-127: líder "que cuenta" de un lado del draft (el de mayor nivel; no
-// acumulativo). nivel 'ninguno' = el equipo no tiene líder.
-function sideLeader(side: TeamDraft["A"], infoById: PlayerInfoMap): Liderazgo {
+// FUT-127: liderazgo agregado de un lado del draft: si tiene líder positivo (no
+// acumulativo) y cuántos negativos/quejosos (acumulativos).
+function sideLeadership(
+  side: TeamDraft["A"],
+  infoById: PlayerInfoMap,
+): { positivo: boolean; negativos: number } {
   const ids = side.goalkeeperPlayerId
     ? [side.goalkeeperPlayerId, ...side.playerIds]
     : side.playerIds;
-  const rank: Record<Liderazgo, number> = { ninguno: 0, medio: 1, alto: 2 };
-  let best: Liderazgo = "ninguno";
+  let positivo = false;
+  let negativos = 0;
   for (const id of ids) {
     const n = infoById.get(id)?.liderazgo ?? "ninguno";
-    if (rank[n] > rank[best]) best = n;
+    if (n === "positivo") positivo = true;
+    else if (n === "negativo") negativos++;
   }
-  return best;
+  return { positivo, negativos };
 }
 
-const LIDERAZGO_LABEL: Record<Liderazgo, string> = {
-  ninguno: "Sin líder",
-  medio: "Líder medio",
-  alto: "Líder alto",
-};
+function leadershipLabel(l: { positivo: boolean; negativos: number }): string {
+  const parts: string[] = [];
+  if (l.positivo) parts.push("líder ✓");
+  if (l.negativos > 0) parts.push(l.negativos === 1 ? "1 quejoso" : `${l.negativos} quejosos`);
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
 
-// FUT-127: muestra qué equipo tiene líder. Solo aparece si al menos uno lo
-// tiene (la mayoría de los partidos no tienen líderes). Si están potenciados
-// (coef > 1) y solo un equipo tiene líder, avisa el desbalance.
+// FUT-127: muestra el liderazgo por equipo. Solo aparece si hay algún líder o
+// quejoso. Si están activos los coeficientes (≠1) y el reparto quedó asimétrico,
+// avisa para que el admin revise el balance.
 function LeaderBalance({
   draft,
   infoById,
@@ -1223,27 +1228,23 @@ function LeaderBalance({
   infoById: PlayerInfoMap;
   coefs: LeaderCoefs;
 }) {
-  const a = sideLeader(draft.A, infoById);
-  const b = sideLeader(draft.B, infoById);
-  if (a === "ninguno" && b === "ninguno") return null;
+  const a = sideLeadership(draft.A, infoById);
+  const b = sideLeadership(draft.B, infoById);
+  if (!a.positivo && !b.positivo && a.negativos === 0 && b.negativos === 0) return null;
 
-  const boosted = coefs.medio > 1 || coefs.alto > 1;
-  const asymmetric = (a === "ninguno") !== (b === "ninguno");
+  const activo = coefs.positivo > 1 || coefs.negativo < 1;
+  const asimetrico = a.positivo !== b.positivo || a.negativos !== b.negativos;
 
   return (
     <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2">
       <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Liderazgo</p>
       <div className="mt-1.5 flex items-center justify-between gap-3 text-xs">
-        <span className="text-neutral-600">
-          Equipo A {a === "ninguno" ? "✗" : `✓ (${LIDERAZGO_LABEL[a].toLowerCase()})`}
-        </span>
-        <span className="text-neutral-600">
-          Equipo B {b === "ninguno" ? "✗" : `✓ (${LIDERAZGO_LABEL[b].toLowerCase()})`}
-        </span>
+        <span className="text-neutral-600">Equipo A: {leadershipLabel(a)}</span>
+        <span className="text-neutral-600">Equipo B: {leadershipLabel(b)}</span>
       </div>
-      {boosted && asymmetric ? (
+      {activo && asimetrico ? (
         <p className="mt-1.5 text-xs text-amber-700">
-          Un equipo tiene líder y el otro no: el líder potencia a su equipo. Revisá el balance.
+          El liderazgo quedó disparejo entre los equipos: potencia/penaliza el balance. Revisalo.
         </p>
       ) : null}
     </div>

@@ -13,11 +13,11 @@ type SupabaseLike = Awaited<ReturnType<typeof createClient>>;
 export async function loadLeaderCoefs(supabase: SupabaseLike): Promise<LeaderCoefs> {
   const { data } = await supabase
     .from("app_settings")
-    .select("liderazgo_coef_medio, liderazgo_coef_alto")
+    .select("liderazgo_coef_positivo, liderazgo_coef_negativo")
     .maybeSingle();
   if (!data) return NO_LEADER_BOOST;
   return {
-    medio: Number(data.liderazgo_coef_medio ?? 1),
-    alto: Number(data.liderazgo_coef_alto ?? 1),
+    positivo: Number(data.liderazgo_coef_positivo ?? 1),
+    negativo: Number(data.liderazgo_coef_negativo ?? 1),
   };
 }
