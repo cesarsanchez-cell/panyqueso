@@ -2072,6 +2072,10 @@ export type Database = {
         Args: { p_grupo_id: string };
         Returns: string;
       };
+      player_leave_grupo: {
+        Args: { p_grupo_id: string };
+        Returns: undefined;
+      };
       player_undo_decline_convocatoria: {
         Args: { p_convocatoria_id: string };
         Returns: string;

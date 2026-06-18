@@ -117,29 +117,25 @@ export async function joinOpenConvocatoria(
   };
 }
 
-export async function joinSuplenteQueue(
-  _prev: OneClickState,
-  formData: FormData,
-): Promise<OneClickState> {
-  const ctx = await requireUser();
-  if (ctx.profile.role !== "player") return { error: "Solo el jugador puede anotarse." };
+// El jugador se baja del GRUPO (distinto de bajarse de una convocatoria). La
+// membresía pasa a inactivo y el trigger lo saca de la convocatoria abierta.
+// Volver a entrar lo decide el coord/admin (no hay auto-reenganche).
+export async function leaveGrupo(_prev: OneClickState, formData: FormData): Promise<OneClickState> {
+  await requireUser();
 
   const grupoId = String(formData.get("grupo_id") ?? "").trim();
   if (!grupoId) return { error: "Falta el id del grupo." };
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("player_join_suplente_queue", {
-    p_grupo_id: grupoId,
-  });
+  const { error } = await supabase.rpc("player_leave_grupo", { p_grupo_id: grupoId });
 
   if (error) {
-    return {
-      error: mapError((error as { code?: string }).code, `No se pudo anotar: ${error.message}`),
-    };
+    const msg = error.message ?? "";
+    if (msg.includes("not_active_member")) return { error: "Ya no sos miembro de este grupo." };
+    if (msg.includes("no_player_ficha")) return { error: "Tu cuenta no tiene ficha de jugador." };
+    return { error: `No se pudo bajar del grupo: ${msg}` };
   }
 
   revalidatePath("/mi-perfil");
-  return {
-    success: data === "titular" ? "Entraste como titular." : "Entraste a la lista de espera.",
-  };
+  return { success: "Te bajaste del grupo." };
 }
