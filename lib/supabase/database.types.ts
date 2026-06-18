@@ -1862,6 +1862,16 @@ export type Database = {
           lugar_nombre: string;
         }[];
       };
+      get_convocatoria_roster_names: {
+        Args: { p_conv_ids: string[] };
+        Returns: {
+          player_id: string;
+          nombre: string;
+          apodo: string;
+          avatar_url: string;
+          club_id: string;
+        }[];
+      };
       get_my_confirmed_match_teams: {
         Args: never;
         Returns: {

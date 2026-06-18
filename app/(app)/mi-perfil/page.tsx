@@ -338,13 +338,15 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
   >();
   const playerIdsList = Array.from(playerIds);
   if (playerIdsList.length > 0) {
-    const { data: playersData } = await supabase
-      .from("players_public")
-      .select("id, nombre, apodo, avatar_url, club_id")
-      .in("id", playerIdsList);
+    // Resolvemos los nombres del roster con una RPC (no con players_public), que
+    // incluye a los invitados (is_guest) de las convocatorias en las que
+    // participo. players_public los filtra y caían a "—".
+    const { data: playersData } = await supabase.rpc("get_convocatoria_roster_names", {
+      p_conv_ids: convIds,
+    });
     for (const p of playersData ?? []) {
-      if (p.id)
-        playerById.set(p.id, {
+      if (p.player_id)
+        playerById.set(p.player_id, {
           nombre: p.nombre ?? "—",
           apodo: p.apodo ?? null,
           avatarUrl: p.avatar_url ?? null,
