@@ -154,7 +154,7 @@ export default async function JugadorDetallePage({
     .select(
       `grupo_id, phys_power, phys_speed, phys_stamina, ment_tactical, ment_resilience,
        ment_attitude, tech_passing, tech_finishing, tech_linkup, role_field, position_pref,
-       internal_score`,
+       internal_score, rating_confidence, liderazgo`,
     )
     .eq("player_id", id);
 

@@ -7,8 +7,9 @@ import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { ClubCrest } from "@/components/club-crest";
 import { parseTeamDraft, type TeamDraft, type TeamLabel } from "@/lib/teams/draft";
-import { countRegroup, effectivePhysical } from "@/lib/teams/generate";
+import { countRegroup, effectivePhysical, type LeaderCoefs } from "@/lib/teams/generate";
 import { loadGroupRatings } from "@/lib/teams/group-ratings";
+import { loadLeaderCoefs } from "@/lib/teams/leader-coefs";
 import { findUnplayedPreviousConvocatoria } from "@/lib/convocatorias/previous-played-gate";
 import { loadPreviousComposition } from "@/lib/teams/previous";
 
@@ -30,6 +31,7 @@ import { VideoForm } from "./video-form";
 type Status = Database["public"]["Enums"]["convocatoria_status"];
 type RoleField = Database["public"]["Enums"]["player_role_field"];
 type PositionPref = Database["public"]["Enums"]["position_pref"];
+type Liderazgo = Database["public"]["Enums"]["liderazgo_nivel"];
 
 type SearchParams = { q?: string; rol?: string; pos?: string; confirmed?: string };
 
@@ -316,6 +318,7 @@ export default async function ConvocatoriaDetallePage({
     mental: number | null;
     technical: number | null;
     edad: number | null;
+    liderazgo: Liderazgo;
   };
   // FUT-103/105: el balance que se muestra usa el rating POR GRUPO (mismo
   // override que la generación y el snapshot), así lo que se ve coincide con lo
@@ -343,9 +346,11 @@ export default async function ConvocatoriaDetallePage({
         mental: g?.mental ?? p.mental,
         technical: g?.technical ?? p.technical,
         edad: p.edad,
+        liderazgo: g?.liderazgo ?? "ninguno",
       });
     }
   }
+  const leaderCoefs = await loadLeaderCoefs(supabase);
 
   const q = (sp.q ?? "").trim();
   const rol = parseRol(sp.rol);
@@ -619,6 +624,10 @@ export default async function ConvocatoriaDetallePage({
           {teamDraft && varietyInfo ? <VarietyBanner info={varietyInfo} /> : null}
 
           {teamDraft ? <RubrosBalance draft={teamDraft} infoById={playerInfoById} /> : null}
+
+          {teamDraft ? (
+            <LeaderBalance draft={teamDraft} infoById={playerInfoById} coefs={leaderCoefs} />
+          ) : null}
 
           {teamDraft ? (
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -1109,6 +1118,7 @@ type PlayerInfoMap = Map<
     mental: number | null;
     technical: number | null;
     edad: number | null;
+    liderazgo: Liderazgo;
   }
 >;
 
@@ -1176,6 +1186,66 @@ function RubrosBalance({ draft, infoById }: { draft: TeamDraft; infoById: Player
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+// FUT-127: líder "que cuenta" de un lado del draft (el de mayor nivel; no
+// acumulativo). nivel 'ninguno' = el equipo no tiene líder.
+function sideLeader(side: TeamDraft["A"], infoById: PlayerInfoMap): Liderazgo {
+  const ids = side.goalkeeperPlayerId
+    ? [side.goalkeeperPlayerId, ...side.playerIds]
+    : side.playerIds;
+  const rank: Record<Liderazgo, number> = { ninguno: 0, medio: 1, alto: 2 };
+  let best: Liderazgo = "ninguno";
+  for (const id of ids) {
+    const n = infoById.get(id)?.liderazgo ?? "ninguno";
+    if (rank[n] > rank[best]) best = n;
+  }
+  return best;
+}
+
+const LIDERAZGO_LABEL: Record<Liderazgo, string> = {
+  ninguno: "Sin líder",
+  medio: "Líder medio",
+  alto: "Líder alto",
+};
+
+// FUT-127: muestra qué equipo tiene líder. Solo aparece si al menos uno lo
+// tiene (la mayoría de los partidos no tienen líderes). Si están potenciados
+// (coef > 1) y solo un equipo tiene líder, avisa el desbalance.
+function LeaderBalance({
+  draft,
+  infoById,
+  coefs,
+}: {
+  draft: TeamDraft;
+  infoById: PlayerInfoMap;
+  coefs: LeaderCoefs;
+}) {
+  const a = sideLeader(draft.A, infoById);
+  const b = sideLeader(draft.B, infoById);
+  if (a === "ninguno" && b === "ninguno") return null;
+
+  const boosted = coefs.medio > 1 || coefs.alto > 1;
+  const asymmetric = (a === "ninguno") !== (b === "ninguno");
+
+  return (
+    <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Liderazgo</p>
+      <div className="mt-1.5 flex items-center justify-between gap-3 text-xs">
+        <span className="text-neutral-600">
+          Equipo A {a === "ninguno" ? "✗" : `✓ (${LIDERAZGO_LABEL[a].toLowerCase()})`}
+        </span>
+        <span className="text-neutral-600">
+          Equipo B {b === "ninguno" ? "✗" : `✓ (${LIDERAZGO_LABEL[b].toLowerCase()})`}
+        </span>
+      </div>
+      {boosted && asymmetric ? (
+        <p className="mt-1.5 text-xs text-amber-700">
+          Un equipo tiene líder y el otro no: el líder potencia a su equipo. Revisá el balance.
+        </p>
+      ) : null}
     </div>
   );
 }

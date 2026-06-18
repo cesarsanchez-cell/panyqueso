@@ -13,6 +13,7 @@ import {
 } from "@/lib/teams/draft";
 import { generateTeamsWithVariety, type GeneratorInput } from "@/lib/teams/generate";
 import { loadGroupRatings } from "@/lib/teams/group-ratings";
+import { loadLeaderCoefs } from "@/lib/teams/leader-coefs";
 import { loadPreviousComposition } from "@/lib/teams/previous";
 
 export type DraftMutationState = null | { error: string } | { success: string };
@@ -87,6 +88,9 @@ async function loadConvocadosForGenerator(
       technical: g?.technical ?? p.technical ?? undefined,
       edad: p.edad ?? undefined,
       positions_possible: g?.positions_possible ?? p.positions_possible ?? undefined,
+      // FUT-127: el liderazgo es por grupo; sin override (convocatoria suelta)
+      // queda 'ninguno' y no potencia nada.
+      liderazgo: g?.liderazgo ?? "ninguno",
     };
   });
 }
@@ -124,7 +128,8 @@ export async function generateDraft(
   // FUT-87: variedad vs la fecha anterior del grupo (best-effort: si no hay
   // partido previo, el generador cae al mejor balance sin más).
   const previous = await loadPreviousComposition(supabase, convocatoriaId);
-  const summary = generateTeamsWithVariety(convocados, { previous });
+  const coefs = await loadLeaderCoefs(supabase);
+  const summary = generateTeamsWithVariety(convocados, { previous }, coefs);
   const draft = summaryToDraft(summary);
 
   const { error } = await supabase

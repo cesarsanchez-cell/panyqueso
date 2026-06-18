@@ -14,6 +14,7 @@ import {
   type PresentismoArmado,
 } from "@/lib/teams/presentismo";
 import { loadGroupRatings } from "@/lib/teams/group-ratings";
+import { loadLeaderCoefs } from "@/lib/teams/leader-coefs";
 
 export type CanchaResult = { ok: true } | { ok: false; error: string };
 export type AbrirResult = { ok: true; convocatoriaId: string } | { ok: false; error: string };
@@ -234,6 +235,8 @@ async function loadPresentForGenerator(
       technical: g?.technical ?? p.technical ?? undefined,
       edad: p.edad ?? undefined,
       positions_possible: g?.positions_possible ?? p.positions_possible ?? undefined,
+      // FUT-127: liderazgo por grupo (sin override queda 'ninguno').
+      liderazgo: g?.liderazgo ?? "ninguno",
     };
   });
 
@@ -262,7 +265,8 @@ export async function armarEquipos(
     };
   }
 
-  const summary = generateMultiTeams(inputs, { numTeams: nt, teamSize: ts });
+  const coefs = await loadLeaderCoefs(supabase);
+  const summary = generateMultiTeams(inputs, { numTeams: nt, teamSize: ts, coefs });
   const armado = buildPresentismoArmado(summary, { numTeams: nt, teamSize: ts, guestIds });
 
   const { error } = await supabase.rpc("guardar_armado_presentismo", {

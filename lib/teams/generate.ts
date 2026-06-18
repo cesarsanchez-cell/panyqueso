@@ -25,6 +25,7 @@ import type { Database } from "@/lib/supabase/database.types";
 
 type RoleField = Database["public"]["Enums"]["player_role_field"];
 type PositionPref = Database["public"]["Enums"]["position_pref"];
+type LiderazgoNivel = Database["public"]["Enums"]["liderazgo_nivel"];
 
 export type GeneratorInput = {
   id: string;
@@ -40,7 +41,56 @@ export type GeneratorInput = {
   technical?: number;
   edad?: number;
   positions_possible?: PositionPref[];
+  // FUT-127: liderazgo del jugador EN el grupo. No es una skill (no entra al
+  // score): es un POTENCIADOR de equipo. El equipo que tiene un líder multiplica
+  // su score en el balance por el coeficiente del nivel (ver LeaderCoefs).
+  liderazgo?: LiderazgoNivel;
 };
+
+/**
+ * FUT-127: coeficientes de potenciación por nivel de líder (vienen de
+ * app_settings). 1.00 = sin efecto. 'ninguno' siempre es 1.
+ */
+export type LeaderCoefs = { medio: number; alto: number };
+
+/** Sin potenciación: el default mientras el admin no ajusta los coeficientes. */
+export const NO_LEADER_BOOST: LeaderCoefs = { medio: 1, alto: 1 };
+
+export type LeaderInfo = { nivel: LiderazgoNivel; coef: number };
+
+const LEVEL_RANK: Record<LiderazgoNivel, number> = { ninguno: 0, medio: 1, alto: 2 };
+
+function leaderCoef(nivel: LiderazgoNivel | undefined, coefs: LeaderCoefs): number {
+  if (nivel === "alto") return coefs.alto;
+  if (nivel === "medio") return coefs.medio;
+  return 1;
+}
+
+/**
+ * Líder "que cuenta" de un conjunto de jugadores: el de MAYOR coeficiente (no
+ * acumulativo, si hay dos líderes solo puntúa uno; empate de coef → el de mayor
+ * nivel). Sin líder, nivel 'ninguno'/coef 1. Exportado para reusar en el
+ * generador multi-equipo (la unidad de potenciación tiene que ser idéntica).
+ */
+export function leaderOf(players: GeneratorInput[], coefs: LeaderCoefs): LeaderInfo {
+  let best: LeaderInfo = { nivel: "ninguno", coef: 1 };
+  for (const p of players) {
+    const nivel = p.liderazgo ?? "ninguno";
+    const coef = leaderCoef(nivel, coefs);
+    if (coef > best.coef || (coef === best.coef && LEVEL_RANK[nivel] > LEVEL_RANK[best.nivel])) {
+      best = { nivel, coef };
+    }
+  }
+  return best;
+}
+
+function teamLeader(comp: TeamComposition, coefs: LeaderCoefs): LeaderInfo {
+  return leaderOf(comp.goalkeeper ? [comp.goalkeeper, ...comp.players] : comp.players, coefs);
+}
+
+function teamLeaderCoef(comp: TeamComposition, coefs: LeaderCoefs): number {
+  return teamLeader(comp, coefs).coef;
+}
 
 export type TeamLabel = "A" | "B";
 
@@ -70,6 +120,13 @@ export type BalanceSummary = {
   dimensions: {
     A: TeamDimensions;
     B: TeamDimensions;
+  };
+  // FUT-127: líder efectivo de cada equipo (el de mayor coef) y su coeficiente.
+  // nivel 'ninguno'/coef 1 = el equipo no tiene líder. Con coeficientes en 1.00
+  // (default) coef siempre es 1 pero nivel refleja igual si hay líder.
+  leaders: {
+    A: { nivel: LiderazgoNivel; coef: number };
+    B: { nivel: LiderazgoNivel; coef: number };
   };
   warnings: string[];
   // FUT-87: metadata de variedad vs la fecha anterior. Solo presente cuando se
@@ -233,13 +290,18 @@ function teamShape(comp: TeamComposition): LineShares {
  * (def/medio/del), contando la presencia repartida según preferida + posibles.
  * Más bajo = más parejo. Las posiciones son objetivo secundario (POSITION_WEIGHT).
  */
-function balanceCost(a: TeamComposition, b: TeamComposition): number {
+function balanceCost(a: TeamComposition, b: TeamComposition, coefs: LeaderCoefs): number {
+  // FUT-127: el líder potencia el score del equipo. El balance se mide a
+  // "puntuación final" = rubros × coef del líder de cada equipo. Con coef 1
+  // (default) esto es idéntico al balance por rubro de FUT-95.
+  const ca = teamLeaderCoef(a, coefs);
+  const cb = teamLeaderCoef(b, coefs);
   const da = teamDimensions(a);
   const db = teamDimensions(b);
   const dimCost =
-    Math.abs(da.physEff - db.physEff) +
-    Math.abs(da.mental - db.mental) +
-    Math.abs(da.technical - db.technical);
+    Math.abs(da.physEff * ca - db.physEff * cb) +
+    Math.abs(da.mental * ca - db.mental * cb) +
+    Math.abs(da.technical * ca - db.technical * cb);
 
   const pa = teamShape(a);
   const pb = teamShape(b);
@@ -334,7 +396,10 @@ function magnitude(p: GeneratorInput): number {
  * rubro. Mantiene los equipos parejos en cantidad (±1). Devuelve composiciones
  * + warnings de arquero, para reusarse en generateTeams y en variedad.
  */
-function generateBaseline(input: GeneratorInput[]): {
+function generateBaseline(
+  input: GeneratorInput[],
+  coefs: LeaderCoefs,
+): {
   teamA: TeamComposition;
   teamB: TeamComposition;
   gkWarnings: string[];
@@ -366,8 +431,8 @@ function generateBaseline(input: GeneratorInput[]): {
       // Elegir el equipo que deje el menor costo de balance.
       const tryA = makeComp(teamA.goalkeeper, [...teamA.players, p]);
       const tryB = makeComp(teamB.goalkeeper, [...teamB.players, p]);
-      const costA = balanceCost(tryA, teamB);
-      const costB = balanceCost(teamA, tryB);
+      const costA = balanceCost(tryA, teamB, coefs);
+      const costB = balanceCost(teamA, tryB, coefs);
       target = costA <= costB ? "A" : "B";
     }
 
@@ -386,6 +451,7 @@ function assembleSummary(
   teamA: TeamComposition,
   teamB: TeamComposition,
   gkWarnings: string[],
+  coefs: LeaderCoefs,
 ): BalanceSummary {
   const positionDist = {
     A: emptyPositionDist(),
@@ -394,11 +460,17 @@ function assembleSummary(
   for (const p of teamA.players) positionDist.A[p.position_pref]++;
   for (const p of teamB.players) positionDist.B[p.position_pref]++;
 
+  const leaderA = teamLeader(teamA, coefs);
+  const leaderB = teamLeader(teamB, coefs);
+
   const totalDiff = Math.abs(teamA.totalScore - teamB.totalScore);
+  // FUT-127: la diferencia "efectiva" pondera el score por el coef del líder.
+  // Con coeficientes en 1.00 coincide con totalDiff (comportamiento de FUT-95).
+  const effDiff = Math.abs(teamA.totalScore * leaderA.coef - teamB.totalScore * leaderB.coef);
 
   const warnings = [...gkWarnings];
-  if (totalDiff > 2) {
-    warnings.push(`Diferencia de score elevada (${totalDiff.toFixed(2)}).`);
+  if (effDiff > 2) {
+    warnings.push(`Diferencia de score elevada (${effDiff.toFixed(2)}).`);
   }
   if (Math.abs(teamCount(teamA) - teamCount(teamB)) > 1) {
     warnings.push("Los teams quedaron desbalanceados en cantidad.");
@@ -410,6 +482,10 @@ function assembleSummary(
     totalDiff,
     positionDist,
     dimensions: { A: teamDimensions(teamA), B: teamDimensions(teamB) },
+    leaders: {
+      A: { nivel: leaderA.nivel, coef: leaderA.coef },
+      B: { nivel: leaderB.nivel, coef: leaderB.coef },
+    },
     warnings,
   };
 }
@@ -516,14 +592,14 @@ function candidateSignature(c: Candidate): string {
  * aplica el swap que más baja el costo de balance, hasta que no mejora.
  * Determinístico (desempate por firma).
  */
-function refineBalance(A0: TeamComposition, B0: TeamComposition): Candidate {
+function refineBalance(A0: TeamComposition, B0: TeamComposition, coefs: LeaderCoefs): Candidate {
   let cur: Candidate = { teamA: A0, teamB: B0 };
-  let curCost = balanceCost(cur.teamA, cur.teamB);
+  let curCost = balanceCost(cur.teamA, cur.teamB, coefs);
 
   for (let guard = 0; guard < 200; guard++) {
     let best: { cand: Candidate; cost: number; sig: string } | null = null;
     for (const c of singleSwapCandidates(cur.teamA, cur.teamB)) {
-      const cost = balanceCost(c.teamA, c.teamB);
+      const cost = balanceCost(c.teamA, c.teamB, coefs);
       if (cost >= curCost - EPS) continue; // solo mejoras estrictas
       const sig = candidateSignature(c);
       if (!best || cost < best.cost - EPS || (Math.abs(cost - best.cost) < EPS && sig < best.sig)) {
@@ -538,10 +614,13 @@ function refineBalance(A0: TeamComposition, B0: TeamComposition): Candidate {
   return cur;
 }
 
-export function generateTeams(input: GeneratorInput[]): BalanceSummary {
-  const { teamA, teamB, gkWarnings } = generateBaseline(input);
-  const refined = refineBalance(teamA, teamB);
-  return assembleSummary(refined.teamA, refined.teamB, gkWarnings);
+export function generateTeams(
+  input: GeneratorInput[],
+  coefs: LeaderCoefs = NO_LEADER_BOOST,
+): BalanceSummary {
+  const { teamA, teamB, gkWarnings } = generateBaseline(input, coefs);
+  const refined = refineBalance(teamA, teamB, coefs);
+  return assembleSummary(refined.teamA, refined.teamB, gkWarnings, coefs);
 }
 
 /**
@@ -558,21 +637,27 @@ export function generateTeams(input: GeneratorInput[]): BalanceSummary {
 export function generateTeamsWithVariety(
   input: GeneratorInput[],
   options: VarietyOptions = {},
+  coefs: LeaderCoefs = NO_LEADER_BOOST,
 ): BalanceSummary {
   const tolerancePct = options.tolerancePct ?? 5;
   const minChanges = options.minChanges ?? 2;
 
-  const base = generateBaseline(input);
-  const refined = refineBalance(base.teamA, base.teamB);
+  const base = generateBaseline(input, coefs);
+  const refined = refineBalance(base.teamA, base.teamB, coefs);
   const A0 = refined.teamA;
   const B0 = refined.teamB;
   const gkWarnings = base.gkWarnings;
   const prev = options.previous ?? null;
 
+  // FUT-127: la tolerancia se mide a puntuación final (score × coef del líder),
+  // así un split con líderes en bandos distintos no se rechaza por su diferencia
+  // de score crudo. Con coef 1 (default) es el score crudo de siempre.
   const withinTolerance = (a: TeamComposition, b: TeamComposition): boolean => {
-    const avg = (a.totalScore + b.totalScore) / 2;
+    const effA = a.totalScore * teamLeaderCoef(a, coefs);
+    const effB = b.totalScore * teamLeaderCoef(b, coefs);
+    const avg = (effA + effB) / 2;
     if (avg <= 0) return true;
-    return Math.abs(a.totalScore - b.totalScore) / avg <= tolerancePct / 100;
+    return Math.abs(effA - effB) / avg <= tolerancePct / 100;
   };
 
   const withVariety = (
@@ -580,7 +665,7 @@ export function generateTeamsWithVariety(
     b: TeamComposition,
     v: VarietyResult,
   ): BalanceSummary => {
-    const summary = assembleSummary(a, b, gkWarnings);
+    const summary = assembleSummary(a, b, gkWarnings, coefs);
     summary.variety = v;
     return summary;
   };
@@ -616,7 +701,7 @@ export function generateTeamsWithVariety(
       if (!withinTolerance(c.teamA, c.teamB)) continue;
       const { changes } = countRegroup(compIds(c.teamA), compIds(c.teamB), prev);
       if (changes < minChanges) continue;
-      const cost = balanceCost(c.teamA, c.teamB);
+      const cost = balanceCost(c.teamA, c.teamB, coefs);
       const sig = candidateSignature(c);
       if (
         !best ||

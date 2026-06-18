@@ -36,18 +36,24 @@ export type Database = {
       app_settings: {
         Row: {
           id: boolean;
+          liderazgo_coef_alto: number;
+          liderazgo_coef_medio: number;
           requiere_veedor: boolean;
           updated_at: string;
           updated_by: string | null;
         };
         Insert: {
           id?: boolean;
+          liderazgo_coef_alto?: number;
+          liderazgo_coef_medio?: number;
           requiere_veedor?: boolean;
           updated_at?: string;
           updated_by?: string | null;
         };
         Update: {
           id?: boolean;
+          liderazgo_coef_alto?: number;
+          liderazgo_coef_medio?: number;
           requiere_veedor?: boolean;
           updated_at?: string;
           updated_by?: string | null;
@@ -1078,6 +1084,7 @@ export type Database = {
           grupo_id: string;
           id: string;
           internal_score: number;
+          liderazgo: Database["public"]["Enums"]["liderazgo_nivel"];
           ment_attitude: number;
           ment_resilience: number;
           ment_tactical: number;
@@ -1102,6 +1109,7 @@ export type Database = {
           grupo_id: string;
           id?: string;
           internal_score?: number;
+          liderazgo?: Database["public"]["Enums"]["liderazgo_nivel"];
           ment_attitude: number;
           ment_resilience: number;
           ment_tactical: number;
@@ -1126,6 +1134,7 @@ export type Database = {
           grupo_id?: string;
           id?: string;
           internal_score?: number;
+          liderazgo?: Database["public"]["Enums"]["liderazgo_nivel"];
           ment_attitude?: number;
           ment_resilience?: number;
           ment_tactical?: number;
@@ -1586,6 +1595,10 @@ export type Database = {
         Args: { p_fecha?: string; p_grupo_id: string };
         Returns: string;
       };
+      activar_jugador_existente: {
+        Args: { p_auth_user_id: string; p_player_id: string; p_token: string };
+        Returns: undefined;
+      };
       admin_apply_sensitive_change: {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
@@ -1608,10 +1621,6 @@ export type Database = {
         Returns: undefined;
       };
       aprobar_join_request: { Args: { p_request_id: string }; Returns: string };
-      activar_jugador_existente: {
-        Args: { p_auth_user_id: string; p_player_id: string; p_token: string };
-        Returns: undefined;
-      };
       asignar_coordinador_a_grupo: {
         Args: { p_grupo_id: string; p_profile_id: string };
         Returns: undefined;
@@ -1784,6 +1793,7 @@ export type Database = {
         Returns: {
           grupo_id: string;
           internal_score: number;
+          liderazgo: Database["public"]["Enums"]["liderazgo_nivel"];
           ment_attitude: number;
           ment_resilience: number;
           ment_tactical: number;
@@ -2103,6 +2113,10 @@ export type Database = {
         Args: { p_grupo_id: string; p_value: boolean };
         Returns: undefined;
       };
+      set_liderazgo_coeficientes: {
+        Args: { p_alto: number; p_medio: number };
+        Returns: undefined;
+      };
       set_requiere_veedor: { Args: { p_value: boolean }; Returns: undefined };
       set_veedor: {
         Args: { p_es_veedor: boolean; p_profile_id: string };
@@ -2152,6 +2166,7 @@ export type Database = {
       grupo_modo_confirmacion: "convocatoria" | "presentismo";
       grupo_status: "activo" | "archivado";
       join_request_status: "pendiente" | "aprobada" | "rechazada";
+      liderazgo_nivel: "ninguno" | "medio" | "alto";
       match_team_label: "A" | "B" | "C";
       match_winner: "a" | "b" | "empate";
       membresia_status: "activo" | "inactivo";
@@ -2311,6 +2326,7 @@ export const Constants = {
       grupo_modo_confirmacion: ["convocatoria", "presentismo"],
       grupo_status: ["activo", "archivado"],
       join_request_status: ["pendiente", "aprobada", "rechazada"],
+      liderazgo_nivel: ["ninguno", "medio", "alto"],
       match_team_label: ["A", "B", "C"],
       match_winner: ["a", "b", "empate"],
       membresia_status: ["activo", "inactivo"],
