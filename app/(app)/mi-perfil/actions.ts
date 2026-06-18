@@ -116,30 +116,3 @@ export async function joinOpenConvocatoria(
     success: data === "titular" ? "Entraste como titular." : "Entraste a la lista de espera.",
   };
 }
-
-export async function joinSuplenteQueue(
-  _prev: OneClickState,
-  formData: FormData,
-): Promise<OneClickState> {
-  const ctx = await requireUser();
-  if (ctx.profile.role !== "player") return { error: "Solo el jugador puede anotarse." };
-
-  const grupoId = String(formData.get("grupo_id") ?? "").trim();
-  if (!grupoId) return { error: "Falta el id del grupo." };
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("player_join_suplente_queue", {
-    p_grupo_id: grupoId,
-  });
-
-  if (error) {
-    return {
-      error: mapError((error as { code?: string }).code, `No se pudo anotar: ${error.message}`),
-    };
-  }
-
-  revalidatePath("/mi-perfil");
-  return {
-    success: data === "titular" ? "Entraste como titular." : "Entraste a la lista de espera.",
-  };
-}

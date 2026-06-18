@@ -9,7 +9,6 @@ import { createClient } from "@/lib/supabase/server";
 import { PlayerAvatar } from "../player-avatar";
 import { DeclineButton } from "./decline-button";
 import { JoinConvocatoriaButton } from "./join-convocatoria-button";
-import { JoinQueueButton } from "./join-queue-button";
 import { NotificationsCard } from "./notifications-card";
 import { ProdeForm, type ProdeInfo } from "./prode-form";
 import { UndoDeclineButton } from "./undo-decline-button";
@@ -69,7 +68,6 @@ type MiEstado =
   | "suplente_convo"
   | "declinado_convo"
   | "no_anotado_convo"
-  | "bajado_grupo"
   | "sin_convocatoria";
 
 type ConfirmedTeamMember = {
@@ -361,8 +359,11 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
     const grupo = grupoInfoMap.get(grupoId);
     if (!grupo) continue;
     if (grupo.status !== "activo") continue;
+    // Si ya no sos miembro activo (te bajaste o te sacaron del grupo), el grupo
+    // no aparece en tu perfil: solo el coord/admin te vuelve a sumar. Declinar
+    // una convocatoria NO te saca del grupo (la membresía sigue activa).
+    if (grupoMembership.get(grupoId) !== "activo") continue;
 
-    const memStatus = grupoMembership.get(grupoId);
     const openConv = openConvByGrupo.get(grupoId) ?? null;
 
     let titulares: LineupMember[] = [];
@@ -427,9 +428,7 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
         .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
 
       const myConvRow = roster.find((r) => r.player_id === playerId);
-      if (memStatus === "inactivo") {
-        miEstado = "bajado_grupo";
-      } else if (myConvRow && myConvRow.attendance_status === "declinado") {
+      if (myConvRow && myConvRow.attendance_status === "declinado") {
         miEstado = "declinado_convo";
       } else if (myConvRow && myConvRow.rol_en_convocatoria === "titular") {
         miEstado = "titular_convo";
@@ -443,11 +442,10 @@ async function loadLineups(supabase: SupabaseLike, playerId: string): Promise<Gr
       }
     } else {
       // Sin convocatoria abierta: NO mostramos roster (parecia una convocatoria
-      // fantasma). Solo el header del grupo + estado vacio. Si el jugador se
-      // bajo del grupo, conserva el CTA "Volver al grupo".
+      // fantasma). Solo el header del grupo + estado vacio.
       titulares = [];
       suplentes = [];
-      miEstado = memStatus === "inactivo" ? "bajado_grupo" : "sin_convocatoria";
+      miEstado = "sin_convocatoria";
     }
 
     result.push({
@@ -722,7 +720,7 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
           ? "Te bajaste de este partido"
           : miEstado === "no_anotado_convo"
             ? "No anotado"
-            : "Te bajaste del grupo";
+            : "";
 
   const miBadgeClass =
     miEstado === "titular_convo"
@@ -820,18 +818,6 @@ function GrupoCard({ lineup }: { lineup: GrupoLineup }) {
           </p>
           <div className="mt-2">
             <JoinConvocatoriaButton convocatoriaId={openConv.id} label="Me anoto" />
-          </div>
-        </div>
-      ) : null}
-
-      {miEstado === "bajado_grupo" ? (
-        <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
-          <p className="text-xs text-neutral-600">
-            Te bajaste de este grupo. Podés volver ahora: si hay cupo entrás como titular, si no al
-            final de la lista de espera.
-          </p>
-          <div className="mt-2">
-            <JoinQueueButton grupoId={grupo.id} label="Volver al grupo" />
           </div>
         </div>
       ) : null}
