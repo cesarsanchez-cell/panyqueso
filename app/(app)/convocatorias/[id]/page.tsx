@@ -10,6 +10,7 @@ import { parseTeamDraft, type TeamDraft, type TeamLabel } from "@/lib/teams/draf
 import { countRegroup, effectivePhysical, type LeaderCoefs } from "@/lib/teams/generate";
 import { loadGroupRatings } from "@/lib/teams/group-ratings";
 import { loadLeaderCoefs } from "@/lib/teams/leader-coefs";
+import { minConvocadosParaGenerar } from "@/lib/teams/min-convocados";
 import { findUnplayedPreviousConvocatoria } from "@/lib/convocatorias/previous-played-gate";
 import { loadPreviousComposition } from "@/lib/teams/previous";
 
@@ -265,9 +266,13 @@ export default async function ConvocatoriaDetallePage({
   // (faltazos, invitados que cubrieron, etc).
   const showSelector = canManage && (isOpen || isClosed || isPlayed);
 
-  // Teams: admin + abierta + al menos 10 convocados (5v5 minimo segun
-  // plan v4). El draft persistido vive en convocatorias.team_draft (PR 2).
-  const MIN_CONVOCADOS_PARA_GENERAR = 10;
+  // Teams: admin/coordinador + abierta + al menos el cupo del grupo (piso 4 =
+  // 2v2). Antes era un 10 fijo, que bloqueaba a los grupos chicos. El draft
+  // persistido vive en convocatorias.team_draft.
+  const MIN_CONVOCADOS_PARA_GENERAR = minConvocadosParaGenerar(
+    convocatoria.grupo_id,
+    convocatoria.cupo_maximo,
+  );
   const canGenerateTeams = canManage && isOpen && convocados.length >= MIN_CONVOCADOS_PARA_GENERAR;
 
   const teamDraft = parseTeamDraft(convocatoria.team_draft);
