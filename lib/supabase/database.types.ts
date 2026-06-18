@@ -1599,6 +1599,14 @@ export type Database = {
         Args: { p_auth_user_id: string; p_player_id: string; p_token: string };
         Returns: undefined;
       };
+      addable_players_for_grupo: {
+        Args: { p_grupo_id: string };
+        Returns: {
+          apodo: string;
+          id: string;
+          nombre: string;
+        }[];
+      };
       admin_apply_sensitive_change: {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;

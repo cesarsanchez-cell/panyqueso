@@ -60,7 +60,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
   const [
     { data: membresias, error: memErr },
     { data: lugares },
-    { data: players },
+    { data: addablePlayers },
     { data: pendingInvitesRaw, error: invitesErr },
     { data: openConvRow },
     { data: coordRows },
@@ -73,11 +73,10 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
       .eq("status", "activo")
       .order("joined_at", { ascending: true }),
     supabase.from("lugares").select("id, nombre").order("nombre", { ascending: true }),
-    supabase
-      .from("players")
-      .select("id, nombre, apodo, status")
-      .eq("status", "approved")
-      .order("nombre", { ascending: true }),
+    // Candidatos para "Agregar miembro": RPC que respeta el rol sin exponer la
+    // ficha. admin = padrón approved; coordinador = miembros (activos o
+    // inactivos) de sus grupos, así puede re-agregar ex-miembros.
+    supabase.rpc("addable_players_for_grupo", { p_grupo_id: id }),
     supabase
       .from("player_invitations")
       .select("id, phone, nombre_tentativo, token, expires_at")
@@ -190,10 +189,12 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
     playerIdsConAvisos = Array.from(new Set((subs ?? []).map((s) => s.player_id)));
   }
 
-  const ocupados = new Set(memList.map((m) => m.player?.id).filter(Boolean) as string[]);
-  const availablePlayers = (players ?? [])
-    .filter((p) => !ocupados.has(p.id))
-    .map((p) => ({ id: p.id, nombre: p.apodo ? `${p.nombre} (${p.apodo})` : p.nombre }));
+  // La RPC ya excluye a los activos del grupo destino y resuelve el alcance por
+  // rol. Solo formateamos el label (nombre + apodo).
+  const availablePlayers = (addablePlayers ?? []).map((p) => ({
+    id: p.id,
+    nombre: p.apodo ? `${p.nombre} (${p.apodo})` : p.nombre,
+  }));
 
   const assignedCoordinadores: AssignedCoordinador[] = (coordRows ?? []).map((r) => ({
     id: r.id,
