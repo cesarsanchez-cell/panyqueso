@@ -2175,7 +2175,7 @@ export type Database = {
       player_role_field: "arquero" | "jugador_campo" | "mixto";
       player_status: "pending" | "approved" | "inactive";
       position_pref: "defensor" | "mediocampista" | "delantero" | "arquero";
-      rating_confidence: "inicial" | "baja" | "media" | "alta";
+      rating_confidence: "baja" | "media" | "alta" | "inicial";
       user_role: "admin" | "veedor" | "player" | "coordinador";
     };
     CompositeTypes: {
@@ -2335,7 +2335,7 @@ export const Constants = {
       player_role_field: ["arquero", "jugador_campo", "mixto"],
       player_status: ["pending", "approved", "inactive"],
       position_pref: ["defensor", "mediocampista", "delantero", "arquero"],
-      rating_confidence: ["inicial", "baja", "media", "alta"],
+      rating_confidence: ["baja", "media", "alta", "inicial"],
       user_role: ["admin", "veedor", "player", "coordinador"],
     },
   },
