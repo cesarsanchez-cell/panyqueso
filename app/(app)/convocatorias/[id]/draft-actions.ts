@@ -14,6 +14,7 @@ import {
 import { generateTeamsWithVariety, type GeneratorInput } from "@/lib/teams/generate";
 import { loadGroupRatings } from "@/lib/teams/group-ratings";
 import { loadLeaderCoefs } from "@/lib/teams/leader-coefs";
+import { minConvocadosParaGenerar } from "@/lib/teams/min-convocados";
 import { loadPreviousComposition } from "@/lib/teams/previous";
 
 export type DraftMutationState = null | { error: string } | { success: string };
@@ -24,7 +25,7 @@ async function loadConvocatoriaWithDraft(
 ) {
   const { data } = await supabase
     .from("convocatorias")
-    .select("status, team_draft, modo, grupo_id")
+    .select("status, team_draft, modo, grupo_id, cupo_maximo")
     .eq("id", convocatoriaId)
     .maybeSingle();
   return data;
@@ -121,8 +122,9 @@ export async function generateDraft(
   }
 
   const convocados = await loadConvocadosForGenerator(supabase, convocatoriaId);
-  if (convocados.length < 10) {
-    return { error: "Se necesitan al menos 10 convocados." };
+  const minConvocados = minConvocadosParaGenerar(row.grupo_id, row.cupo_maximo);
+  if (convocados.length < minConvocados) {
+    return { error: `Se necesitan al menos ${minConvocados} convocados.` };
   }
 
   // FUT-87: variedad vs la fecha anterior del grupo (best-effort: si no hay
