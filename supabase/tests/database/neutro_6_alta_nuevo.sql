@@ -3,7 +3,7 @@
 -- ============================================================================
 --   1. claim_invite corre sin error.
 --   2. El player nuevo nace con technical/physical/mental = 6/6/6.
---   3. rating_confidence = 'baja' (= sin calibrar).
+--   3. rating_confidence = 'inicial' (= sin calibrar; FUT-127 Fase 3).
 --   4. El rating POR GRUPO hereda neutro (phys_power = 6).
 --   5. El internal_score por grupo es > 0 (refleja el 6, no el viejo piso).
 -- ============================================================================
@@ -68,11 +68,12 @@ select is(
   'claim_invite: el jugador nuevo nace con 6/6/6 (neutro)'
 );
 
--- 3. Confianza baja = sin calibrar.
+-- 3. Confianza 'inicial' = sin calibrar (FUT-127 Fase 3: el trigger de alta
+--    traduce el 'baja' histórico de las RPCs a 'inicial').
 select is(
   (select rating_confidence::text from public.players where phone = '+5491155559006'),
-  'baja',
-  'claim_invite: rating_confidence = baja'
+  'inicial',
+  'claim_invite: rating_confidence = inicial (sin calibrar)'
 );
 
 -- 4. El rating por grupo hereda el neutro (seed coalesce base 6).

@@ -22,6 +22,8 @@ const SUB_KEYS = [
 
 const ROLES = new Set(["arquero", "jugador_campo", "mixto"]);
 const POSITIONS = new Set(["arquero", "defensor", "mediocampista", "delantero"]);
+const CONFIDENCES = new Set(["inicial", "baja", "media", "alta"]);
+const LIDERAZGOS = new Set(["negativo", "ninguno", "positivo"]);
 
 function parseSub(raw: FormDataEntryValue | null): number | null {
   const n = Number(String(raw ?? "").trim());
@@ -59,6 +61,21 @@ export async function proposeGroupRating(
   const positionPref = String(formData.get("position_pref") ?? "").trim();
   if (!POSITIONS.has(positionPref)) return { error: "Posición inválida." };
   proposed.position_pref = positionPref;
+
+  // FUT-127: confianza (faltaba mandarla: el rating quedaba siempre 'baja') +
+  // liderazgo (potenciador de equipo por grupo). Ambos son opcionales en el
+  // form viejo; si no vienen, no se tocan (el _apply usa coalesce).
+  const confidence = String(formData.get("rating_confidence") ?? "").trim();
+  if (confidence.length > 0) {
+    if (!CONFIDENCES.has(confidence)) return { error: "Confianza inválida." };
+    proposed.rating_confidence = confidence;
+  }
+
+  const liderazgo = String(formData.get("liderazgo") ?? "").trim();
+  if (liderazgo.length > 0) {
+    if (!LIDERAZGOS.has(liderazgo)) return { error: "Liderazgo inválido." };
+    proposed.liderazgo = liderazgo;
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("propose_group_rating_change", {

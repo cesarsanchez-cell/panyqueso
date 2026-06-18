@@ -8,6 +8,8 @@ import { proposeGroupRating, type GroupRatingState } from "./group-rating-action
 
 type RoleField = Database["public"]["Enums"]["player_role_field"];
 type PositionPref = Database["public"]["Enums"]["position_pref"];
+type RatingConfidence = Database["public"]["Enums"]["rating_confidence"];
+type Liderazgo = Database["public"]["Enums"]["liderazgo_nivel"];
 
 export type GroupRatingInitial = {
   phys_power: number;
@@ -21,6 +23,8 @@ export type GroupRatingInitial = {
   tech_linkup: number;
   role_field: RoleField;
   position_pref: PositionPref;
+  rating_confidence: RatingConfidence;
+  liderazgo: Liderazgo;
   internal_score: number;
 };
 
@@ -35,6 +39,19 @@ const POSITION_OPTIONS: { value: PositionPref; label: string }[] = [
   { value: "defensor", label: "Defensor" },
   { value: "mediocampista", label: "Mediocampista" },
   { value: "delantero", label: "Delantero" },
+];
+
+const CONFIDENCE_OPTIONS: { value: RatingConfidence; label: string }[] = [
+  { value: "inicial", label: "Inicial (sin evaluar)" },
+  { value: "baja", label: "Baja" },
+  { value: "media", label: "Media" },
+  { value: "alta", label: "Alta" },
+];
+
+const LIDERAZGO_OPTIONS: { value: Liderazgo; label: string }[] = [
+  { value: "negativo", label: "Negativo (quejoso)" },
+  { value: "ninguno", label: "Ninguno" },
+  { value: "positivo", label: "Positivo (líder)" },
 ];
 
 const GROUPS: { titulo: string; subs: { key: keyof GroupRatingInitial; label: string }[] }[] = [
@@ -154,7 +171,38 @@ export function GroupRatingEditor({
             ))}
           </select>
         </label>
+        <label className="block text-xs text-neutral-600">
+          Confianza del rating
+          <select
+            name="rating_confidence"
+            defaultValue={initial.rating_confidence}
+            className={inputClass}
+          >
+            {CONFIDENCE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-xs text-neutral-600">
+          Liderazgo en el grupo
+          <select name="liderazgo" defaultValue={initial.liderazgo} className={inputClass}>
+            {LIDERAZGO_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
+
+      <p className="mt-2 text-xs text-neutral-500">
+        El <strong>liderazgo</strong> no cambia el score del jugador: ajusta el balance del equipo.
+        Un <strong>positivo</strong> organiza y mejora al resto (potencia); un{" "}
+        <strong>negativo</strong> (quejoso) molesta a sus compañeros (penaliza). Los coeficientes
+        los fija el admin en Configuración.
+      </p>
 
       <label className="mt-3 block text-xs text-neutral-600">
         Motivo del cambio

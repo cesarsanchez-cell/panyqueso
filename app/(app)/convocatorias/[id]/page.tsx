@@ -7,8 +7,9 @@ import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { ClubCrest } from "@/components/club-crest";
 import { parseTeamDraft, type TeamDraft, type TeamLabel } from "@/lib/teams/draft";
-import { countRegroup, effectivePhysical } from "@/lib/teams/generate";
+import { countRegroup, effectivePhysical, type LeaderCoefs } from "@/lib/teams/generate";
 import { loadGroupRatings } from "@/lib/teams/group-ratings";
+import { loadLeaderCoefs } from "@/lib/teams/leader-coefs";
 import { findUnplayedPreviousConvocatoria } from "@/lib/convocatorias/previous-played-gate";
 import { loadPreviousComposition } from "@/lib/teams/previous";
 
@@ -30,6 +31,7 @@ import { VideoForm } from "./video-form";
 type Status = Database["public"]["Enums"]["convocatoria_status"];
 type RoleField = Database["public"]["Enums"]["player_role_field"];
 type PositionPref = Database["public"]["Enums"]["position_pref"];
+type Liderazgo = Database["public"]["Enums"]["liderazgo_nivel"];
 
 type SearchParams = { q?: string; rol?: string; pos?: string; confirmed?: string };
 
@@ -316,6 +318,7 @@ export default async function ConvocatoriaDetallePage({
     mental: number | null;
     technical: number | null;
     edad: number | null;
+    liderazgo: Liderazgo;
   };
   // FUT-103/105: el balance que se muestra usa el rating POR GRUPO (mismo
   // override que la generación y el snapshot), así lo que se ve coincide con lo
@@ -343,9 +346,11 @@ export default async function ConvocatoriaDetallePage({
         mental: g?.mental ?? p.mental,
         technical: g?.technical ?? p.technical,
         edad: p.edad,
+        liderazgo: g?.liderazgo ?? "ninguno",
       });
     }
   }
+  const leaderCoefs = await loadLeaderCoefs(supabase);
 
   const q = (sp.q ?? "").trim();
   const rol = parseRol(sp.rol);
@@ -619,6 +624,10 @@ export default async function ConvocatoriaDetallePage({
           {teamDraft && varietyInfo ? <VarietyBanner info={varietyInfo} /> : null}
 
           {teamDraft ? <RubrosBalance draft={teamDraft} infoById={playerInfoById} /> : null}
+
+          {teamDraft ? (
+            <LeaderBalance draft={teamDraft} infoById={playerInfoById} coefs={leaderCoefs} />
+          ) : null}
 
           {teamDraft ? (
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -1109,6 +1118,7 @@ type PlayerInfoMap = Map<
     mental: number | null;
     technical: number | null;
     edad: number | null;
+    liderazgo: Liderazgo;
   }
 >;
 
@@ -1176,6 +1186,67 @@ function RubrosBalance({ draft, infoById }: { draft: TeamDraft; infoById: Player
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+// FUT-127: liderazgo agregado de un lado del draft: si tiene líder positivo (no
+// acumulativo) y cuántos negativos/quejosos (acumulativos).
+function sideLeadership(
+  side: TeamDraft["A"],
+  infoById: PlayerInfoMap,
+): { positivo: boolean; negativos: number } {
+  const ids = side.goalkeeperPlayerId
+    ? [side.goalkeeperPlayerId, ...side.playerIds]
+    : side.playerIds;
+  let positivo = false;
+  let negativos = 0;
+  for (const id of ids) {
+    const n = infoById.get(id)?.liderazgo ?? "ninguno";
+    if (n === "positivo") positivo = true;
+    else if (n === "negativo") negativos++;
+  }
+  return { positivo, negativos };
+}
+
+function leadershipLabel(l: { positivo: boolean; negativos: number }): string {
+  const parts: string[] = [];
+  if (l.positivo) parts.push("líder ✓");
+  if (l.negativos > 0) parts.push(l.negativos === 1 ? "1 quejoso" : `${l.negativos} quejosos`);
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
+// FUT-127: muestra el liderazgo por equipo. Solo aparece si hay algún líder o
+// quejoso. Si están activos los coeficientes (≠1) y el reparto quedó asimétrico,
+// avisa para que el admin revise el balance.
+function LeaderBalance({
+  draft,
+  infoById,
+  coefs,
+}: {
+  draft: TeamDraft;
+  infoById: PlayerInfoMap;
+  coefs: LeaderCoefs;
+}) {
+  const a = sideLeadership(draft.A, infoById);
+  const b = sideLeadership(draft.B, infoById);
+  if (!a.positivo && !b.positivo && a.negativos === 0 && b.negativos === 0) return null;
+
+  const activo = coefs.positivo > 1 || coefs.negativo < 1;
+  const asimetrico = a.positivo !== b.positivo || a.negativos !== b.negativos;
+
+  return (
+    <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Liderazgo</p>
+      <div className="mt-1.5 flex items-center justify-between gap-3 text-xs">
+        <span className="text-neutral-600">Equipo A: {leadershipLabel(a)}</span>
+        <span className="text-neutral-600">Equipo B: {leadershipLabel(b)}</span>
+      </div>
+      {activo && asimetrico ? (
+        <p className="mt-1.5 text-xs text-amber-700">
+          El liderazgo quedó disparejo entre los equipos: potencia/penaliza el balance. Revisalo.
+        </p>
+      ) : null}
     </div>
   );
 }

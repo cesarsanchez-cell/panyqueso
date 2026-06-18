@@ -153,10 +153,12 @@ export default async function JugadoresPage({
   // contradicen (calificado en general, sin calificar en el grupo heredado). El
   // filtro de grupo solo decide A QUIÉN listar, no si está calificado.
   //
-  // Calificado = confianza base ≠ 'baja'  (vía base, que setea confianza)
-  //           OR existe un cambio de rating no-rechazado en cualquier grupo/base
-  //              (vía editor por grupo, que cambia los subs pero deja confianza
-  //              en 'baja'). El OR es retroactivo y cubre ambas vías + la herencia.
+  // Sin calificar = confianza base 'inicial' (estado de arranque, FUT-127 Fase 3)
+  //              AND no existe un cambio de rating no-rechazado en ningún
+  //              grupo/base (el editor por grupo cambia los subs pero puede dejar
+  //              la confianza base en 'inicial'). El AND-NOT es retroactivo y
+  //              cubre ambas vías + la herencia (calificado en algún lado ⇒ no es
+  //              "sin calificar").
   const ids = players.map((p) => p.id);
 
   const ratedIds = new Set<string>();
@@ -172,7 +174,7 @@ export default async function JugadoresPage({
 
   const withFlag = players.map((p) => ({
     ...p,
-    sinCalificar: p.rating_confidence === "baja" && !ratedIds.has(p.id),
+    sinCalificar: p.rating_confidence === "inicial" && !ratedIds.has(p.id),
   }));
   const visiblePlayers = sinCalificarFilter ? withFlag.filter((p) => p.sinCalificar) : withFlag;
 

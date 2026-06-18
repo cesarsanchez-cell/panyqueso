@@ -38,6 +38,7 @@ const POSITION_PREF_LABEL: Record<PositionPref, string> = {
 };
 
 const RATING_CONFIDENCE_LABEL: Record<RatingConfidence, string> = {
+  inicial: "Inicial (sin evaluar)",
   baja: "Baja",
   media: "Media",
   alta: "Alta",

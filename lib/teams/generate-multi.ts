@@ -20,10 +20,14 @@
 
 import {
   type GeneratorInput,
+  type LeaderCoefs,
   type LineShares,
   type TeamDimensions,
+  type TeamLeadership,
+  NO_LEADER_BOOST,
   POSITION_WEIGHT,
   dimensionsOf,
+  leadershipOf,
   shapeOf,
 } from "./generate.ts";
 
@@ -35,6 +39,8 @@ export type MultiTeamOptions = {
   numTeams: number;
   // Tamaño objetivo de cada equipo (titulares por bando, incluye al arquero).
   teamSize: number;
+  // FUT-127: coeficientes de potenciación por líder. Default sin efecto.
+  coefs?: LeaderCoefs;
 };
 
 export type MultiTeam = {
@@ -48,6 +54,8 @@ export type MultiTeam = {
   startersScore: number;
   // Totales por rubro de los titulares (para mostrar el balance).
   dimensions: TeamDimensions;
+  // FUT-127: liderazgo agregado de los titulares (positivo + negativos + coef).
+  leadership: TeamLeadership;
 };
 
 export type MultiBalanceSummary = {
@@ -103,8 +111,14 @@ function diffShape(a: LineShares, b: LineShares): number {
 // Costo de desbalance entre N conjuntos de jugadores: suma sobre todos los pares
 // de (diferencia de rubros + POSITION_WEIGHT * diferencia de forma). Más bajo =
 // más parejo. Generaliza balanceCost() de generate.ts a N grupos.
-function pairwiseCost(groups: GeneratorInput[][]): number {
-  const dims = groups.map((g) => dimensionsOf(g));
+function pairwiseCost(groups: GeneratorInput[][], coefs: LeaderCoefs): number {
+  // FUT-127: cada grupo se mide a "puntuación final" = rubros × coef de su líder
+  // (no acumulativo). Con coef 1 (default) es el balance por rubro de siempre.
+  const dims = groups.map((g) => {
+    const c = leadershipOf(g, coefs).coef;
+    const d = dimensionsOf(g);
+    return { physEff: d.physEff * c, mental: d.mental * c, technical: d.technical * c };
+  });
   const shapes = groups.map((g) => shapeOf(g));
   let cost = 0;
   for (let i = 0; i < groups.length; i++) {
@@ -177,6 +191,7 @@ function distributeField(
   numGroups: number,
   capacities: number[],
   seed: GeneratorInput[][],
+  coefs: LeaderCoefs,
 ): GeneratorInput[][] {
   const groups: GeneratorInput[][] = Array.from({ length: numGroups }, () => []);
 
@@ -196,7 +211,7 @@ function distributeField(
     let best: { idx: number; cost: number } | null = null;
     for (const i of balanced) {
       const trial = groups.map((g, k) => (k === i ? [...seed[k]!, ...g, p] : [...seed[k]!, ...g]));
-      const cost = pairwiseCost(trial);
+      const cost = pairwiseCost(trial, coefs);
       if (!best || cost < best.cost - EPS) best = { idx: i, cost };
     }
     groups[best!.idx]!.push(p);
@@ -208,10 +223,14 @@ function distributeField(
 // Búsqueda local: intercambia jugadores de campo entre pares de grupos mientras
 // baje el costo. Determinístico (aplica la mejor mejora estricta por iteración).
 // `seed[i]` se incluye en el costo pero nunca se mueve.
-function refineSwaps(groups: GeneratorInput[][], seed: GeneratorInput[][]): GeneratorInput[][] {
+function refineSwaps(
+  groups: GeneratorInput[][],
+  seed: GeneratorInput[][],
+  coefs: LeaderCoefs,
+): GeneratorInput[][] {
   const cur = groups.map((g) => [...g]);
   const withSeed = () => cur.map((g, k) => [...seed[k]!, ...g]);
-  let curCost = pairwiseCost(withSeed());
+  let curCost = pairwiseCost(withSeed(), coefs);
 
   for (let guard = 0; guard < 200; guard++) {
     let best: { gi: number; ai: number; gj: number; bj: number; cost: number } | null = null;
@@ -224,7 +243,10 @@ function refineSwaps(groups: GeneratorInput[][], seed: GeneratorInput[][]): Gene
             const tmp = trial[gi]![ai]!;
             trial[gi]![ai] = trial[gj]![bj]!;
             trial[gj]![bj] = tmp;
-            const cost = pairwiseCost(trial.map((g, k) => [...seed[k]!, ...g]));
+            const cost = pairwiseCost(
+              trial.map((g, k) => [...seed[k]!, ...g]),
+              coefs,
+            );
             if (cost < curCost - EPS && (!best || cost < best.cost - EPS)) {
               best = { gi, ai, gj, bj, cost };
             }
@@ -252,6 +274,7 @@ export function generateMultiTeams(
 ): MultiBalanceSummary {
   const numTeams = Math.max(2, Math.min(3, Math.trunc(options.numTeams)));
   const teamSize = Math.max(1, Math.trunc(options.teamSize));
+  const coefs = options.coefs ?? NO_LEADER_BOOST;
   const warnings: string[] = [];
 
   // 1. Arqueros (uno por equipo).
@@ -268,15 +291,15 @@ export function generateMultiTeams(
   const startersPool = fieldStarters.slice(0, totalFieldCap);
   const benchPool = fieldStarters.slice(totalFieldCap);
 
-  let starterGroups = distributeField(startersPool, numTeams, fieldCap, seed);
-  starterGroups = refineSwaps(starterGroups, seed);
+  let starterGroups = distributeField(startersPool, numTeams, fieldCap, seed, coefs);
+  starterGroups = refineSwaps(starterGroups, seed, coefs);
 
   // 4. Suplentes: repartir el sobrante parejo entre los bandos, mismo criterio.
   //    Sin cupo (todos entran); se balancea por cantidad y por rubro/posición.
   const benchCap = Array.from({ length: numTeams }, () => Number.POSITIVE_INFINITY);
   const emptySeed = Array.from({ length: numTeams }, () => [] as GeneratorInput[]);
-  let benchGroups = distributeField(benchPool, numTeams, benchCap, emptySeed);
-  benchGroups = refineSwaps(benchGroups, emptySeed);
+  let benchGroups = distributeField(benchPool, numTeams, benchCap, emptySeed, coefs);
+  benchGroups = refineSwaps(benchGroups, emptySeed, coefs);
 
   // 5. Ensamblar.
   const teams: MultiTeam[] = [];
@@ -295,6 +318,7 @@ export function generateMultiTeams(
       bench,
       startersScore,
       dimensions: dimensionsOf(starters),
+      leadership: leadershipOf(starters, coefs),
     });
   }
 

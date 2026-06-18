@@ -57,7 +57,10 @@ begin
 end;
 $$;
 
-select plan(8);
+-- Modelo de 3 estados (Fase 3): negativo/ninguno/positivo. Los coeficientes y la
+-- confianza 'inicial' se cubren en liderazgo_fase3.sql; acá queda la cobertura
+-- propia de seed/herencia/apply del liderazgo por grupo.
+select plan(4);
 
 -- 1. Alta en grupo A: el seed base deja liderazgo 'ninguno'.
 insert into public.grupo_membresias (grupo_id, player_id, tipo, status)
@@ -71,8 +74,8 @@ select is(
   'seed base: liderazgo arranca en ninguno'
 );
 
--- 2. Herencia: marco líder 'alto' en A; al unirse a B se hereda.
-update public.player_group_ratings set liderazgo = 'alto'
+-- 2. Herencia: marco líder 'positivo' en A; al unirse a B se hereda.
+update public.player_group_ratings set liderazgo = 'positivo'
  where player_id = '00000000-0000-0000-0000-0000000000b1'
    and grupo_id = '00000000-0000-0000-0000-0000000000e1';
 
@@ -83,7 +86,7 @@ select is(
   (select liderazgo::text from public.player_group_ratings
     where player_id = '00000000-0000-0000-0000-0000000000b1'
       and grupo_id = '00000000-0000-0000-0000-0000000000e2'),
-  'alto',
+  'positivo',
   'herencia: el grupo nuevo hereda el liderazgo del grupo previo'
 );
 
@@ -96,7 +99,7 @@ select ok(
   'snapshot incluye liderazgo'
 );
 
--- 4. _apply_group_rating_request aplica el liderazgo propuesto (B: alto → medio).
+-- 4. _apply_group_rating_request aplica el liderazgo propuesto (B: positivo → negativo).
 insert into public.player_change_requests (
   id, player_id, grupo_id, action_type, requested_by,
   old_values, proposed_values, fields_changed, reason, status
@@ -107,9 +110,9 @@ insert into public.player_change_requests (
   'update_sensitive_fields',
   '00000000-0000-0000-0000-0000000000a1',
   null,
-  jsonb_build_object('liderazgo', 'medio'),
+  jsonb_build_object('liderazgo', 'negativo'),
   array['liderazgo'],
-  'baja un escalón',
+  'se volvió quejoso',
   'pending'
 );
 
@@ -124,39 +127,9 @@ select is(
   (select liderazgo::text from public.player_group_ratings
     where player_id = '00000000-0000-0000-0000-0000000000b1'
       and grupo_id = '00000000-0000-0000-0000-0000000000e2'),
-  'medio',
+  'negativo',
   'apply: el liderazgo propuesto se aplica'
 );
-
--- 5/6. Coeficientes default 1.00.
-select is(
-  (select liderazgo_coef_medio from public.app_settings where id),
-  1.00,
-  'coef medio default 1.00'
-);
-select is(
-  (select liderazgo_coef_alto from public.app_settings where id),
-  1.00,
-  'coef alto default 1.00'
-);
-
--- 7. Admin ajusta los coeficientes.
-select _as('00000000-0000-0000-0000-0000000000a1');
-select lives_ok(
-  $$select public.set_liderazgo_coeficientes(1.10, 1.25)$$,
-  'admin: set_liderazgo_coeficientes corre'
-);
-reset role;
-
--- 8. No-admin → forbidden (P0013).
-select _as('00000000-0000-0000-0000-0000000000a2');
-select throws_ok(
-  $$select public.set_liderazgo_coeficientes(1.10, 1.25)$$,
-  'P0013',
-  null,
-  'no-admin: set_liderazgo_coeficientes lanza P0013'
-);
-reset role;
 
 select * from finish();
 rollback;

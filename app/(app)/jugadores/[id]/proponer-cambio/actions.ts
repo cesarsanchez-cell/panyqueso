@@ -13,7 +13,7 @@ type RatingConfidence = Database["public"]["Enums"]["rating_confidence"];
 
 export type ProposeChangeState = null | { error: string } | { fieldErrors: Record<string, string> };
 
-const CONFIDENCES: readonly RatingConfidence[] = ["baja", "media", "alta"];
+const CONFIDENCES: readonly RatingConfidence[] = ["inicial", "baja", "media", "alta"];
 
 // Subcomponentes por dimensión (modelo de puntuación v2). La dimensión
 // técnica/físico/mental es el promedio redondeado de sus 3 subs.
