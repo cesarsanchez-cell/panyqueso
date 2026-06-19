@@ -2,6 +2,8 @@
 
 import { useActionState } from "react";
 
+import { invitarVeedorNuevo } from "./invitar-gestion-actions";
+import { InvitarGestionForm } from "./invitar-gestion-form";
 import { assignVeedor, unassignVeedor, type VeedorGrupoState } from "./veedores-actions";
 
 export type AssignedVeedor = {
@@ -22,10 +24,12 @@ export type EligibleVeedor = {
  */
 export function VeedoresSection({
   grupoId,
+  grupoNombre,
   assigned,
   eligible,
 }: {
   grupoId: string;
+  grupoNombre: string;
   assigned: AssignedVeedor[];
   eligible: EligibleVeedor[];
 }) {
@@ -128,6 +132,13 @@ export function VeedoresSection({
           </p>
         ) : null}
       </div>
+
+      <InvitarGestionForm
+        rol="veedor"
+        grupoId={grupoId}
+        grupoNombre={grupoNombre}
+        action={invitarVeedorNuevo}
+      />
     </section>
   );
 }
