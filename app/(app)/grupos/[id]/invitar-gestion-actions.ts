@@ -26,6 +26,8 @@ export type InvitarGestionState =
 
 type Rol = "coordinador" | "veedor";
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function generateTempPassword(): string {
   return randomBytes(9).toString("base64").replace(/\+/g, "A").replace(/\//g, "Z");
 }
@@ -39,6 +41,7 @@ async function invitarGestion(
   grupoId: string,
   celularRaw: string,
   nombreRaw: string,
+  emailRaw: string,
 ): Promise<InvitarGestionState> {
   // 1. Autoridad. Coordinador: solo el admin. Veedor: admin o coordinador del grupo.
   const ctx = await requireRole(rol === "coordinador" ? "admin" : ["admin", "coordinador"]);
@@ -60,6 +63,16 @@ async function invitarGestion(
   const nombre = nombreRaw.trim();
   if (!nombre) return { error: "Falta el nombre." };
   if (nombre.length > 80) return { error: "Nombre demasiado largo (máx 80)." };
+
+  // Email de contacto OPCIONAL (no es el login). Si lo cargan, lo validamos.
+  const emailTrimmed = emailRaw.trim().toLowerCase();
+  let emailOptional: string | null = null;
+  if (emailTrimmed) {
+    if (!EMAIL_REGEX.test(emailTrimmed) || emailTrimmed.length > 254) {
+      return { error: "Email inválido." };
+    }
+    emailOptional = emailTrimmed;
+  }
 
   const phone = parseArPhone(celularRaw);
   if (!phone) {
@@ -118,12 +131,29 @@ async function invitarGestion(
     }
 
     authUserId = existing.auth_user_id;
-    if (existing.rol !== rol) {
-      const { error: profErr } = await admin
-        .from("profiles")
-        .update({ role: rol })
-        .eq("id", authUserId);
+
+    // Una cuenta con rol nulo es una que estaba dada de baja (la "quitamos" de su
+    // último grupo, sin borrar la cuenta). Reactivarla = alta de nuevo: re-pongo
+    // rol/nombre/email y genero una clave nueva para compartir (perdió el acceso).
+    // Si en cambio ya tiene el rol (gestiona otros grupos) es multi-grupo real:
+    // la sumo sin clave nueva.
+    const reactivando = existing.rol == null;
+
+    const patch: { role?: Rol; email?: string; nombre?: string } = {};
+    if (existing.rol !== rol) patch.role = rol;
+    if (emailOptional) patch.email = emailOptional;
+    if (reactivando) patch.nombre = nombre;
+    if (Object.keys(patch).length > 0) {
+      const { error: profErr } = await admin.from("profiles").update(patch).eq("id", authUserId);
       if (profErr) return { error: `No se pudo configurar el perfil: ${profErr.message}` };
+    }
+
+    if (reactivando) {
+      tempPassword = generateTempPassword();
+      const { error: pwErr } = await admin.auth.admin.updateUserById(authUserId, {
+        password: tempPassword,
+      });
+      if (pwErr) return { error: `No se pudo generar la clave: ${pwErr.message}` };
     }
   } else {
     // Crear la cuenta por celular (sintético) con clave temporal.
@@ -151,7 +181,7 @@ async function invitarGestion(
     // falla a partir de acá, borramos el auth.user para no dejar huérfanos.
     const { error: profErr } = await admin
       .from("profiles")
-      .update({ role: rol, nombre })
+      .update({ role: rol, nombre, email: emailOptional })
       .eq("id", authUserId);
     if (profErr) {
       await admin.auth.admin.deleteUser(authUserId);
@@ -186,6 +216,7 @@ export async function invitarCoordinadorNuevo(
     String(formData.get("grupo_id") ?? "").trim(),
     String(formData.get("celular") ?? "").trim(),
     String(formData.get("nombre") ?? "").trim(),
+    String(formData.get("email") ?? "").trim(),
   );
 }
 
@@ -198,5 +229,6 @@ export async function invitarVeedorNuevo(
     String(formData.get("grupo_id") ?? "").trim(),
     String(formData.get("celular") ?? "").trim(),
     String(formData.get("nombre") ?? "").trim(),
+    String(formData.get("email") ?? "").trim(),
   );
 }

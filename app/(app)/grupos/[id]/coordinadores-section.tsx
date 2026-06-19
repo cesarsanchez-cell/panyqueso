@@ -14,6 +14,7 @@ export type AssignedCoordinador = {
   id: string; // id de la fila coordinador_grupos
   profileId: string;
   nombre: string;
+  email: string | null;
 };
 
 export type EligibleCoordinador = {
@@ -60,7 +61,12 @@ export function CoordinadoresSection({
         <ul className="mt-3 divide-y divide-neutral-100">
           {assigned.map((c) => (
             <li key={c.id} className="flex items-center justify-between gap-3 py-2">
-              <span className="min-w-0 truncate text-sm text-neutral-900">{c.nombre}</span>
+              <span className="min-w-0 truncate text-sm text-neutral-900">
+                {c.nombre}
+                {c.email ? (
+                  <span className="ml-2 text-xs font-normal text-neutral-400">{c.email}</span>
+                ) : null}
+              </span>
               <form action={unassignCoordinador}>
                 <input type="hidden" name="coordinador_grupo_id" value={c.id} />
                 <input type="hidden" name="grupo_id" value={grupoId} />

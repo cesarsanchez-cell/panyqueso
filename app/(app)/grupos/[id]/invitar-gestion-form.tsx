@@ -60,7 +60,7 @@ export function InvitarGestionForm({ rol, grupoId, grupoNombre, action }: Props)
       {success && tempPassword ? (
         <div className="mt-3 space-y-3 rounded-md border border-emerald-200 bg-emerald-50 p-3">
           <p className="text-sm font-medium text-emerald-900">
-            Cuenta de {rolLabel} creada para {success.nombre}. Copiá la clave y pasásela por
+            Cuenta de {rolLabel} lista para {success.nombre}. Copiá la clave y pasásela por
             WhatsApp.
           </p>
           <div className="flex items-center gap-2">
@@ -138,6 +138,19 @@ export function InvitarGestionForm({ rol, grupoId, grupoNombre, action }: Props)
               type="tel"
               required
               placeholder="11 2345 6789"
+              autoComplete="off"
+              className="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <label htmlFor={`${rol}_email`} className="block text-xs font-medium text-neutral-700">
+              Email <span className="font-normal text-neutral-400">(opcional)</span>
+            </label>
+            <input
+              id={`${rol}_email`}
+              name="email"
+              type="email"
+              placeholder="contacto@email.com"
               autoComplete="off"
               className="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
             />

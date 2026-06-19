@@ -95,11 +95,11 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
       .maybeSingle(),
     supabase
       .from("coordinador_grupos")
-      .select("id, profile_id, profile:profiles!profile_id(nombre)")
+      .select("id, profile_id, profile:profiles!profile_id(nombre, email)")
       .eq("grupo_id", id),
     supabase
       .from("veedor_grupos")
-      .select("id, profile_id, profile:profiles!profile_id(nombre)")
+      .select("id, profile_id, profile:profiles!profile_id(nombre, email)")
       .eq("grupo_id", id),
   ]);
 
@@ -200,6 +200,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
     id: r.id,
     profileId: r.profile_id,
     nombre: r.profile?.nombre?.trim() || "—",
+    email: r.profile?.email ?? null,
   }));
   const assignedProfileIds = new Set(assignedCoordinadores.map((c) => c.profileId));
 
@@ -238,6 +239,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
     id: r.id,
     profileId: r.profile_id,
     nombre: r.profile?.nombre?.trim() || "—",
+    email: r.profile?.email ?? null,
   }));
   const assignedVeedorIds = new Set(assignedVeedores.map((v) => v.profileId));
   const eligibleVeedores: EligibleVeedor[] = memList
