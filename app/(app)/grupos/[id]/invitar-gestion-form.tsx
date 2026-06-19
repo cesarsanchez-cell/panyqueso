@@ -60,7 +60,7 @@ export function InvitarGestionForm({ rol, grupoId, grupoNombre, action }: Props)
       {success && tempPassword ? (
         <div className="mt-3 space-y-3 rounded-md border border-emerald-200 bg-emerald-50 p-3">
           <p className="text-sm font-medium text-emerald-900">
-            Cuenta de {rolLabel} creada para {success.nombre}. Copiá la clave y pasásela por
+            Cuenta de {rolLabel} lista para {success.nombre}. Copiá la clave y pasásela por
             WhatsApp.
           </p>
           <div className="flex items-center gap-2">

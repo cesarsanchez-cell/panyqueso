@@ -131,13 +131,29 @@ async function invitarGestion(
     }
 
     authUserId = existing.auth_user_id;
-    // Asegurar el rol (si venía sin rol o nulo) y, si cargaron email, guardarlo.
-    const patch: { role?: Rol; email?: string } = {};
+
+    // Una cuenta con rol nulo es una que estaba dada de baja (la "quitamos" de su
+    // último grupo, sin borrar la cuenta). Reactivarla = alta de nuevo: re-pongo
+    // rol/nombre/email y genero una clave nueva para compartir (perdió el acceso).
+    // Si en cambio ya tiene el rol (gestiona otros grupos) es multi-grupo real:
+    // la sumo sin clave nueva.
+    const reactivando = existing.rol == null;
+
+    const patch: { role?: Rol; email?: string; nombre?: string } = {};
     if (existing.rol !== rol) patch.role = rol;
     if (emailOptional) patch.email = emailOptional;
+    if (reactivando) patch.nombre = nombre;
     if (Object.keys(patch).length > 0) {
       const { error: profErr } = await admin.from("profiles").update(patch).eq("id", authUserId);
       if (profErr) return { error: `No se pudo configurar el perfil: ${profErr.message}` };
+    }
+
+    if (reactivando) {
+      tempPassword = generateTempPassword();
+      const { error: pwErr } = await admin.auth.admin.updateUserById(authUserId, {
+        password: tempPassword,
+      });
+      if (pwErr) return { error: `No se pudo generar la clave: ${pwErr.message}` };
     }
   } else {
     // Crear la cuenta por celular (sintético) con clave temporal.
