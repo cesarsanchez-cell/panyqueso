@@ -1376,18 +1376,21 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string;
+          email: string | null;
           id: string;
           nombre: string | null;
           role: Database["public"]["Enums"]["user_role"] | null;
         };
         Insert: {
           created_at?: string;
+          email?: string | null;
           id: string;
           nombre?: string | null;
           role?: Database["public"]["Enums"]["user_role"] | null;
         };
         Update: {
           created_at?: string;
+          email?: string | null;
           id?: string;
           nombre?: string | null;
           role?: Database["public"]["Enums"]["user_role"] | null;

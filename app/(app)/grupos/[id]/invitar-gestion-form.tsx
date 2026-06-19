@@ -142,6 +142,19 @@ export function InvitarGestionForm({ rol, grupoId, grupoNombre, action }: Props)
               className="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
             />
           </div>
+          <div className="min-w-0 flex-1">
+            <label htmlFor={`${rol}_email`} className="block text-xs font-medium text-neutral-700">
+              Email <span className="font-normal text-neutral-400">(opcional)</span>
+            </label>
+            <input
+              id={`${rol}_email`}
+              name="email"
+              type="email"
+              placeholder="contacto@email.com"
+              autoComplete="off"
+              className="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+            />
+          </div>
           <button
             type="submit"
             disabled={pending}

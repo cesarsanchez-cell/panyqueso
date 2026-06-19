@@ -10,6 +10,7 @@ export type AssignedVeedor = {
   id: string; // id de la fila veedor_grupos
   profileId: string;
   nombre: string;
+  email: string | null;
 };
 
 export type EligibleVeedor = {
@@ -55,7 +56,12 @@ export function VeedoresSection({
         <ul className="mt-3 divide-y divide-neutral-100">
           {assigned.map((v) => (
             <li key={v.id} className="flex items-center justify-between gap-3 py-2">
-              <span className="min-w-0 truncate text-sm text-neutral-900">{v.nombre}</span>
+              <span className="min-w-0 truncate text-sm text-neutral-900">
+                {v.nombre}
+                {v.email ? (
+                  <span className="ml-2 text-xs font-normal text-neutral-400">{v.email}</span>
+                ) : null}
+              </span>
               <form action={unassignVeedor}>
                 <input type="hidden" name="veedor_grupo_id" value={v.id} />
                 <input type="hidden" name="grupo_id" value={grupoId} />
