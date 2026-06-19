@@ -14,7 +14,13 @@
     "test:unit": "node --test --experimental-strip-types \"lib/**/*.test.ts\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "preflight": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm build",
+    "preflight:db": "pnpm preflight && pnpm db:test",
     "seed:linear": "node --env-file=.env.local --experimental-strip-types scripts/seed-linear.ts",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db",
     "db:push": "supabase db push --linked",
     "db:diff": "supabase db diff --linked",
     "db:types": "supabase gen types typescript --linked > lib/supabase/database.types.ts && prettier --write lib/supabase/database.types.ts"
