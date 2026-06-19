@@ -103,6 +103,17 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
       .eq("grupo_id", id),
   ]);
 
+  // Gate por gestión de ESTE grupo. requireRole solo verifica que seas admin o
+  // coordinador de ALGÚN grupo. Un coordinador que además es miembro de otro
+  // grupo podía abrir la página de gestión de ese grupo (la RLS lo deja leer el
+  // grupo por su membresía) y ver/usar controles que no le corresponden (p.ej.
+  // asignar veedor). Acá gestiona solo el admin o el coordinador de este grupo;
+  // los RPC ya validan can_manage_grupo, esto saca el control de la vista.
+  const coordinatesThisGroup = (coordRows ?? []).some((r) => r.profile_id === ctx.userId);
+  if (!isAdmin && !coordinatesThisGroup) {
+    notFound();
+  }
+
   // Solicitudes de alta pendientes (link /g con aprobación requerida).
   const { data: joinRequests } = await supabase.rpc("listar_join_requests", { p_grupo_id: id });
 
