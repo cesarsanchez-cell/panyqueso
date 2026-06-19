@@ -7,6 +7,8 @@ import {
   unassignCoordinador,
   type CoordinadorState,
 } from "./coordinadores-actions";
+import { InvitarGestionForm } from "./invitar-gestion-form";
+import { invitarCoordinadorNuevo } from "./invitar-gestion-actions";
 
 export type AssignedCoordinador = {
   id: string; // id de la fila coordinador_grupos
@@ -26,10 +28,12 @@ export type EligibleCoordinador = {
  */
 export function CoordinadoresSection({
   grupoId,
+  grupoNombre,
   assigned,
   eligible,
 }: {
   grupoId: string;
+  grupoNombre: string;
   assigned: AssignedCoordinador[];
   eligible: EligibleCoordinador[];
 }) {
@@ -130,6 +134,13 @@ export function CoordinadoresSection({
           </p>
         ) : null}
       </div>
+
+      <InvitarGestionForm
+        rol="coordinador"
+        grupoId={grupoId}
+        grupoNombre={grupoNombre}
+        action={invitarCoordinadorNuevo}
+      />
     </section>
   );
 }

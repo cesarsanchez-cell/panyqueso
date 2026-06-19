@@ -338,12 +338,18 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ i
       {isAdmin ? (
         <CoordinadoresSection
           grupoId={grupo.id}
+          grupoNombre={grupo.nombre}
           assigned={assignedCoordinadores}
           eligible={eligibleCoordinadores}
         />
       ) : null}
 
-      <VeedoresSection grupoId={grupo.id} assigned={assignedVeedores} eligible={eligibleVeedores} />
+      <VeedoresSection
+        grupoId={grupo.id}
+        grupoNombre={grupo.nombre}
+        assigned={assignedVeedores}
+        eligible={eligibleVeedores}
+      />
 
       {isActive && grupo.modo_confirmacion === "presentismo" ? (
         <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
