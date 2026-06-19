@@ -25,12 +25,13 @@ const ROL_LABEL: Record<Rol, string> = { coordinador: "coordinador", veedor: "ve
 
 // Invita a una persona SIN ficha de jugador a gestionar el grupo (coordinador o
 // veedor): crea su cuenta por celular y te da la clave temporal para mandar por
-// WhatsApp. Entra con su celular, no ve la vista de jugador (no tiene ficha).
+// WhatsApp. Si ya tenía cuenta de gestión, la suma a este grupo (sin clave nueva).
+// Entra con su celular, no ve la vista de jugador (no tiene ficha).
 export function InvitarGestionForm({ rol, grupoId, grupoNombre, action }: Props) {
   const [state, formAction, pending] = useActionState<InvitarGestionState, FormData>(action, null);
   const [copied, setCopied] = useState(false);
 
-  const success = state && "tempPassword" in state ? state : null;
+  const success = state && "ok" in state ? state : null;
   const error = state && "error" in state ? state : null;
   const rolLabel = ROL_LABEL[rol];
 
@@ -44,6 +45,8 @@ export function InvitarGestionForm({ rol, grupoId, grupoNombre, action }: Props)
     }
   }
 
+  const tempPassword = success?.tempPassword ?? null;
+
   return (
     <div className="mt-4 border-t border-neutral-100 pt-4">
       <p className="text-xs font-medium text-neutral-700">
@@ -54,7 +57,7 @@ export function InvitarGestionForm({ rol, grupoId, grupoNombre, action }: Props)
         pasarle. Entra con su celular y gestiona este grupo.
       </p>
 
-      {success ? (
+      {success && tempPassword ? (
         <div className="mt-3 space-y-3 rounded-md border border-emerald-200 bg-emerald-50 p-3">
           <p className="text-sm font-medium text-emerald-900">
             Cuenta de {rolLabel} creada para {success.nombre}. Copiá la clave y pasásela por
@@ -62,11 +65,11 @@ export function InvitarGestionForm({ rol, grupoId, grupoNombre, action }: Props)
           </p>
           <div className="flex items-center gap-2">
             <code className="flex-1 select-all rounded-md border border-emerald-300 bg-white px-3 py-2 font-mono text-base text-neutral-900">
-              {success.tempPassword}
+              {tempPassword}
             </code>
             <button
               type="button"
-              onClick={() => copyToClipboard(success.tempPassword)}
+              onClick={() => copyToClipboard(tempPassword)}
               className="rounded-md border border-emerald-300 bg-white px-3 py-2 text-xs font-medium text-emerald-900 shadow-sm transition hover:bg-emerald-100"
             >
               {copied ? "Copiado!" : "Copiar"}
@@ -75,7 +78,7 @@ export function InvitarGestionForm({ rol, grupoId, grupoNombre, action }: Props)
 
           {(() => {
             const loginUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/login`;
-            const message = `Hola ${success.nombre}, te sumamos como ${rolLabel} de ${grupoNombre} en Pan y Queso ⚽\n\n1) Entrá acá 👉 ${loginUrl}\n2) Usuario: tu celular (${formatArLocal(success.phone)})\n3) Contraseña temporal: ${success.tempPassword}\n\nYa adentro podés gestionar el grupo y cambiar la clave desde tu perfil. ¡Cualquier duda avisá! 🙌`;
+            const message = `Hola ${success.nombre}, te sumamos como ${rolLabel} de ${grupoNombre} en Pan y Queso ⚽\n\n1) Entrá acá 👉 ${loginUrl}\n2) Usuario: tu celular (${formatArLocal(success.phone)})\n3) Contraseña temporal: ${tempPassword}\n\nYa adentro podés gestionar el grupo y cambiar la clave desde tu perfil. ¡Cualquier duda avisá! 🙌`;
             const link = buildWhatsAppLink(success.phone, message);
             if (!link) return null;
             return (
@@ -95,6 +98,15 @@ export function InvitarGestionForm({ rol, grupoId, grupoNombre, action }: Props)
             ver.
           </p>
         </div>
+      ) : success ? (
+        <p
+          role="status"
+          aria-live="polite"
+          className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
+        >
+          {success.nombre} ya tenía cuenta: lo sumaste como {rolLabel} de {grupoNombre}. Entra con
+          su celular de siempre.
+        </p>
       ) : (
         <form action={formAction} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
           <input type="hidden" name="grupo_id" value={grupoId} />

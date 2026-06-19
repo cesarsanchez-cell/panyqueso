@@ -1637,6 +1637,14 @@ export type Database = {
         Args: { p_grupo_id: string; p_profile_id: string };
         Returns: undefined;
       };
+      buscar_cuenta_gestion_por_celular: {
+        Args: { p_celular: string };
+        Returns: {
+          auth_user_id: string;
+          rol: Database["public"]["Enums"]["user_role"] | null;
+          tiene_ficha: boolean;
+        }[];
+      };
       can_audit_grupo: { Args: { p_grupo_id: string }; Returns: boolean };
       can_manage_convocatoria: {
         Args: { p_convocatoria_id: string };

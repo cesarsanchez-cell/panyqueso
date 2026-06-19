@@ -13,14 +13,16 @@ import { createClient } from "@/lib/supabase/server";
 // temporal para compartir), pero acá la cuenta NO tiene ficha en players: la
 // autoridad vive en profiles.role + coordinador_grupos/veedor_grupos.
 //
-// No necesita migración: todo es sobre tablas existentes con service-role.
+// Si el celular YA tiene una cuenta de gestión (sin ficha), la sumamos al nuevo
+// grupo (multi-grupo) en vez de fallar — sin clave temporal (ya tiene acceso).
+//
 // La autoridad se chequea acá (service-role saltea RLS): coordinador solo lo
 // otorga el admin; veedor lo otorga el admin o el coordinador del grupo.
 
 export type InvitarGestionState =
   | null
   | { error: string }
-  | { tempPassword: string; phone: string; nombre: string };
+  | { ok: true; nombre: string; phone: string; tempPassword: string | null };
 
 type Rol = "coordinador" | "veedor";
 
@@ -43,9 +45,10 @@ async function invitarGestion(
 
   if (!grupoId) return { error: "Falta el grupo." };
 
+  const supabase = await createClient();
+
   if (rol === "veedor" && ctx.profile.role === "coordinador") {
-    const supa = await createClient();
-    const { data: manages } = await supa
+    const { data: manages } = await supabase
       .from("coordinador_grupos")
       .select("id")
       .eq("grupo_id", grupoId)
@@ -64,7 +67,6 @@ async function invitarGestion(
   }
 
   // 2. El grupo tiene que existir y estar activo.
-  const supabase = await createClient();
   const { data: grupo, error: gErr } = await supabase
     .from("grupos")
     .select("id, status")
@@ -90,51 +92,89 @@ async function invitarGestion(
     };
   }
 
-  // 4. Crear la cuenta por celular (sintético) con clave temporal.
-  const email = syntheticEmailFromPhone(phone);
-  const tempPassword = generateTempPassword();
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
-    email,
-    password: tempPassword,
-    email_confirm: true,
-    user_metadata: { phone, nombre },
+  // 4. ¿Ya hay una cuenta de gestión con ese celular? (multi-grupo). Si la
+  // migración no está aplicada, el lookup falla → seguimos como si no existiera.
+  const { data: lookupRows } = await supabase.rpc("buscar_cuenta_gestion_por_celular", {
+    p_celular: phone,
   });
+  const existing = lookupRows && lookupRows.length > 0 ? lookupRows[0] : null;
 
-  if (createErr || !created.user) {
-    if (createErr?.message.toLowerCase().includes("already")) {
+  let authUserId: string;
+  let tempPassword: string | null = null;
+
+  if (existing) {
+    if (existing.tiene_ficha) {
       return {
         error:
-          "Ya existe una cuenta con ese celular. Si la persona ya tiene acceso, asignale el rango desde la app o avisá al admin.",
+          "Ese celular ya es de un jugador. Sumalo al grupo y asignale el rango desde la lista de miembros.",
       };
     }
-    return { error: `No se pudo crear la cuenta: ${createErr?.message ?? "sin detalle"}` };
+    if (existing.rol === "admin") {
+      return { error: "Esa cuenta es admin; no se gestiona desde acá." };
+    }
+    const otro: Rol = rol === "coordinador" ? "veedor" : "coordinador";
+    if (existing.rol === otro) {
+      return { error: `Esa persona ya es ${otro}. Quitale ese rango primero.` };
+    }
+
+    authUserId = existing.auth_user_id;
+    if (existing.rol !== rol) {
+      const { error: profErr } = await admin
+        .from("profiles")
+        .update({ role: rol })
+        .eq("id", authUserId);
+      if (profErr) return { error: `No se pudo configurar el perfil: ${profErr.message}` };
+    }
+  } else {
+    // Crear la cuenta por celular (sintético) con clave temporal.
+    const email = syntheticEmailFromPhone(phone);
+    tempPassword = generateTempPassword();
+    const { data: created, error: createErr } = await admin.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { phone, nombre },
+    });
+
+    if (createErr || !created.user) {
+      if (createErr?.message.toLowerCase().includes("already")) {
+        return {
+          error: "Ya existe una cuenta con ese celular pero no se pudo vincular. Avisá al admin.",
+        };
+      }
+      return { error: `No se pudo crear la cuenta: ${createErr?.message ?? "sin detalle"}` };
+    }
+
+    authUserId = created.user.id;
+
+    // El trigger ya creó el profile (sin rol). Le ponemos rol + nombre. Si algo
+    // falla a partir de acá, borramos el auth.user para no dejar huérfanos.
+    const { error: profErr } = await admin
+      .from("profiles")
+      .update({ role: rol, nombre })
+      .eq("id", authUserId);
+    if (profErr) {
+      await admin.auth.admin.deleteUser(authUserId);
+      return { error: `No se pudo configurar el perfil: ${profErr.message}` };
+    }
   }
 
-  const authUserId = created.user.id;
-
-  // 5. Otorgar el rango en el profile (el trigger ya creó el profile sin rol).
-  // Si algo falla a partir de acá, borramos el auth.user para no dejar huérfanos.
-  const { error: profErr } = await admin
-    .from("profiles")
-    .update({ role: rol, nombre })
-    .eq("id", authUserId);
-  if (profErr) {
-    await admin.auth.admin.deleteUser(authUserId);
-    return { error: `No se pudo configurar el perfil: ${profErr.message}` };
-  }
-
-  // 6. Ligar al grupo (coordinador_grupos / veedor_grupos).
+  // 5. Ligar al grupo (idempotente: si ya estaba, no duplica).
   const tabla = rol === "coordinador" ? "coordinador_grupos" : "veedor_grupos";
   const { error: linkErr } = await admin
     .from(tabla)
-    .insert({ profile_id: authUserId, grupo_id: grupoId, created_by: ctx.userId });
+    .upsert(
+      { profile_id: authUserId, grupo_id: grupoId, created_by: ctx.userId },
+      { onConflict: "profile_id,grupo_id", ignoreDuplicates: true },
+    );
   if (linkErr) {
-    await admin.auth.admin.deleteUser(authUserId);
+    // Rollback del auth.user solo si lo creamos en esta llamada.
+    if (!existing) await admin.auth.admin.deleteUser(authUserId);
     return { error: `No se pudo vincular al grupo: ${linkErr.message}` };
   }
 
   revalidatePath(`/grupos/${grupoId}`);
-  return { tempPassword, phone, nombre };
+  return { ok: true, nombre, phone, tempPassword };
 }
 
 export async function invitarCoordinadorNuevo(
