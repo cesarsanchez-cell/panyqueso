@@ -5,12 +5,10 @@ GitHub y producción son el **destino final de algo ya resuelto**, no el ambient
 ## El ciclo (una fase = una unidad cerrada)
 
 1. **Desarrollar local** — código + checks rápidos mientras iterás.
-2. **Validar local** — que ande de verdad, sin subir nada:
-   - Lógica/UI: `pnpm build && pnpm start` → app local en http://localhost:3000, apuntando a la **Supabase de dev** (proyecto sandbox en la nube, NO prod). Esquiva el `next dev` roto.
-   - DB: los pgTAP corren en el **CI** (en este equipo no levantamos Supabase local; ver más abajo).
+2. **Validar el código local** — `pnpm preflight` (el hook pre-push lo fuerza). Acá cae la mayoría de los errores: tipos, lint, formato, build. **Nada se sube si esto no pasa.**
 3. **Auditar** — clasificar hallazgos: **blocker / mayor / sugerencia**. Blocker o mayor ⇒ no-go (se arregla antes de seguir).
 4. **Registrar + documentar** — memoria + Linear + Notion (rutina de "guarda"), _antes_ de subir.
-5. **Subir** — 1 PR por fase. El CI corre **una vez** (ya verde porque pasó el gate local). Merge → migración → prod.
+5. **Subir + validar visual** — 1 PR por fase. El CI corre **una vez** (ya verde por el gate local). La validación **visual/DB** se hace en el **preview de Vercel** (gratis). Recién ahí: merge → migración → prod.
 
 ## El gate local
 
@@ -28,19 +26,20 @@ git config core.hooksPath .githooks
 
 (Emergencia puntual: `git push --no-verify`.)
 
-## La base para validar local: Supabase de **dev** (en la nube)
+## Validación visual y de DB: preview de Vercel
 
-En este equipo (disco/CPU justos) no levantamos Supabase local con Docker. En su
-lugar usamos un **segundo proyecto Supabase, "panyqueso-dev"**, separado de prod:
-un sandbox con el mismo esquema donde validar sin tocar producción.
+En este equipo no hay DB local aislada (sin Docker por el disco; sin proyecto
+Supabase de dev por el límite del free tier). No es un hueco del flujo: es límite
+de hardware/plan. La validación visual/DB se hace donde es **gratis y segura**:
+el **preview de Vercel** de cada PR (los previews no consumen minutos de GitHub).
 
-- `.env.local` apunta al proyecto **dev** (URL + anon key + service_role key del
-  dev; `NEXT_PUBLIC_SITE_URL=http://localhost:3000`).
-- Las migraciones se aplican a dev con `pnpm supabase db push` (linkeado a dev),
-  antes de mandarlas a prod.
-- Validás con `pnpm build && pnpm start` contra esa base dev.
+- El gate local (`preflight`) ya frena el grueso de los errores antes de subir.
+- El preview corre contra la DB real; validar **mirando** es seguro, evitá hacer
+  mutaciones de prueba que ensucien prod.
+- Los pgTAP corren en el **CI** (barato: el stack de Supabase solo se levanta si
+  el PR toca `supabase/**`).
 
-### Opción futura: Supabase 100% local (requiere Docker)
+### Opción futura: Supabase 100% local (requiere Docker + disco)
 
 Si en otra máquina hay Docker + disco, el stack offline completo:
 
