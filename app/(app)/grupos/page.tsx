@@ -33,22 +33,33 @@ function formatHora(raw: string): string {
 }
 
 export default async function GruposPage() {
-  await requireRole(["admin", "coordinador"]);
+  const ctx = await requireRole(["admin", "coordinador"]);
+  const isAdmin = ctx.profile.role === "admin";
 
   const supabase = await createClient();
 
-  const [{ data: grupos, error: gruposErr }, { data: lugares, error: lugaresErr }] =
-    await Promise.all([
-      supabase
-        .from("grupos")
-        .select(
-          "id, nombre, dia_semana, hora, cupo_titulares, status, lugar:lugares!lugar_id(nombre)",
-        )
-        .order("status", { ascending: true })
-        .order("dia_semana", { ascending: true })
-        .order("hora", { ascending: true }),
-      supabase.from("lugares").select("id, nombre").order("nombre", { ascending: true }),
-    ]);
+  const [
+    { data: grupos, error: gruposErr },
+    { data: lugares, error: lugaresErr },
+    { data: coordRows },
+  ] = await Promise.all([
+    supabase
+      .from("grupos")
+      .select(
+        "id, nombre, dia_semana, hora, cupo_titulares, status, lugar:lugares!lugar_id(nombre)",
+      )
+      .order("status", { ascending: true })
+      .order("dia_semana", { ascending: true })
+      .order("hora", { ascending: true }),
+    supabase.from("lugares").select("id, nombre").order("nombre", { ascending: true }),
+    // El coordinador solo gestiona los grupos que coordina. La RLS le deja LEER
+    // también los grupos donde es miembro (vista de jugador), así que sin este
+    // filtro el listado de gestión mostraba grupos que no coordina y que, al
+    // entrar, caen en notFound() (ver guard en /grupos/[id]).
+    isAdmin
+      ? Promise.resolve({ data: null })
+      : supabase.from("coordinador_grupos").select("grupo_id").eq("profile_id", ctx.userId),
+  ]);
 
   if (gruposErr) {
     throw new Error(`No se pudieron cargar los grupos: ${gruposErr.message}`);
@@ -57,7 +68,9 @@ export default async function GruposPage() {
     throw new Error(`No se pudieron cargar los lugares: ${lugaresErr.message}`);
   }
 
-  const grupoList = grupos ?? [];
+  // admin = todos; coordinador = solo los que coordina.
+  const managedSet = isAdmin ? null : new Set((coordRows ?? []).map((r) => r.grupo_id));
+  const grupoList = (grupos ?? []).filter((g) => managedSet === null || managedSet.has(g.id));
   const lugarList = lugares ?? [];
 
   return (
@@ -70,14 +83,16 @@ export default async function GruposPage() {
         </p>
       </div>
 
-      <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-          Nuevo grupo
-        </h2>
-        <div className="mt-4">
-          <NewGrupoForm lugares={lugarList} />
-        </div>
-      </section>
+      {isAdmin ? (
+        <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+            Nuevo grupo
+          </h2>
+          <div className="mt-4">
+            <NewGrupoForm lugares={lugarList} />
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
@@ -85,7 +100,9 @@ export default async function GruposPage() {
         </h2>
         {grupoList.length === 0 ? (
           <p className="mt-3 text-sm text-neutral-500">
-            Sin grupos todavía. Cargá el primero arriba.
+            {isAdmin
+              ? "Sin grupos todavía. Cargá el primero arriba."
+              : "No coordinás ningún grupo."}
           </p>
         ) : (
           <ul className="mt-3 divide-y divide-neutral-100">
