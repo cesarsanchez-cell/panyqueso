@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# Cancela runs viejos del mismo branch/PR cuando pusheás de nuevo: no se gastan
+# minutos en commits que ya quedaron pisados.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -41,11 +47,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ¿Cambió algo de la DB? Si no, saltamos el stack de Supabase (lo más caro).
+      # El job igual termina en verde, así sirve como check requerido sin gastar.
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            db:
+              - 'supabase/**'
+              - 'scripts/test-p0004-invalid-status.sh'
+              - '.github/workflows/ci.yml'
+
       - uses: supabase/setup-cli@v1
+        if: steps.changes.outputs.db == 'true'
         with:
           version: 2.101.0
 
       - name: Start Supabase local stack
+        if: steps.changes.outputs.db == 'true'
         # El pull de imágenes del stack a veces devuelve 502 del registry (flake
         # de infra, no del código). Reintentamos antes de fallar.
         run: |
@@ -59,7 +78,13 @@ jobs:
           exit 1
 
       - name: Run pgTAP tests
+        if: steps.changes.outputs.db == 'true'
         run: supabase test db
 
       - name: Manual P0004 invalid_status tests (psql-based)
+        if: steps.changes.outputs.db == 'true'
         run: bash scripts/test-p0004-invalid-status.sh
+
+      - name: Sin cambios de DB
+        if: steps.changes.outputs.db != 'true'
+        run: echo "No se tocó supabase/**; se omiten los db-tests (nada que probar)."

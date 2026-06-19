@@ -1,0 +1,26 @@
+#!/bin/sh
+# ============================================================================
+# Gate local antes de pushear (local-first): nada sube sin pasar los mismos
+# checks que el CI 'verify'. Evita gastar minutos de GitHub Actions en algo
+# que ya sabíamos que iba a fallar.
+#
+# Activar una vez por repo:  git config core.hooksPath .githooks
+#
+# Los db-tests (pgTAP) NO corren acá (necesitan Docker + supabase start, es
+# lento para cada push). Cuando toques supabase/** corré aparte:  pnpm db:test
+#
+# Saltarlo en una emergencia puntual:  git push --no-verify
+# ============================================================================
+
+echo "▶ pre-push: corriendo preflight (typecheck · lint · format · build)…"
+
+if ! pnpm preflight; then
+  echo ""
+  echo "✖ preflight falló. No se pushea. Arreglá lo de arriba y reintentá."
+  echo "  (emergencia: git push --no-verify)"
+  exit 1
+fi
+
+echo "✔ preflight OK."
+echo "  Si tocaste migraciones o tests de DB, corré también:  pnpm db:test"
+exit 0
