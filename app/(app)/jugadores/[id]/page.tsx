@@ -159,6 +159,34 @@ export default async function JugadorDetallePage({
     )
     .eq("player_id", id);
 
+  // Fase 1 (coordinador/veedor desacoplado de la ficha): si la CUENTA de este
+  // jugador tiene rango de gestión, lo mostramos. La autoridad vive en la cuenta
+  // (profiles.role + coordinador_grupos/veedor_grupos), no en la ficha: por eso
+  // desactivar o sacar al jugador NO le quita la gestión → hay que quitar el
+  // rango aparte. El aviso evita el estado "sigue administrando sin que se note".
+  type GestionGrupo = { id: string; nombre: string };
+  let coordinaGrupos: GestionGrupo[] = [];
+  let veedaGrupos: GestionGrupo[] = [];
+  if (player.auth_user_id) {
+    const [{ data: coordRows }, { data: veedorRows }] = await Promise.all([
+      supabase
+        .from("coordinador_grupos")
+        .select("grupo:grupos!grupo_id(id, nombre)")
+        .eq("profile_id", player.auth_user_id),
+      supabase
+        .from("veedor_grupos")
+        .select("grupo:grupos!grupo_id(id, nombre)")
+        .eq("profile_id", player.auth_user_id),
+    ]);
+    coordinaGrupos = (coordRows ?? [])
+      .map((r) => r.grupo)
+      .filter((g): g is GestionGrupo => Boolean(g));
+    veedaGrupos = (veedorRows ?? [])
+      .map((r) => r.grupo)
+      .filter((g): g is GestionGrupo => Boolean(g));
+  }
+  const tieneGestion = coordinaGrupos.length > 0 || veedaGrupos.length > 0;
+
   const ratingByGrupo = new Map((groupRatings ?? []).map((r) => [r.grupo_id, r]));
   const gruposDelJugador = (membresias ?? [])
     .map((m) => m.grupo)
@@ -240,6 +268,44 @@ export default async function JugadorDetallePage({
               </li>
             ))}
           </ul>
+        </div>
+      ) : null}
+
+      {tieneGestion ? (
+        <div className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+          <p className="font-medium">Esta persona también gestiona grupos con su cuenta.</p>
+          <ul className="mt-1 space-y-0.5 text-xs">
+            {coordinaGrupos.length > 0 ? (
+              <li>
+                Coordina:{" "}
+                {coordinaGrupos.map((g, i) => (
+                  <span key={g.id}>
+                    {i > 0 ? ", " : ""}
+                    <Link href={`/grupos/${g.id}`} className="underline">
+                      {g.nombre}
+                    </Link>
+                  </span>
+                ))}
+              </li>
+            ) : null}
+            {veedaGrupos.length > 0 ? (
+              <li>
+                Veeda:{" "}
+                {veedaGrupos.map((g, i) => (
+                  <span key={g.id}>
+                    {i > 0 ? ", " : ""}
+                    <Link href={`/grupos/${g.id}`} className="underline">
+                      {g.nombre}
+                    </Link>
+                  </span>
+                ))}
+              </li>
+            ) : null}
+          </ul>
+          <p className="mt-1 text-xs">
+            Desactivar o sacar la ficha de jugador <strong>no</strong> le quita la gestión. Para
+            eso, quitá el rango en cada grupo.
+          </p>
         </div>
       ) : null}
 
