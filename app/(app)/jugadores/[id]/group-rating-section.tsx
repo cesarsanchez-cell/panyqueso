@@ -19,11 +19,19 @@ const selectClass =
 export function GroupRatingSection({
   playerId,
   groups,
+  preferredGrupoId,
 }: {
   playerId: string;
   groups: GroupRatingEntry[];
+  // Grupo a mostrar de entrada (viene del filtro del listado). Si no está entre
+  // los grupos del jugador, cae al primero.
+  preferredGrupoId?: string | null;
 }) {
-  const [selectedId, setSelectedId] = useState(groups[0]?.grupoId ?? "");
+  const initialId =
+    preferredGrupoId && groups.some((g) => g.grupoId === preferredGrupoId)
+      ? preferredGrupoId
+      : (groups[0]?.grupoId ?? "");
+  const [selectedId, setSelectedId] = useState(initialId);
   const selected = groups.find((g) => g.grupoId === selectedId) ?? groups[0];
 
   if (!selected) return null;

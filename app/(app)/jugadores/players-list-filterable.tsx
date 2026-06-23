@@ -46,8 +46,18 @@ function normalize(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-export function PlayersListFilterable({ players }: { players: Player[] }) {
+export function PlayersListFilterable({
+  players,
+  grupoId,
+}: {
+  players: Player[];
+  // Grupo filtrado en la vista: se propaga al detalle para que el editor de
+  // ratings arranque en ese grupo (y no en el primero alfabético).
+  grupoId?: string | null;
+}) {
   const [query, setQuery] = useState("");
+  const hrefFor = (id: string) =>
+    grupoId ? `/jugadores/${id}?grupo=${encodeURIComponent(grupoId)}` : `/jugadores/${id}`;
 
   const filtered = useMemo(() => {
     const q = normalize(query.trim());
@@ -84,7 +94,7 @@ export function PlayersListFilterable({ players }: { players: Player[] }) {
           {filtered.map((p) => (
             <li key={p.id}>
               <Link
-                href={`/jugadores/${p.id}`}
+                href={hrefFor(p.id)}
                 className="flex items-center justify-between gap-4 px-4 py-3 transition hover:bg-neutral-50"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-3">

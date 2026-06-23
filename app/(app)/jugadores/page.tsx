@@ -320,7 +320,7 @@ export default async function JugadoresPage({
               })}
             </ul>
           ) : null}
-          <PlayersListFilterable players={visiblePlayers} />
+          <PlayersListFilterable players={visiblePlayers} grupoId={grupoFilter} />
         </>
       )}
     </div>
