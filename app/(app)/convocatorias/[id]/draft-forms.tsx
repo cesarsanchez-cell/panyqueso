@@ -132,9 +132,9 @@ export function PromoteToGKForm({
         type="submit"
         disabled={pending}
         title="Hacer arquero"
-        className="rounded-md border border-emerald-300 bg-white px-2 py-0.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+        className="rounded-md border border-neutral-300 bg-white px-2 py-0.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pending ? "…" : "GK"}
+        {pending ? "…" : "Hacer GK"}
       </button>
       {state && "error" in state ? (
         <p role="alert" className="ml-2 text-xs text-red-600">
