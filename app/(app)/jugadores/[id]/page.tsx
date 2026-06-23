@@ -14,7 +14,7 @@ import { GroupRatingSection } from "./group-rating-section";
 import { InviteToComplete } from "./invite-to-complete";
 import { PrivateNotesForm } from "./private-notes-form";
 
-type SearchParams = { proposed?: string; applied?: string };
+type SearchParams = { proposed?: string; applied?: string; grupo?: string };
 
 type PlayerStatus = Database["public"]["Enums"]["player_status"];
 type PlayerRoleField = Database["public"]["Enums"]["player_role_field"];
@@ -111,6 +111,12 @@ export default async function JugadorDetallePage({
   const canManageRatings = isAdmin || ctx.profile.role === "coordinador";
   const showProposedFlash = sp.proposed === "1";
   const showAppliedFlash = sp.applied === "1";
+  // Grupo que venía filtrado en el listado: el editor de ratings arranca acá y el
+  // "Volver" mantiene el filtro. Así no hay que re-elegir el grupo.
+  const grupoFiltro = sp.grupo?.trim() || null;
+  const volverHref = grupoFiltro
+    ? `/jugadores?grupo=${encodeURIComponent(grupoFiltro)}`
+    : "/jugadores";
 
   const supabase = await createClient();
   const { data: player, error } = await supabase
@@ -217,7 +223,7 @@ export default async function JugadorDetallePage({
     <div className="space-y-6">
       <div>
         <Link
-          href="/jugadores"
+          href={volverHref}
           className="text-sm text-neutral-500 transition hover:text-neutral-700"
         >
           ← Volver al listado
@@ -396,6 +402,7 @@ export default async function JugadorDetallePage({
           <div className="mt-4">
             <GroupRatingSection
               playerId={player.id}
+              preferredGrupoId={grupoFiltro}
               groups={gruposDelJugador.map(({ grupo, rating }) => ({
                 grupoId: grupo.id,
                 grupoNombre: grupo.nombre,
