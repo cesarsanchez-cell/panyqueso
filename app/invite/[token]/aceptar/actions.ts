@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { createPhoneAccountHealingOrphan, syntheticEmailFromPhone } from "@/lib/auth/phone-account";
 import { isValidClubId } from "@/lib/clubs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
@@ -18,10 +19,6 @@ const POSITIONS: readonly PositionPref[] = ["arquero", "defensor", "mediocampist
 const PIERNA_VALUES: readonly PiernaHabil[] = ["derecha", "izquierda", "ambas", "ninguna"];
 const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function syntheticEmailFromPhone(phone: string): string {
-  return `${phone.toLowerCase()}@phone.fdlm.local`;
-}
 
 function parseFechaNacimiento(raw: string): { fecha: string; edad: number } | null {
   if (!FECHA_REGEX.test(raw)) return null;
@@ -120,27 +117,26 @@ export async function acceptInvite(
     };
   }
 
-  // 3. Crear auth user via admin API.
+  // 3. Crear auth user via admin API. Si choca con un huérfano (alta cortada a
+  // la mitad: cuenta sin ficha que nunca logueó), lo barre y reintenta solo.
   const admin = createAdminClient();
   const email = syntheticEmailFromPhone(invite.invite_phone);
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
-    email,
+  const acct = await createPhoneAccountHealingOrphan(admin, {
+    phone: invite.invite_phone,
     password,
-    email_confirm: true,
-    user_metadata: { phone: invite.invite_phone, nombre },
+    nombre,
   });
-
-  if (createErr || !created.user) {
-    if (createErr?.message.toLowerCase().includes("already")) {
+  if (!acct.ok) {
+    if (acct.alreadyActive) {
       return {
         error:
           "Ya existe una cuenta con este teléfono. Probá ingresar desde /login con tu celular y contraseña.",
       };
     }
-    return { error: `No se pudo crear la cuenta: ${createErr?.message ?? "sin detalle"}` };
+    return { error: `No se pudo crear la cuenta: ${acct.message}` };
   }
 
-  const authUserId = created.user.id;
+  const authUserId = acct.userId;
 
   // 4. claim_invite atomico. Si falla, borramos el auth.user para no dejar orfanos.
   const { data: newPlayerId, error: claimErr } = await admin.rpc("claim_invite", {
