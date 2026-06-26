@@ -15,7 +15,7 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, "$user";
 
 -- Setup: auth users -----------------------------------------------------------
--- a0 admin; o1 huérfano (sin ficha, nunca logueó); o2 sin ficha pero logueó;
+-- a0 admin; b1 huérfano (sin ficha, nunca logueó); b2 sin ficha pero logueó;
 -- c3 cuenta con ficha (nunca logueó).
 insert into auth.users (
   id, instance_id, email, encrypted_password,
@@ -25,10 +25,10 @@ insert into auth.users (
   ('00000000-0000-0000-0000-0000000000a0', '00000000-0000-0000-0000-000000000000',
    'admin-fro@test.local', '', 'authenticated', 'authenticated', now(), now(), now(), now(),
    '{}'::jsonb, '{}'::jsonb),
-  ('00000000-0000-0000-0000-0000000000o1', '00000000-0000-0000-0000-000000000000',
+  ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-000000000000',
    '+5491100000001@phone.fdlm.local', '', 'authenticated', 'authenticated', now(), now(), now(), null,
    '{}'::jsonb, '{}'::jsonb),
-  ('00000000-0000-0000-0000-0000000000o2', '00000000-0000-0000-0000-000000000000',
+  ('00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-000000000000',
    '+5491100000002@phone.fdlm.local', '', 'authenticated', 'authenticated', now(), now(), now(), now(),
    '{}'::jsonb, '{}'::jsonb),
   ('00000000-0000-0000-0000-0000000000c3', '00000000-0000-0000-0000-000000000000',
@@ -50,7 +50,7 @@ select plan(4);
 -- 1. Sin ficha + nunca logueada → reclamable (devuelve su id).
 select is(
   public.find_reclaimable_orphan('+5491100000001'),
-  '00000000-0000-0000-0000-0000000000o1'::uuid,
+  '00000000-0000-0000-0000-0000000000b1'::uuid,
   'huérfano sin ficha y nunca logueado → devuelve su id'
 );
 
