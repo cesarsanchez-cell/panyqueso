@@ -1760,6 +1760,10 @@ export type Database = {
         Args: { p_endpoint: string };
         Returns: undefined;
       };
+      find_reclaimable_orphan: {
+        Args: { p_phone: string };
+        Returns: string;
+      };
       flag_player_change_request: {
         Args: { p_comment?: string; p_request_id: string };
         Returns: undefined;
